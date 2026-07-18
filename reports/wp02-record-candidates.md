@@ -96,3 +96,14 @@ Estimated single-GPU wall time (naive 8× scaling of recorded train_time, ignori
 ## Numbers audit
 
 Every number above is either read from a cited file/line in `vendor/modded-nanogpt/` or explicitly labeled "derived"/"estimate" with its arithmetic shown. No runs were performed for this report.
+
+---
+
+## DECISION (human, 2026-07-19)
+
+Pinned record: **2025-07-12_BosAlign** (candidate B), selected in-session by
+Kasper Nielsen. Rationale accepted: in-repo n=20 seed distribution (mean
+3.2791, std 0.0013) is the strongest basis for authoring
+`criteria/nanogpt_tolerance.yaml`. WP0.2 port work targets this record;
+`world_size == 8` assertions to be relaxed for the 1–2 GPU grad-accumulation
+port per the candidates analysis above.
