@@ -174,7 +174,7 @@ def _run_airbench(
     train_loader = ab.CifarLoader(
         data_root, train=True, batch_size=batch_size, aug=dict(flip=True, translate=2)
     )
-    model = ab.make_net()
+    model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
 
     opt_cfg = dict(config["optimizer"])
     opt_cfg.pop("name", None)
