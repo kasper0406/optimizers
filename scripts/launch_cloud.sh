@@ -79,9 +79,11 @@ cmd_push() {
         echo "WARNING: local tree is dirty; cloud results will record git_dirty" >&2
     fi
     vm_ssh "mkdir -p $RM_REMOTE_DIR $RM_REMOTE_DIR/results_out"
+    # data/ and results_out/ are VM-local state: never delete them on push
     vm_rsync --delete \
         --exclude .git --exclude .venv --exclude .pytest_cache \
         --exclude results --exclude cloud_staging --exclude sweeps \
+        --exclude data --exclude results_out \
         "$REPO_ROOT"/ "$RM_VM:$RM_REMOTE_DIR/"
     printf '%s\n' "$sha" | vm_ssh "cat > $RM_REMOTE_DIR/GIT_SHA"
     echo "pushed repo @ $sha -> $RM_VM:$RM_REMOTE_DIR"
