@@ -98,6 +98,7 @@ cmd_run() {
     local config="$1"; shift
     vm_ssh "docker run --rm --gpus all \
         -v $RM_REMOTE_DIR/results_out:/workspace/results \
+        -v $RM_REMOTE_DIR/data:/workspace/data \
         $RM_IMAGE $config $*"
 }
 
@@ -108,6 +109,7 @@ cmd_sweep() {
     # the run.py command line only) and executes every run inside the container.
     vm_ssh "docker run --rm --gpus all \
         -v $RM_REMOTE_DIR/results_out:/workspace/results \
+        -v $RM_REMOTE_DIR/data:/workspace/data \
         --entrypoint uv $RM_IMAGE \
         run --frozen python scripts/sweep.py $config --out-dir /workspace/sweep_out --execute $*"
 }
