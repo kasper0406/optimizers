@@ -17,7 +17,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git curl ca-certificates \
+    && apt-get install -y --no-install-recommends git curl ca-certificates gcc libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # uv (static binary)
