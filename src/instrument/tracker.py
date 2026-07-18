@@ -12,9 +12,9 @@ Orchestrates, per Muon-managed weight matrix (plan section 1.1):
   tracked block and ||G_t||_F;
 * on each refresh, innovation detection: a direction whose subspace pair
   rotated (alignment below ``align_min``) gets its statistics and classifier
-  confidence reset through the src.stats reset API (fresh
-  ``RegimeClassifier`` state; the classifier restarts in SIGNAL and must
-  re-earn a label with n_min fresh observations);
+  confidence reset through the src.stats reset API
+  (``BatchRegimeClassifier.reset_directions``: the direction restarts in
+  SIGNAL and must re-earn a label with n_min fresh observations);
 * optionally, once per tracked pair per refresh, a curvature probe
   lambda_i ~= vec(u_i v_i^T)^T H vec(u_i v_i^T) through a trainer-provided
   HVP callback.
@@ -27,15 +27,24 @@ update path: no optimizer update, gain, or gating decision may consume
 that way.
 
 All statistics (EMAs, autocorrelation, t-stats, implied eta*lambda,
-classification) come from ``src.stats`` -- the WP0.5-tested code.  This
-module computes projections and bookkeeping only; it deliberately contains
+classification) come from ``src.stats`` -- the WP0.5-tested code, in its
+array mode (``BatchRegimeClassifier``, equivalence-tested against the scalar
+WP0.5 path in tests/test_stats_batch_equivalence.py).  All k tracked
+directions of a (matrix, beta) advance in O(1) Python calls per step; this
+module computes projections and bookkeeping only and deliberately contains
 no statistical formulas.
+
+Per-step data movement: the k projections plus the two per-matrix scalars
+are packed into one small device tensor per matrix; the hub concatenates
+them across matrices and performs a SINGLE device->host ``.cpu()`` transfer
+per training step (linear algebra stays on the tensors' device).
 
 Call order per training step (see :class:`InstrumentationHub`):
 
     loss.backward()
+    hub.capture_grads()       # only needed if optimizer.step() mutates p.grad
     optimizer.step()          # updates momentum buffers in optimizer.state
-    hub.after_step()          # reads param.grad (raw G) + momentum buffer
+    hub.after_step()          # raw G (captured or param.grad) + momentum buffer
     optimizer.zero_grad()
 """
 
@@ -43,10 +52,12 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
+import numpy as np
 import torch
 
 from src.instrument.subspace import TrackedSubspace
-from src.stats import RegimeClassifier
+from src.stats import BatchRegimeClassifier
+from src.stats.batch import DirectionView
 
 __all__ = [
     "DirectionTrack",
@@ -63,16 +74,15 @@ HvpFn = Callable[[torch.Tensor, torch.Tensor], float]
 
 
 class DirectionTrack:
-    """One tracked direction: a WP0.5 RegimeClassifier per beta + log buffers."""
+    """One tracked direction: log buffers + read-only views into the
+    per-(matrix, beta) BatchRegimeClassifiers (``classifiers[beta]`` keeps
+    the scalar-classifier-shaped API: .regime, .stats, .n_since_reset)."""
 
-    def __init__(self, index: int, kind: str, betas: Sequence[float], classifier_kwargs: Dict[str, Any]):
+    def __init__(self, index: int, kind: str, views: Dict[float, DirectionView]):
         self.index = index
         self.kind = kind  # "top" | "bulk"
-        self.betas = [float(b) for b in betas]
-        self._classifier_kwargs = dict(classifier_kwargs)
-        self.classifiers: Dict[float, RegimeClassifier] = {
-            b: RegimeClassifier(beta=b, **self._classifier_kwargs) for b in self.betas
-        }
+        self.betas = list(views)
+        self.classifiers: Dict[float, DirectionView] = dict(views)
         # Log buffers.
         self.s_values: List[float] = []  # every observed step
         self.reset_steps: List[int] = []  # subspace-rotation resets (global step)
@@ -95,38 +105,6 @@ class DirectionTrack:
             }
             for b in self.betas
         }
-
-    def observe(self, s: float) -> None:
-        self.s_values.append(float(s))
-        for clf in self.classifiers.values():
-            clf.update(float(s))
-
-    def reset(self, step: int) -> None:
-        """Innovation reset: rebuild classifier state via the src.stats API.
-
-        A rotated subspace pair means the scalar stream changed identity; the
-        classifier is rebuilt fresh (regime -> SIGNAL, n_min clock restarts),
-        matching the WP0.5 confidence-reset semantics.
-        """
-        self.classifiers = {
-            b: RegimeClassifier(beta=b, **self._classifier_kwargs) for b in self.betas
-        }
-        self.reset_steps.append(int(step))
-
-    def snapshot(self, step: int) -> None:
-        for b, clf in self.classifiers.items():
-            st = clf.stats
-            snap = self.snapshots[b]
-            snap["step"].append(int(step))
-            snap["regime"].append(clf.regime.value)
-            snap["mu"].append(float(st.mean))
-            snap["var"].append(float(st.var))
-            snap["rho"].append(float(st.rho_corrected))
-            snap["t_stat"].append(float(st.t_stat))
-            snap["amplitude_ratio"].append(float(st.amplitude_ratio))
-            snap["implied_eta_lambda"].append(float(st.implied_eta_lambda))
-            snap["ess"].append(float(st.ess))
-            snap["n_since_reset"].append(int(clf.n_since_reset))
 
 
 class MatrixTracker:
@@ -167,8 +145,18 @@ class MatrixTracker:
             generator=generator,
             device=device,
         )
+        self.betas = [float(b) for b in betas]
+        k_total = self.subspace.k_total
+        # One BatchRegimeClassifier per beta covering ALL tracked directions
+        # of this matrix (array mode; O(1) Python calls per step per beta).
+        self.classifiers: Dict[float, BatchRegimeClassifier] = {
+            b: BatchRegimeClassifier(beta=b, k=k_total, **dict(classifier_kwargs))
+            for b in self.betas
+        }
         self.directions: List[DirectionTrack] = [
-            DirectionTrack(i, kind, betas, classifier_kwargs)
+            DirectionTrack(
+                i, kind, {b: self.classifiers[b].view(i) for b in self.betas}
+            )
             for i, kind in enumerate(self.subspace.kinds())
         ]
         self.step_count = 0
@@ -193,6 +181,28 @@ class MatrixTracker:
         Both are 2-D (callers flatten >2-D params as len(p) x -1, matching the
         Muon-family optimizers).  ``hvp_fn``/``param`` enable the per-refresh
         curvature probe (Phase-1 validation only -- see module docstring).
+
+        Convenience wrapper around :meth:`prepare` + :meth:`finish` with a
+        per-matrix device->host transfer; the hub fuses transfers across
+        matrices instead (one ``.cpu()`` per training step).
+        """
+        packed = self.prepare(G, M, hvp_fn=hvp_fn, param=param)
+        self.finish(packed.cpu().numpy())
+
+    def prepare(
+        self,
+        G: torch.Tensor,
+        M: torch.Tensor,
+        *,
+        hvp_fn: Optional[HvpFn] = None,
+        param: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Device-side half of one instrumented step.
+
+        Runs the (possibly due) subspace refresh and packs everything that
+        must cross to the host -- the k per-direction projections s_i =
+        u_i^T G v_i, the top-sigma estimate of M, and ||G||_F -- into one
+        (k + 2,) tensor on G's device.  No host synchronization here.
         """
         self.step_count += 1
         step = self.step_count
@@ -202,18 +212,31 @@ class MatrixTracker:
 
         # Raw-gradient projections for every tracked pair (plan section 1.1).
         s = self.subspace.project(G)
-        for track, s_i in zip(self.directions, s.tolist()):
-            track.observe(s_i)
+        sigma_top = self.subspace.project(M)[: self.subspace.k1].abs().max()
+        gnorm = torch.linalg.norm(G.detach().float())
+        return torch.cat([s, sigma_top.reshape(1), gnorm.reshape(1)])
+
+    def finish(self, packed: np.ndarray) -> None:
+        """Host-side half: unpack the :meth:`prepare` payload and advance the
+        batched statistics/classifiers for every beta in O(1) numpy calls."""
+        step = self.step_count
+        k = self.subspace.k_total
+        s_np = np.asarray(packed[:k], dtype=np.float64)
+        sigma_top = float(packed[k])
+        gnorm = float(packed[k + 1])
+
+        for clf in self.classifiers.values():
+            clf.update(s_np)
+        for i, track in enumerate(self.directions):
+            track.s_values.append(float(s_np[i]))
 
         # Per-matrix per-step scalars.
-        sigma_top = float(self.subspace.project(M)[: self.subspace.k1].abs().max())
         self.steps.append(step)
-        self.grad_fro_norm.append(float(torch.linalg.norm(G.detach().float())))
+        self.grad_fro_norm.append(gnorm)
         self.top_sigma_m.append(sigma_top)
 
         if step % self.snapshot_every == 0 or step == 1:
-            for track in self.directions:
-                track.snapshot(step)
+            self._snapshot_all(step)
 
     # --------------------------------------------------------------- refresh
 
@@ -227,20 +250,58 @@ class MatrixTracker:
     ) -> None:
         result = self.subspace.refresh(M)
         self.refresh_steps.append(step)
+        # Refresh happens every t_refresh steps; the (k,)-sized transfers
+        # here are off the per-step path.
+        alignment = result.alignment.cpu().numpy()
+        sigma = result.sigma.cpu().numpy()
         U, V = self.subspace.all_u(), self.subspace.all_v()
+        rotated: List[int] = []
         for i, track in enumerate(self.directions):
-            align = float(result.alignment[i])
+            align = float(alignment[i])
             track.refresh_alignment.append((step, align))
-            track.sigma.append((step, float(result.sigma[i])))
+            track.sigma.append((step, float(sigma[i])))
             if not result.first and align < self.align_min:
                 # Innovation: the tracked pair rotated -> reset confidence.
-                track.reset(step)
+                rotated.append(i)
+                track.reset_steps.append(step)
             if hvp_fn is not None and param is not None:
                 # Curvature along u_i v_i^T -- once per pair per refresh.
                 # Phase-1 validation ONLY; never available to routing.
                 D = torch.outer(U[:, i], V[:, i]).reshape(param.shape)
                 lam = float(hvp_fn(param, D.to(dtype=param.dtype, device=param.device)))
                 track.lambda_hvp.append((step, lam))
+        if rotated:
+            for clf in self.classifiers.values():
+                clf.reset_directions(rotated)
+
+    # -------------------------------------------------------------- snapshot
+
+    def _snapshot_all(self, step: int) -> None:
+        """Append one stat snapshot for every direction x beta (batched:
+        each per-beta stat array is computed once per matrix)."""
+        for b, clf in self.classifiers.items():
+            st = clf.stats
+            mu = st.mean
+            var = st.var
+            rho = st.rho_corrected
+            t_stat = st.t_stat
+            amp = st.amplitude_ratio
+            iel = st.implied_eta_lambda
+            ess = st.ess
+            n_obs = st.n_obs
+            regimes = clf.regimes
+            for i, track in enumerate(self.directions):
+                snap = track.snapshots[b]
+                snap["step"].append(int(step))
+                snap["regime"].append(regimes[i].value)
+                snap["mu"].append(float(mu[i]))
+                snap["var"].append(float(var[i]))
+                snap["rho"].append(float(rho[i]))
+                snap["t_stat"].append(float(t_stat[i]))
+                snap["amplitude_ratio"].append(float(amp[i]))
+                snap["implied_eta_lambda"].append(float(iel[i]))
+                snap["ess"].append(float(ess[i]))
+                snap["n_since_reset"].append(int(n_obs[i]))
 
     # ------------------------------------------------------------------- log
 
@@ -296,11 +357,13 @@ class InstrumentationHub:
     Tracks every parameter with ndim >= 2 (flattening >2-D to len(p) x -1,
     the Muon-family convention) whose flattened min dimension is at least
     ``min_dim``.  Reads the raw gradient from ``param.grad`` (the interface
-    contract forbids pre_step from modifying G in place) and the momentum
-    matrix from ``optimizer.state[param][momentum_key]`` after
-    ``optimizer.step()``; falls back to the raw gradient itself when the
-    optimizer keeps no momentum buffer (e.g. AdamW -- the tracked subspace
-    then follows the gradient's own top directions).
+    contract forbids pre_step from modifying G in place) -- or from the
+    snapshot taken by :meth:`capture_grads` when the optimizer's ``step()``
+    mutates ``p.grad`` in place -- and the momentum matrix from
+    ``optimizer.state[param][momentum_key]`` after ``optimizer.step()``;
+    falls back to the raw gradient itself when the optimizer keeps no
+    momentum buffer (e.g. AdamW -- the tracked subspace then follows the
+    gradient's own top directions).
     """
 
     def __init__(
@@ -326,6 +389,7 @@ class InstrumentationHub:
         self.hvp_fn = hvp_fn
         self.betas = [float(b) for b in betas]
         self._params: List[Tuple[str, torch.Tensor]] = []
+        self._captured: Dict[str, torch.Tensor] = {}
         self.trackers: Dict[str, MatrixTracker] = {}
         for name, p in named_params:
             if p.ndim < 2:
@@ -358,21 +422,55 @@ class InstrumentationHub:
     # ------------------------------------------------------------------ step
 
     @torch.no_grad()
-    def after_step(self) -> None:
-        """Observe one training step. Call after optimizer.step(), before
-        zero_grad (param.grad must still hold the raw gradient)."""
+    def capture_grads(self) -> None:
+        """Snapshot raw pre-momentum gradients (call between backward() and
+        optimizer.step()).  Only needed when the optimizer mutates ``p.grad``
+        in place during ``step()``; :meth:`after_step` prefers the snapshot
+        and falls back to ``param.grad`` otherwise."""
+        captured: Dict[str, torch.Tensor] = {}
         for name, p in self._params:
             if p.grad is None:
                 continue
             G = p.grad
             G2 = G.reshape(len(G), -1) if G.ndim > 2 else G
+            captured[name] = G2.detach().float().clone()
+        self._captured = captured
+
+    @torch.no_grad()
+    def after_step(self) -> None:
+        """Observe one training step. Call after optimizer.step(), before
+        zero_grad (param.grad -- or the capture_grads() snapshot -- must
+        hold the raw gradient).  All per-direction scalars cross the
+        device->host boundary in ONE batched .cpu() transfer."""
+        prepared: List[Tuple[MatrixTracker, torch.Tensor]] = []
+        for name, p in self._params:
+            G2 = self._captured.pop(name, None)
+            if G2 is None:
+                if p.grad is None:
+                    continue
+                G = p.grad
+                G2 = (G.reshape(len(G), -1) if G.ndim > 2 else G).float()
             M2 = self._momentum_matrix(p, G2)
-            self.trackers[name].observe(
-                G2.float(),
+            packed = self.trackers[name].prepare(
+                G2,
                 M2.float(),
                 hvp_fn=self.hvp_fn,
                 param=p,
             )
+            prepared.append((self.trackers[name], packed))
+        self._captured = {}
+        if not prepared:
+            return
+        if len(prepared) == 1:
+            fused = prepared[0][1].cpu().numpy()
+            prepared[0][0].finish(fused)
+            return
+        fused = torch.cat([packed for _, packed in prepared]).cpu().numpy()
+        offset = 0
+        for tracker, packed in prepared:
+            n = packed.numel()
+            tracker.finish(fused[offset : offset + n])
+            offset += n
 
     def _momentum_matrix(self, p: torch.Tensor, G2: torch.Tensor) -> torch.Tensor:
         if self.optimizer is not None:

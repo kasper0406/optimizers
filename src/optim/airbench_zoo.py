@@ -168,7 +168,11 @@ def load_vendor_airbench():
 # ----------------------------------------------------------------- experiment
 
 
-def run_airbench_smoke(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]:
+def run_airbench_smoke(
+    config: Dict[str, Any],
+    device: torch.device,
+    _hub_factory=None,
+) -> Dict[str, Any]:
     """One airbench94 training run with a zoo optimizer on the filter params.
 
     Faithful port of vendor/airbench/airbench94_muon.py:main() (lines
@@ -179,6 +183,15 @@ def run_airbench_smoke(config: Dict[str, Any], device: torch.device) -> Dict[str
       optimizer trains under the identical recipe (config-switchable);
     - torch.compile optional (smoke default: off);
     - wall-clock timing via CUDA events as in the reference.
+
+    ``_hub_factory`` (internal; used by :func:`run_airbench_instrumented`):
+    callable ``(model, optimizer2, filter_params) -> InstrumentationHub``.
+    When given, the hub observes every step -- ``capture_grads()`` right
+    before the optimizer steps (the raw PRE-momentum gradient; the vendored
+    Muon's ``step()`` must never be assumed to leave ``p.grad`` intact) and
+    ``after_step()`` right after, before ``zero_grad``.  Instrumentation is
+    strictly read-only: it never modifies parameters, gradients, optimizer
+    state, or any update.
     """
     from src.optim.registry import build_optimizer
 
@@ -250,6 +263,10 @@ def run_airbench_smoke(config: Dict[str, Any], device: torch.device) -> Dict[str
         for group in opt.param_groups:
             group["initial_lr"] = group["lr"]
 
+    hub = None
+    if _hub_factory is not None:
+        hub = _hub_factory(model, optimizer2, filter_params)
+
     starter = torch.cuda.Event(enable_timing=True)
     ender = torch.cuda.Event(enable_timing=True)
     time_seconds = 0.0
@@ -291,8 +308,12 @@ def run_airbench_smoke(config: Dict[str, Any], device: torch.device) -> Dict[str
                 # airbench94_muon.py:83 (recipe step, applied uniformly)
                 for p in filter_params:
                     p.data.mul_(len(p.data) ** 0.5 / p.data.norm())
+            if hub is not None:
+                hub.capture_grads()  # raw pre-momentum G, before any step()
             for opt in optimizers:
                 opt.step()
+            if hub is not None:
+                hub.after_step()  # reads captured G + post-step momentum
             model.zero_grad(set_to_none=True)
             step += 1
             if step >= total_train_steps:
@@ -347,6 +368,76 @@ def run_airbench(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]
     return run_airbench_smoke(merged, device)
 
 
+AIRBENCH_STOCK_LR = 0.24  # vendored record hyperparameter (airbench94_muon.py:362)
+
+
+def run_airbench_instrumented(
+    config: Dict[str, Any], device: torch.device
+) -> Dict[str, Any]:
+    """WP1.2 instrumented airbench: the IDENTICAL stock WP0.1 recipe
+    (vendored Muon lr=0.24 momentum=0.6 nesterov, compile on) with an
+    InstrumentationHub observing the filter-parameter matrices.
+
+    Per plan section 1.1: top-k1 + k2 bulk tracked pairs of the vendored
+    Muon's momentum buffers; per-step raw PRE-momentum gradient projections
+    s_i = u^T G v (grabbed via ``hub.capture_grads()`` before
+    ``optimizer2.step()``); per-matrix top sigma and ||G||_F; both betas.
+    The HVP callback stays None on airbench (the amplitude-ratio path is the
+    core estimator; HVPs are validation-only and optional here).
+
+    Zero behavior change to training itself: the hub is read-only and the
+    recipe, schedules, and optimizers are exactly those of the ``airbench``
+    experiment.  The returned metrics carry the full instrumentation log
+    under the private key ``"_instrumentation_log"``; scripts/run.py pops it
+    and writes the src.instrument.schema sidecar next to the results JSON.
+
+    LAUNCH PRECONDITION (WP1.2, enforced in scripts/run.py): the
+    human-authored ``criteria/phase1_preregistration.md`` must exist before
+    any run of this experiment.
+    """
+    from src.instrument import hub_from_config
+
+    if "optimizer" in config:
+        raise SystemExit(
+            "experiment 'airbench_instrumented' is the stock WP0.1 recipe "
+            "plus read-only instrumentation; it does not accept an optimizer "
+            "override."
+        )
+    instr_cfg = config.get("instrumentation")
+    if not isinstance(instr_cfg, dict):
+        raise SystemExit(
+            "experiment 'airbench_instrumented' requires an 'instrumentation' "
+            "block in the config (k1, k2, t_refresh, betas, classifier, ...)"
+        )
+
+    merged = dict(config)
+    merged["optimizer"] = dict(
+        name="vendor_muon", lr=AIRBENCH_STOCK_LR, momentum=0.6, nesterov=True
+    )
+    recipe = dict(config.get("recipe", {}))
+    recipe["normalize_filter_weights"] = False  # vendored Muon.step does it
+    recipe.setdefault("compile", True)  # the reference compiles the model
+    merged["recipe"] = recipe
+
+    holder: Dict[str, Any] = {}
+
+    def factory(model, optimizer2, filter_params):
+        names = {id(p): n for n, p in model.named_parameters()}
+        named = [
+            (names.get(id(p), f"filter_{i}"), p)
+            for i, p in enumerate(filter_params)
+        ]
+        # HVP callback stays None for airbench (validation-only, optional).
+        holder["hub"] = hub_from_config(instr_cfg, named, optimizer2, hvp_fn=None)
+        return holder["hub"]
+
+    metrics = run_airbench_smoke(merged, device, _hub_factory=factory)
+    metrics["instrumented"] = True
+    metrics["optimizer_lr"] = AIRBENCH_STOCK_LR  # for the eta*lambda plot
+    metrics["_instrumentation_log"] = holder["hub"].to_log()
+    return metrics
+
+
 # ----------------------------------------------------------------- entrypoint
 
 
@@ -373,6 +464,7 @@ def main(argv=None) -> int:
     run_mod.OPTIMIZER_REGISTRY.update(OPTIMIZER_REGISTRY)
     run_mod.EXPERIMENT_REGISTRY["airbench_smoke"] = run_airbench_smoke
     run_mod.EXPERIMENT_REGISTRY["airbench"] = run_airbench
+    run_mod.EXPERIMENT_REGISTRY["airbench_instrumented"] = run_airbench_instrumented
     return run_mod.main(argv)
 
 

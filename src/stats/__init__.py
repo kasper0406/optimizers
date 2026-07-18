@@ -7,10 +7,14 @@ Public API:
     BiasCorrectedEma, ema_effective_sample_size   (ema.py)
     DirectionStats                                (direction_stats.py)
     Regime, RegimeClassifier                      (classifier.py)
+    ArrayDirectionStats, BatchRegimeClassifier    (batch.py; vectorized k-at-
+                                                   once equivalents, equivalence-
+                                                   tested against the scalar path)
     ar1, drifting_mean, oscillation,
     gaussian_noise, concat_segments               (generators.py)
 """
 
+from .batch import ArrayDirectionStats, BatchRegimeClassifier
 from .classifier import Regime, RegimeClassifier
 from .direction_stats import DirectionStats
 from .ema import BiasCorrectedEma, ema_effective_sample_size
@@ -22,6 +26,8 @@ __all__ = [
     "DirectionStats",
     "Regime",
     "RegimeClassifier",
+    "ArrayDirectionStats",
+    "BatchRegimeClassifier",
     "ar1",
     "drifting_mean",
     "oscillation",

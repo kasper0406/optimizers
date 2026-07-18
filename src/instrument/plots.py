@@ -16,10 +16,18 @@ Generates, from a results/sidecar JSON alone (no live training):
 Everything is deterministic: sorted iteration order, fixed figure geometry,
 fixed dpi, no timestamps.  Usage::
 
-    uv run python -m src.instrument.plots <log.json> <out_dir> [--lr LR]
+    uv run python -m src.instrument.plots <log.json | sidecar_dir> <out_dir> [--lr LR]
 
-``--lr`` is required for plot 3 unless the JSON is a full results file whose
-``config.contents.optimizer.lr`` is readable.
+The input may be a single instrumentation JSON (sidecar or full results
+file) or a **directory** of ``*.instrumentation.json`` sidecars (e.g. a
+synced ``results/`` after the WP1.2 seed sweep): all sidecars are merged
+into one log, with matrix records namespaced by run stem, so the three plots
+pool tracked directions across runs/seeds.
+
+``--lr`` is required for plot 3 unless it can be recovered from the JSON --
+``config.contents.optimizer.lr`` or ``metrics.optimizer_lr`` of a full
+results file, or (directory mode) of the sidecars' sibling results JSONs,
+which must then agree on a single value.
 """
 
 from __future__ import annotations
@@ -38,12 +46,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap, Normalize
 
-from src.instrument.schema import iter_directions, load_instrumentation
+from src.instrument.schema import (
+    SIDECAR_SUFFIX,
+    iter_directions,
+    load_instrumentation,
+)
 
 __all__ = [
     "plot_regime_scatter",
     "plot_regime_occupancy",
     "plot_eta_lambda_calibration",
+    "load_sidecar_directory",
     "make_all_plots",
 ]
 
@@ -127,13 +140,80 @@ def _lambda_at(direction: Dict[str, Any], step: int) -> Optional[float]:
 
 
 def _lr_from_json(path: Path) -> Optional[float]:
-    """Try to read optimizer lr from a full results JSON."""
+    """Try to read optimizer lr from a full results JSON.
+
+    Checks ``config.contents.optimizer.lr`` first, then
+    ``metrics.optimizer_lr`` (experiments that pin the optimizer themselves,
+    e.g. airbench_instrumented, record the pinned lr in metrics).
+    """
     try:
         with open(path) as fh:
             obj = json.load(fh)
-        return float(obj["config"]["contents"]["optimizer"]["lr"])
     except Exception:
         return None
+    try:
+        return float(obj["config"]["contents"]["optimizer"]["lr"])
+    except Exception:
+        pass
+    try:
+        return float(obj["metrics"]["optimizer_lr"])
+    except Exception:
+        return None
+
+
+def _sidecar_paths(dir_path: Path) -> List[Path]:
+    paths = sorted(Path(dir_path).glob(f"*{SIDECAR_SUFFIX}"))
+    if not paths:
+        raise FileNotFoundError(
+            f"no *{SIDECAR_SUFFIX} sidecar files found in {dir_path}"
+        )
+    return paths
+
+
+def load_sidecar_directory(dir_path: Path) -> Dict[str, Any]:
+    """Merge every ``*.instrumentation.json`` sidecar in a directory into one
+    validated log; matrix records are namespaced ``<run_stem>:<matrix>`` so
+    the plots pool tracked directions across runs/seeds."""
+    merged: Optional[Dict[str, Any]] = None
+    for path in _sidecar_paths(dir_path):
+        log = load_instrumentation(path)
+        stem = path.name[: -len(SIDECAR_SUFFIX)]
+        if merged is None:
+            merged = {
+                "instrumentation_schema_version": log[
+                    "instrumentation_schema_version"
+                ],
+                "betas": list(log["betas"]),
+                "hvp_enabled": bool(log["hvp_enabled"]),
+                "matrices": {},
+            }
+        elif list(log["betas"]) != merged["betas"]:
+            raise ValueError(
+                f"{path}: betas {log['betas']} != {merged['betas']} of earlier "
+                "sidecars; cannot merge a mixed-beta directory"
+            )
+        else:
+            merged["hvp_enabled"] = merged["hvp_enabled"] or bool(log["hvp_enabled"])
+        for name, mat in log["matrices"].items():
+            merged["matrices"][f"{stem}:{name}"] = mat
+    return merged
+
+
+def _lr_from_sidecar_siblings(dir_path: Path) -> Optional[float]:
+    """Directory mode: recover lr from the sidecars' sibling results JSONs
+    (<stem>.instrumentation.json -> <stem>.json); all found values must agree."""
+    lrs = set()
+    for path in _sidecar_paths(dir_path):
+        sibling = path.with_name(path.name[: -len(SIDECAR_SUFFIX)] + ".json")
+        lr = _lr_from_json(sibling)
+        if lr is not None:
+            lrs.add(lr)
+    if len(lrs) > 1:
+        raise ValueError(
+            f"sibling results JSONs in {dir_path} disagree on optimizer lr "
+            f"({sorted(lrs)}); pass --lr explicitly"
+        )
+    return lrs.pop() if lrs else None
 
 
 # --------------------------------------------------------------- plot 1 of 3
@@ -347,15 +427,21 @@ def make_all_plots(
     lr: Optional[float] = None,
     n_facets: int = 4,
 ) -> List[Path]:
-    """Generate the three Phase-1 plots from an instrumentation JSON."""
+    """Generate the three Phase-1 plots from an instrumentation JSON or a
+    directory of ``*.instrumentation.json`` sidecars (merged across runs)."""
     json_path = Path(json_path)
-    log = load_instrumentation(json_path)
-    if lr is None:
-        lr = _lr_from_json(json_path)
+    if json_path.is_dir():
+        log = load_sidecar_directory(json_path)
+        if lr is None:
+            lr = _lr_from_sidecar_siblings(json_path)
+    else:
+        log = load_instrumentation(json_path)
+        if lr is None:
+            lr = _lr_from_json(json_path)
     if lr is None:
         raise ValueError(
             "lr is required for the eta*lambda calibration plot; pass --lr "
-            "or point at a results JSON with config.contents.optimizer.lr"
+            "or point at results JSONs that record the optimizer lr"
         )
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -370,7 +456,12 @@ def make_all_plots(
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("json_path", type=Path, help="instrumentation sidecar or results JSON")
+    parser.add_argument(
+        "json_path",
+        type=Path,
+        help="instrumentation sidecar / results JSON, or a directory of "
+        "*.instrumentation.json sidecars (merged across runs)",
+    )
     parser.add_argument("out_dir", type=Path, help="directory for the three PNGs")
     parser.add_argument("--lr", type=float, default=None, help="optimizer lr (for plot 3)")
     parser.add_argument("--n-facets", type=int, default=4)

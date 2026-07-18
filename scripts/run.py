@@ -131,14 +131,37 @@ def run_smoke(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]:
     }
 
 
-from src.optim.airbench_zoo import run_airbench, run_airbench_smoke  # noqa: E402
+from src.optim.airbench_zoo import (  # noqa: E402
+    run_airbench,
+    run_airbench_instrumented,
+    run_airbench_smoke,
+)
 
 EXPERIMENT_REGISTRY = {
     "smoke": run_smoke,
     "airbench": run_airbench,  # WP0.1 stock baseline (vendored Muon, compile on)
     "airbench_smoke": run_airbench_smoke,  # WP0.4 zoo smoke harness
-    # Later WPs register nanogpt / instrumented experiments here.
+    "airbench_instrumented": run_airbench_instrumented,  # WP1.2 measurement runs
+    # Later WPs register nanogpt experiments here.
 }
+
+# WP1.2 launch precondition (CLAUDE.md): the human-authored, pre-registered
+# Phase-1 criteria must exist BEFORE any instrumented measurement run.  The
+# agent never authors this file; main() refuses to run the instrumented
+# experiment while it is missing.
+PHASE1_PREREG = REPO_ROOT / "criteria" / "phase1_preregistration.md"
+PREREG_GATED_EXPERIMENTS = {"airbench_instrumented"}
+
+
+def check_phase1_preregistration(experiment: str) -> None:
+    """Refuse pre-registration-gated experiments while criteria are absent."""
+    if experiment in PREREG_GATED_EXPERIMENTS and not PHASE1_PREREG.exists():
+        raise SystemExit(
+            f"experiment {experiment!r} is a WP1.2 Phase-1 measurement run and "
+            f"requires the human-authored pre-registration file "
+            f"{PHASE1_PREREG} to exist (committed before the first run). "
+            "It is missing; refusing to launch. The agent must not create it."
+        )
 
 
 # ---------------------------------------------------------------------- main
@@ -171,6 +194,7 @@ def main(argv=None) -> int:
         raise SystemExit(
             f"Unknown experiment {experiment!r}; known: {sorted(EXPERIMENT_REGISTRY)}"
         )
+    check_phase1_preregistration(experiment)
 
     config_seed = config.get("seed")
     if args.seed is None:
@@ -195,6 +219,20 @@ def main(argv=None) -> int:
     wall_time_s = time.perf_counter() - t0
     finished_at = results_io.utc_now_iso()
 
+    stamp = started_at.replace(":", "").replace("-", "").split(".")[0]
+    out_path = args.out_dir / f"{experiment}_seed{seed}_{stamp}.json"
+
+    # Instrumented experiments return the full per-direction log under a
+    # private key; it is written as a sidecar next to the results JSON
+    # (src.instrument.schema) and referenced by filename from metrics.
+    instr_log = metrics.pop("_instrumentation_log", None)
+    if instr_log is not None:
+        from src.instrument.schema import write_sidecar
+
+        sidecar = write_sidecar(instr_log, out_path)
+        metrics["instrumentation_sidecar"] = sidecar.name
+        print(f"Wrote {sidecar}")
+
     result = {
         "schema_version": results_io.SCHEMA_VERSION,
         "experiment": experiment,
@@ -209,8 +247,6 @@ def main(argv=None) -> int:
         "metrics": metrics,
     }
 
-    stamp = started_at.replace(":", "").replace("-", "").split(".")[0]
-    out_path = args.out_dir / f"{experiment}_seed{seed}_{stamp}.json"
     results_io.write_result(result, out_path)
     print(f"Wrote {out_path}")
     return 0
