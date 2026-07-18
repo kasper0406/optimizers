@@ -61,7 +61,11 @@ vm_ssh() {
 
 vm_rsync() {
     need_vm
-    rsync -az --info=stats1 -e "ssh $RM_SSH_OPTS" "$@"
+    # --info=stats1 only where supported (macOS ships openrsync without it)
+    local info_flag=""
+    rsync --info=stats1 --version >/dev/null 2>&1 && info_flag="--info=stats1"
+    # shellcheck disable=SC2086
+    rsync -az ${info_flag} -e "ssh $RM_SSH_OPTS" "$@"
 }
 
 local_git_sha() {
