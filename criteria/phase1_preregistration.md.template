@@ -1,0 +1,47 @@
+<!-- HUMAN MUST AUTHOR — agent-drafted template, all thresholds intentionally
+blank. Copy to criteria/phase1_preregistration.md, fill every TODO, DATE IT,
+and commit BEFORE the first instrumented Phase-1 run: WP1.2 launch tooling
+verifies this file exists and predates the first run's timestamp, and refuses
+to launch otherwise. The agent never fills thresholds and never evaluates this
+gate (Gate 1 is a human decision). -->
+
+# Phase 1 pre-registration: regime cluster-existence criteria
+
+Date authored: TODO (must predate the first instrumented run)
+Author: TODO (human)
+Plan reference: routed-muon-research-plan.md sections 1.2-1.4
+
+## Hypothesis under test
+
+The regime scatter in (|mu|/sqrt(var), rho) space shows >= TODO distinct
+clusters (predicted: signal = high-SNR/rho ~ 0+, noise = low-SNR/rho ~ 0,
+oscillation = rho < 0 with |rho| large), against the null of a single smear.
+
+## Pre-registered criteria (decided before looking at any Phase-1 plot)
+
+1. **Cluster existence (GMM/BIC):** BIC prefers >= TODO components in
+   (SNR, rho) space in >= TODO % of (matrix, phase) cells.
+   - Cell definition: matrix = TODO (which tracked matrices); training phase
+     bins = TODO (e.g. LR-schedule phases; fix the binning HERE, in advance).
+   - GMM fitting protocol: TODO (covariance type, restarts, feature scaling).
+2. **Oscillation population:** the rho <= -TODO population is non-empty during
+   the high-LR phase, where high-LR phase = TODO (exact step/schedule range)
+   and non-empty = TODO (minimum fraction of tracked directions).
+3. **Cross-seed consistency:** criteria 1-2 hold in >= TODO of the >= 20
+   instrumented airbench seeds and >= TODO of the 2-3 nanogpt seeds.
+4. **Estimator sanity precondition:** WP0.5 synthetic-suite green at the SHA
+   used for the runs (recorded here: TODO after the fact by the human).
+
+## Fixed analysis parameters (no post-hoc tuning)
+
+- EMA betas: 0.9 and 0.99 (both logged; the primary beta for criteria is TODO)
+- Tracked pairs: k1 = TODO top, k2 = TODO bulk probes; T_refresh = TODO
+- SNR statistic: TODO (exact formula, incl. bias correction choice)
+- rho statistic: TODO (exact formula)
+- Burn-in / exclusion window: TODO steps
+
+## Gate-1 decision rule (human-evaluated)
+
+- Regimes separate per criteria above -> Phase 2 full routing.
+- Only oscillation separates -> Phase 2 oscillation channel only.
+- No separation -> stop; write the measurement study as the deliverable.

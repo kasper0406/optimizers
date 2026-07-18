@@ -1,0 +1,33 @@
+# WP0.3 — DynMuon reproduction: smallest config showing the Muon-vs-DynMuon
+# gap (their claim: 10.6-26.5% fewer steps to target loss).
+#
+# STATUS: SKELETON — DO NOT LAUNCH.
+# The concrete task/model/budget choices below are TBD pending the WP0.2/WP0.3
+# candidate report (which proposes the smallest-gap config from vendor/DynMuon
+# with rationale) and the human's pick at that checkpoint. No fake values are
+# filled in here; sweep expansion will fail on the placeholder experiment name
+# until the WP0.3 runner is registered in scripts/run.py.
+
+experiment: dynmuon_repro     # runner registered by WP0.3 work
+device: auto
+
+dynmuon:
+  vendor_path: vendor/DynMuon  # pinned submodule; never modified
+
+# ----------------------------------------------------------------------
+# TBD — to be filled from the WP0.3 report + human checkpoint decision:
+#
+#   task:            TBD  # which DynMuon benchmark (their smallest config
+#                         # that exhibits the claimed gap)
+#   model:           TBD  # architecture/size exactly as in their config
+#   token_or_step_budget: TBD
+#   target_loss:     TBD  # steps-to-target metric per their protocol
+#   optimizers:      TBD  # muon vs dynmuon arms, matched tuning effort;
+#                         # the tuning grid goes in sweep.grid below and the
+#                         # equal-effort accounting goes in the WP0.3 report
+# ----------------------------------------------------------------------
+
+sweep:
+  seeds: dev          # dev seeds (>= 1000) while reproducing; any final
+                      # comparison table re-runs under policy "eval"
+  # grid: TBD (matched tuning effort for both arms — see report)

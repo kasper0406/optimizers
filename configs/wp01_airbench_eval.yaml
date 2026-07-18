@@ -1,0 +1,32 @@
+# WP0.1 — CIFAR-10 airbench 94% tier baseline, evaluation seed sweep.
+#
+# Launch (human, per the compute boundary — cloud or local GPU box):
+#   bash scripts/launch_cloud.sh sweep configs/wp01_airbench_eval.yaml
+#   # or locally: uv run python scripts/sweep.py configs/wp01_airbench_eval.yaml --execute
+#
+# Seed policy: "eval" resolves to the evaluation set (seeds 0-99, exactly 100
+# runs) inside scripts/sweep.py at launch time; eval seeds are passed to
+# scripts/run.py via --seed and are NEVER written literally in this or any
+# other config file (CLAUDE.md ground rule 2).
+#
+# GPU-type rule (plan section 0.1): run the entire 100-seed sweep on ONE GPU
+# type; scripts/aggregate.py refuses mixed-GPU comparison tables.
+#
+# The "airbench" experiment (src/optim/airbench_zoo.py:run_airbench) is the
+# stock vendored recipe: vendored Muon at record hyperparameters
+# (airbench94_muon.py:362), torch.compile on, no optimizer overrides accepted.
+
+experiment: airbench
+device: auto            # CUDA on the launch box; the tier needs a real GPU
+
+airbench:
+  vendor_path: vendor/airbench   # pinned submodule; never modified
+  tier: "94"                     # the 94% tier (airbench94)
+
+# Stock record recipe — no optimizer overrides; this is the untouched baseline
+# whose per-seed accuracy/time distribution becomes results/baseline_airbench
+# aggregates (checked by the human against criteria/airbench_tolerance.yaml).
+
+sweep:
+  seeds: eval           # -> seeds 0-99 at launch time; comparison-table set
+  # no grid: single config x 100 seeds

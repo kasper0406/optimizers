@@ -1,0 +1,40 @@
+# HUMAN MUST AUTHOR — agent-drafted template, all thresholds intentionally blank.
+# Copy to criteria/phase2_success.yaml, fill every TODO, commit as human
+# BEFORE looking at any WP2.2/WP2.3 comparison table. Consumed by: the WP2.x
+# descriptive report (agent reports numbers against this file; Gate 2 pass/
+# fail is a human decision).
+
+# Plan reference: routed-muon-research-plan.md section 2.3 (pre-registered
+# success criteria for the airbench routed-Muon comparison, n = 100 eval seeds
+# per config, single GPU type per table).
+
+primary:
+  # Time/steps-to-94% improvement of routed Muon over stock Muon at fair
+  # tuning (the 3x3 LR x WD sweep of plan 2.2.2).
+  metric: TODO                       # e.g. "steps_to_94" or "time_to_94_s"
+  min_improvement_sigma: TODO        # >= TODO x seed-noise sigma (plan: 2)
+  must_exceed_dynmuon_gap: TODO      # true/false — >= the DynMuon gap
+                                     # measured on OUR harness (WP0.3 number)
+  dynmuon_gap_reference: TODO        # the WP0.3 measured gap this refers to
+  ablation_non_match_margin: TODO    # how much full routing must exceed each
+                                     # of ablations 4a (retuned WD),
+                                     # 4b (LR bump + clip), 4c (rho-ignored
+                                     # magnitude-only gate) to count as
+                                     # "not matched"
+  placebo_rule: TODO                 # required relation to random-gating arm
+
+secondary:
+  # Independently publishable stability claim (plan 2.2.5 stress test).
+  max_stable_lr_ratio_min: TODO      # routed/stock max stable LR (plan: 1.3)
+  stability_definition: TODO         # what counts as "stable" (e.g. no
+                                     # divergence + accuracy floor over TODO
+                                     # seeds at each LR point)
+
+statistics:
+  n_eval_seeds_per_config: TODO      # e.g. 100 (the full eval set)
+  ci_method: TODO                    # e.g. "t-distribution 95%"
+  multiple_comparison_correction: TODO
+
+notes: >
+  TODO — human rationale, including how "fair tuning" effort is matched
+  across arms (plan 2.2.3) and any deviations decided before unblinding.

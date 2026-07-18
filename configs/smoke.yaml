@@ -1,0 +1,21 @@
+# WP0.0 smoke test: 10-step training no-op.
+# Exercises config -> trainer -> optimizer interface (NoOpOptimizer) ->
+# results JSON on CPU in seconds. Parameters must not change (no-op).
+experiment: smoke
+seed: 1234          # dev seed (>= 1000); eval seeds are injected by launch tooling only
+device: cpu
+
+model:
+  in_dim: 32
+  hidden_dim: 64
+  out_dim: 4
+
+data:
+  batch_size: 16
+
+train:
+  steps: 10
+
+optimizer:
+  name: noop
+  lr: 0.0

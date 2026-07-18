@@ -1,0 +1,27 @@
+# HUMAN MUST AUTHOR — agent-drafted template, all thresholds intentionally blank.
+# Copy to criteria/airbench_tolerance.yaml, fill every TODO, commit as human.
+# Consumed by: WP0.1 aggregate report (agent reports pass/fail against this
+# file; agent never sets or edits the values).
+
+# What this gates: the WP0.1 airbench 94%-tier baseline reproduction
+# (results/baseline_airbench aggregates over the 100-seed eval sweep,
+# configs/wp01_airbench_eval.yaml). Plan section 0.1: what matters is a stable
+# local reference distribution on OUR GPU type, not matching the A100 record
+# exactly.
+
+reference:
+  published_record_accuracy: TODO      # e.g. the airbench94 published mean
+  published_record_gpu: TODO           # e.g. "NVIDIA A100"
+  our_gpu_type: TODO                   # the single GPU type all 100 runs used
+
+tolerance:
+  n_seeds_required: TODO               # e.g. 100 (the full eval set)
+  mean_accuracy_min: TODO              # minimum acceptable mean accuracy
+  mean_accuracy_max: TODO              # optional sanity ceiling (or null)
+  std_accuracy_max: TODO               # seed-noise ceiling
+  ci95_halfwidth_max: TODO             # precision requirement on the mean
+  wall_time_per_run_max_s: TODO        # sanity bound on per-run wall time
+
+notes: >
+  TODO — human rationale for the chosen bounds (hardware delta vs the
+  reference record, expected seed noise from pilot dev-seed runs, etc.).

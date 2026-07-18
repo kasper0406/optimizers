@@ -1,0 +1,52 @@
+# WP1.1 instrumented airbench smoke: reference Muon (record hyperparameters,
+# same as airbench_smoke_muon.yaml) plus the tracked-pair instrumentation
+# block. Requires CUDA for the airbench harness. Dev seed (>= 1000).
+#
+# NOTE on thresholds: the classifier values below are DEV PLACEHOLDERS for
+# smoke/debug runs only. Phase-1 measurement runs use the human-authored,
+# pre-registered values from criteria/phase1_preregistration.md (WP1.2
+# precondition); the stats module itself ships no scientific defaults.
+experiment: airbench_smoke
+seed: 1500
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: muon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+
+instrumentation:
+  k1: 16               # top singular pairs of M_t (plan section 1.1)
+  k2: 16               # bulk probes, orthogonalized against the top block
+  t_refresh: 50        # subspace refresh cadence (steps)
+  subspace_iters: 2    # warm-started subspace iterations per refresh
+  betas: [0.9, 0.99]   # both EMA timescales (timescale sensitivity is a finding)
+  align_min: 0.9       # DEV PLACEHOLDER -- refresh alignment below this = innovation reset
+  snapshot_every: 10   # per-direction stat snapshot cadence (steps)
+  seed: 4242           # instrumentation probe RNG (dev seed, >= 1000)
+  min_dim: 8           # skip matrices whose flattened min dim is below this
+  momentum_key: momentum_buffer
+  hvp: false           # HVP probes are Phase-1 VALIDATION ONLY; never routing
+  classifier:          # DEV PLACEHOLDERS (see note above)
+    tau_sig: 4.0
+    tau_noise: 2.0
+    rho_osc: 0.5
+    n_min: 50
+    z_reset: 6.0
+    innov_needed: 2
+    innov_window: 4

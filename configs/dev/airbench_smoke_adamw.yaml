@@ -1,0 +1,26 @@
+# WP0.4 airbench smoke: AdamW on the airbench94 recipe (filter params only;
+# biases/head stay on the reference SGD recipe).
+# lr/wd are UNTUNED dev starting points -- smoke checks a plausible accuracy
+# band, not a tuned comparison. Requires CUDA. Dev seed (>= 1000).
+experiment: airbench_smoke
+seed: 1501
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: adamw
+  lr: 0.01
+  betas: [0.9, 0.95]
+  eps: 1.0e-8
+  weight_decay: 0.0

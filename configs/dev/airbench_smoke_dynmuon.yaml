@@ -1,0 +1,35 @@
+# WP0.4 airbench smoke: DynMuon on the airbench94 recipe.
+# Schedule semantics per vendor/DynMuon/dynmuon/dynmuon.py (logistic anneal of
+# the spectral exponent p from p_max to p_min); total_steps matches this run's
+# 8 epochs x 25 steps/epoch = 200 optimizer steps.
+# lr is an UNTUNED dev starting point (their default adjust_lr=spectral_norm
+# rescales per matrix shape). Requires CUDA. Dev seed (>= 1000).
+experiment: airbench_smoke
+seed: 1502
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: dynmuon
+  lr: 0.05
+  momentum: 0.6
+  nesterov: true
+  weight_decay: 0.0
+  total_steps: 200
+  p_max: 1.0
+  p_min: -0.25
+  tau_ratio: 0.02
+  width_ratio: 0.08
+  adjust_lr: spectral_norm
+  spectral_impl: poly

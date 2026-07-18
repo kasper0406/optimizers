@@ -1,0 +1,26 @@
+# HUMAN MUST AUTHOR — agent-drafted template, all thresholds intentionally blank.
+# Copy to criteria/nanogpt_tolerance.yaml, fill every TODO, commit as human.
+# Consumed by: WP0.2 reproduction report (overlay plot + max deviation at
+# fixed token checkpoints; agent reports numbers against this file, human
+# judges reproduction quality at the WP0.2 checkpoint).
+
+# What this gates: the modded-nanogpt pinned-record reproduction. The record
+# itself is human-picked from the 3 candidates proposed in the WP0.2 report.
+
+pinned_record:
+  record_id: TODO                      # which historical record (human pick)
+  record_commit: TODO                  # vendored submodule SHA of that record
+  record_log_path: TODO                # path to the released loss log
+  gpu_setup: TODO                      # our target (e.g. "1x H100" / "2x A100 DDP")
+
+tolerance:
+  token_checkpoints: TODO              # list of token counts to compare at,
+                                       # e.g. [TODO, TODO, TODO]
+  max_val_loss_deviation_per_checkpoint: TODO  # abs deviation vs record log
+  final_val_loss_max: TODO             # ceiling at the record's final tokens
+  n_seeds: TODO                        # e.g. 3 (plan section 0.2)
+  seed_std_max_at_final: TODO          # seed-variance ceiling at final checkpoint
+
+notes: >
+  TODO — human rationale: token trajectory should overlay the record
+  (wall-clock will differ across hardware; loss-vs-tokens should not).
