@@ -333,13 +333,23 @@ def test_tuneA_routed_grid_matches_muon_but_osc_only():  # Gate-1 A1
 
 
 def test_stage_b_placeholders_are_marked_and_unrunnable():
+    """Stage-B configs are either unfilled placeholders or properly filled.
+
+    Unfilled: PLACEHOLDER status + TBD-STAGE-A optimizer scalars (unrunnable).
+    Filled: a status recording the fill provenance and fully numeric
+    optimizer scalars — no TBD strings may remain.
+    """
     for name in sorted(PLACEHOLDER_CONFIGS):
         config = load(CONFIG_DIR / name)
         status = str(config.get("status", ""))
-        assert status.startswith("PLACEHOLDER-TBD-STAGE-A"), f"{name}: missing placeholder marker"
-        # Structurally unrunnable: at least one optimizer scalar is the TBD string.
         tbd_values = [v for v in config["optimizer"].values() if v == "TBD-STAGE-A"]
-        assert tbd_values, f"{name}: placeholder must carry TBD-STAGE-A optimizer value(s)"
+        if status.startswith("PLACEHOLDER-TBD-STAGE-A"):
+            assert tbd_values, f"{name}: placeholder must carry TBD-STAGE-A value(s)"
+        else:
+            assert status.startswith("filled"), (
+                f"{name}: status must be PLACEHOLDER-TBD-STAGE-A or record the fill"
+            )
+            assert not tbd_values, f"{name}: filled config still carries TBD values"
 
 
 def test_blocked_configs_are_marked_not_runnable_yet():
