@@ -17,10 +17,11 @@ accepted). Evidence: `reports/wp22-comparison-table.md` @ `b323ed6`.
   excluded at 97.5% confidence vs the 0.272pp (2σ) bar**. 0/45 within-tier
   pairwise contrasts reach nominal p<0.05 (min p=0.109, below the expected
   family-max under the global null). Fair-tuned contrast is sign-negative
-  (−0.020pp). Ablations: 4a (retuned WD) and 4c/4d (rho-ignored exploratory,
-  random-gating placebo) ran and are all within the tier; 4b (LR bump +
-  grad clip) never ran (missing harness hook, deviation 6) — moot under the
-  null but recorded. Pipeline sensitivity is proven by the baseline arms
+  (−0.020pp). Ablations: 4a (retuned WD) and 4d (random-gating placebo) ran and are
+  within the tier; 4b (LR bump + grad clip) never ran (missing harness hook,
+  deviation 6); 4c (rho-ignored) and the noise-only arm were budget-cut with
+  the exploratory tier and never ran [correction 2026-07-20: the earlier
+  parenthetical mis-stated 4c as run] — all moot under the null but recorded. Pipeline sensitivity is proven by the baseline arms
   (dynmuon −0.717pp, paired t=−35).
 - The registered "≥ the DynMuon gap on the same harness" clause is
   **degenerate**: WP0.3 was never executed (no reference number), and the

@@ -127,107 +127,131 @@ CLAUDE.md rule 5.
 
 ```json
 {
-  "gpu_type_class": "A6000",
-  "sec_per_run": 22,
-  "price_per_hour_usd": 0.4067,
-  "groups": [
-    {
-      "group": "G1-headtohead",
-      "seed_policy": "eval",
-      "n_seeds": 100,
-      "configs": {
-        "configs/wp22_headtohead_muon.yaml": 1,
-        "configs/wp22_headtohead_routed.yaml": 1,
-        "configs/wp22_headtohead_dynmuon.yaml": 1,
-        "configs/wp22_headtohead_adamuon.yaml": 1,
-        "configs/wp22_headtohead_normuon.yaml": 1
-      },
-      "runs": 500
-    },
-    {
-      "group": "G2-tuneA",
-      "seed_policy": "dev",
-      "n_seeds": 25,
-      "configs": {
-        "configs/wp22_tuneA_muon.yaml": 9,
-        "configs/wp22_tuneA_routed.yaml": 9
-      },
-      "runs": 450
-    },
-    {
-      "group": "G3-tuneB",
-      "seed_policy": "eval",
-      "n_seeds": 100,
-      "configs": {
-        "configs/wp22_tuneB_muon.yaml": 1,
-        "configs/wp22_tuneB_routed.yaml": 1
-      },
-      "runs": 200
-    },
-    {
-      "group": "G4-null",
-      "seed_policy": "eval",
-      "n_seeds": 100,
-      "configs": {
-        "configs/wp22_null_muon_wd.yaml": 1,
-        "configs/wp22_null_muon_lrclip.yaml": 1,
-        "configs/wp22_null_routed_rhoignored.yaml": 1,
-        "configs/wp22_null_routed_randomgating.yaml": 1
-      },
-      "runs": 400
-    },
-    {
-      "group": "G5-goscconst",
-      "seed_policy": "eval",
-      "n_seeds": 100,
-      "configs": {
-        "configs/wp22_goscconst_025.yaml": 1,
-        "configs/wp22_goscconst_050.yaml": 1,
-        "configs/wp22_goscconst_075.yaml": 1
-      },
-      "runs": 300
-    },
-    {
-      "group": "G6-stress",
-      "seed_policy": "dev",
-      "n_seeds": 10,
-      "configs": {
-        "configs/wp22_stress_muon.yaml": 3,
-        "configs/wp22_stress_routed.yaml": 3
-      },
-      "runs": 60
-    },
-    {
-      "group": "G7-exploratory",
-      "seed_policy": "eval",
-      "n_seeds": 100,
-      "configs": {
-        "configs/wp22_exploratory_fullrouted.yaml": 1,
-        "configs/wp22_channel_noise_only.yaml": 1
-      },
-      "runs": 200
-    },
-    {
-      "group": "G8-beta-sensitivity",
-      "seed_policy": "dev",
-      "n_seeds": 10,
-      "configs": {
-        "configs/wp22_beta09_oscarm.yaml": 1
-      },
-      "runs": 10
-    }
-  ],
-  "total_runs": 2120,
-  "total_gpu_hours": 12.96,
-  "total_cost_usd": 5.27,
-  "pending": {
-    "group": "G9-lambda-tracking",
-    "seed_policy": "dev",
-    "n_seeds": 3,
-    "configs": { "configs/wp23_lambda_tracking.yaml": 1 },
-    "runs": 3,
-    "blocked_on": "instrumentation-on-routed wiring"
+ "gpu_type_class": "A6000",
+ "sec_per_run": 22,
+ "price_per_hour_usd": 0.4067,
+ "groups": [
+  {
+   "group": "G1-headtohead",
+   "seed_policy": "eval",
+   "n_seeds": 100,
+   "configs": {
+    "configs/wp22_headtohead_muon.yaml": 1,
+    "configs/wp22_headtohead_routed.yaml": 1,
+    "configs/wp22_headtohead_dynmuon.yaml": 1,
+    "configs/wp22_headtohead_adamuon.yaml": 1,
+    "configs/wp22_headtohead_normuon.yaml": 1
+   },
+   "runs": 500
+  },
+  {
+   "group": "G2-tuneA",
+   "seed_policy": "dev",
+   "n_seeds": 25,
+   "configs": {
+    "configs/wp22_tuneA_muon.yaml": 9,
+    "configs/wp22_tuneA_routed.yaml": 9
+   },
+   "runs": 450
+  },
+  {
+   "group": "G3-tuneB",
+   "seed_policy": "eval",
+   "n_seeds": 100,
+   "configs": {
+    "configs/wp22_tuneB_muon.yaml": 1,
+    "configs/wp22_tuneB_routed.yaml": 1
+   },
+   "runs": 200
+  },
+  {
+   "group": "G4-null",
+   "seed_policy": "eval",
+   "n_seeds": 100,
+   "configs": {
+    "configs/wp22_null_muon_wd.yaml": 1,
+    "configs/wp22_null_muon_lrclip.yaml": 1,
+    "configs/wp22_null_routed_rhoignored.yaml": 1,
+    "configs/wp22_null_routed_randomgating.yaml": 1
+   },
+   "runs": 400
+  },
+  {
+   "group": "G5-goscconst",
+   "seed_policy": "eval",
+   "n_seeds": 100,
+   "configs": {
+    "configs/wp22_goscconst_025.yaml": 1,
+    "configs/wp22_goscconst_050.yaml": 1,
+    "configs/wp22_goscconst_075.yaml": 1
+   },
+   "runs": 300
+  },
+  {
+   "group": "G6-stress",
+   "seed_policy": "dev",
+   "n_seeds": 10,
+   "configs": {
+    "configs/wp22_stress_muon.yaml": 3,
+    "configs/wp22_stress_routed.yaml": 3
+   },
+   "runs": 60
+  },
+  {
+   "group": "G7-exploratory",
+   "seed_policy": "eval",
+   "n_seeds": 100,
+   "configs": {
+    "configs/wp22_exploratory_fullrouted.yaml": 1,
+    "configs/wp22_channel_noise_only.yaml": 1
+   },
+   "runs": 200
+  },
+  {
+   "group": "G8-beta-sensitivity",
+   "seed_policy": "dev",
+   "n_seeds": 10,
+   "configs": {
+    "configs/wp22_beta09_oscarm.yaml": 1
+   },
+   "runs": 10
+  },
+  {
+   "group": "G10a-gate2-ladder",
+   "title": "Gate-2 extended LR ladder (reports/gate2-decision.md)",
+   "configs": {
+    "configs/wp22_stress2_muon.yaml": 3,
+    "configs/wp22_stress2_routed.yaml": 3
+   },
+   "seed_policy": "dev",
+   "n_seeds": 10,
+   "runs": 60
+  },
+  {
+   "group": "G10b-gate2-lr2x",
+   "title": "Gate-2 2x-LR eval confirmation (reports/gate2-decision.md)",
+   "configs": {
+    "configs/wp22_lr2x_muon.yaml": 1,
+    "configs/wp22_lr2x_routed.yaml": 1
+   },
+   "seed_policy": "eval",
+   "n_seeds": 100,
+   "runs": 200
   }
+ ],
+ "total_runs": 2380,
+ "total_gpu_hours": 14.54,
+ "total_cost_usd": 5.92,
+ "pending": {
+  "group": "G9-lambda-tracking",
+  "seed_policy": "dev",
+  "n_seeds": 3,
+  "configs": {
+   "configs/wp23_lambda_tracking.yaml": 1
+  },
+  "runs": 3,
+  "blocked_on": "instrumentation-on-routed wiring"
+ }
 }
 ```
 

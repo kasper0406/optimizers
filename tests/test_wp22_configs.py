@@ -122,6 +122,12 @@ def test_expected_config_set_present():
         "wp22_stress_routed.yaml",
         # Gate-1 A5: beta-sensitivity dev probe.
         "wp22_beta09_oscarm.yaml",
+        # Gate-2 secondary-criterion completion (reports/gate2-decision.md):
+        # extended LR ladder + 2x-LR eval confirmation.
+        "wp22_stress2_muon.yaml",
+        "wp22_stress2_routed.yaml",
+        "wp22_lr2x_muon.yaml",
+        "wp22_lr2x_routed.yaml",
     }
     assert WP23_CONFIG.exists()
 
@@ -203,6 +209,14 @@ def test_seed_policy_matches_group(path):
         assert policy == "dev" and seeds == list(range(1000, 1010)), (
             f"{name}: beta sensitivity is a dev n=10 probe (Gate-1 A5)"
         )
+    elif name.startswith("wp22_stress2_"):
+        assert policy == "dev" and seeds == list(range(1000, 1010)), (
+            f"{name}: Gate-2 extended ladder is dev n=10 per point"
+        )
+    elif name.startswith("wp22_lr2x_"):
+        assert policy == "eval" and seeds == list(range(100)), (
+            f"{name}: Gate-2 2x-LR confirmation is eval n=100 (pre-registered)"
+        )
     elif name == "wp23_lambda_tracking.yaml":
         assert policy == "dev" and seeds == list(range(1000, 1003)), (
             f"{name}: lambda tracking is dev n=3 (measurement)"
@@ -249,7 +263,7 @@ def test_grid_counts_and_totals_match_run_plan():
             group_runs += len(variants) * len(seeds)
         assert group_runs == group["runs"], f"{group['group']}: runs mismatch"
         total_runs += group_runs
-    assert total_runs == manifest["total_runs"] == 2120  # Gate-1-amended matrix
+    assert total_runs == manifest["total_runs"] == 2380  # Gate-1 matrix + Gate-2 completion
     # Budget arithmetic stays consistent with the declared assumptions.
     hours = total_runs * manifest["sec_per_run"] / 3600.0
     assert abs(hours - manifest["total_gpu_hours"]) < 0.05
