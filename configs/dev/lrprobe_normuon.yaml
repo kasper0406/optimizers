@@ -1,0 +1,32 @@
+# Dev LR probe for normuon (pre-eval tuning fairness: WP0.4 smoke settings were
+# untuned; head-to-head eval lr is set to this probe's argmax, labeled
+# "lightly tuned (dev)" in the comparison table). Dev seeds only.
+experiment: airbench_smoke
+seed: 1700
+device: cuda
+data:
+  root: data/cifar10
+train:
+  epochs: 8
+  batch_size: 2000
+recipe:
+  normalize_filter_weights: true
+  compile: true
+  tta_level: 2
+optimizer:
+  name: normuon
+  beta1: 0.6
+  beta2: 0.95
+  ns_steps: 3
+  weight_decay: 0.0
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 5
+  grid:
+    optimizer.lr:
+    - 0.02
+    - 0.05
+    - 0.12
+    - 0.24
+    - 0.5

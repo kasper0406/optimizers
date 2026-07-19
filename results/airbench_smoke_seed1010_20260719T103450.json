@@ -1,0 +1,59 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_smoke",
+      "optimizer": {
+        "lr": 0.24,
+        "momentum": 0.6,
+        "name": "muon",
+        "nesterov": true,
+        "ns_steps": 3,
+        "weight_decay": 0.004
+      },
+      "recipe": {
+        "compile": false,
+        "normalize_filter_weights": true,
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/wp22_tuneA_muon__lr0.24_weight_decay0.004.yaml",
+    "sha256": "03b42394fd317f850144f7f79168fde3a19ca60ee5e41642b50e64dfc3254f92"
+  },
+  "cost_usd": 0.003,
+  "experiment": "airbench_smoke",
+  "finished_at": "2026-07-19T10:35:00.330493+00:00",
+  "git_dirty": false,
+  "git_sha": "91a5bbe908ad8cee87c46329c2d9b57b6fb93388",
+  "gpu_type": "NVIDIA RTX A6000",
+  "metrics": {
+    "epochs": 8.0,
+    "optimizer": "muon",
+    "steps": 200,
+    "time_seconds": 7.668768753051758,
+    "train_acc_last": 0.9730000495910645,
+    "tta_val_acc": 0.9388999938964844,
+    "val_acc": 0.9305999875068665,
+    "val_accs": [
+      0.507099986076355,
+      0.6674999594688416,
+      0.7712999582290649,
+      0.7551999688148499,
+      0.8671000003814697,
+      0.8991000056266785,
+      0.9213999509811401,
+      0.9305999875068665
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1010,
+  "started_at": "2026-07-19T10:34:50.191197+00:00",
+  "wall_time_s": 10.139243896999687
+}

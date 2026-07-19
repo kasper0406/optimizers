@@ -1,0 +1,83 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_instrumented",
+      "instrumentation": {
+        "align_min": 0.9,
+        "betas": [
+          0.9,
+          0.99
+        ],
+        "classifier": {
+          "innov_needed": 2,
+          "innov_window": 4,
+          "n_min": 50,
+          "rho_osc": 0.5,
+          "tau_noise": 2.0,
+          "tau_sig": 4.0,
+          "z_reset": 6.0
+        },
+        "hvp": false,
+        "k1": 16,
+        "k2": 16,
+        "min_dim": 8,
+        "momentum_key": "momentum_buffer",
+        "seed": 4242,
+        "snapshot_every": 5,
+        "subspace_iters": 2,
+        "t_refresh": 50
+      },
+      "probe_overrides": {
+        "lr": 0.06
+      },
+      "recipe": {
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/instrumented_airbench_lrquarter.yaml",
+    "sha256": "c25bd0fb53ef45c72f1de3596896ce1c859a5f578b9369ab556366dc549b6d9a"
+  },
+  "cost_usd": 0.003,
+  "experiment": "airbench_instrumented",
+  "finished_at": "2026-07-19T10:07:02.849432+00:00",
+  "git_dirty": false,
+  "git_sha": "91a5bbe908ad8cee87c46329c2d9b57b6fb93388",
+  "gpu_type": "NVIDIA RTX A6000",
+  "metrics": {
+    "epochs": 8.0,
+    "instrumentation_sidecar": "airbench_instrumented_seed1304_20260719T100617.instrumentation.json",
+    "instrumented": true,
+    "optimizer": "vendor_muon",
+    "optimizer_lr": 0.06,
+    "probe_overrides": {
+      "lr": 0.06
+    },
+    "steps": 200,
+    "time_seconds": 36.1582586517334,
+    "train_acc_last": 0.9625000357627869,
+    "tta_val_acc": 0.9199000000953674,
+    "val_acc": 0.9103999733924866,
+    "val_accs": [
+      0.7239999771118164,
+      0.8077999949455261,
+      0.8400999903678894,
+      0.8774999976158142,
+      0.8729999661445618,
+      0.9023999571800232,
+      0.9091999530792236,
+      0.9103999733924866
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1304,
+  "started_at": "2026-07-19T10:06:17.977795+00:00",
+  "wall_time_s": 44.87160312800006
+}
