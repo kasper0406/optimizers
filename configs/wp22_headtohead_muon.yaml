@@ -1,0 +1,39 @@
+# WP2.2 Group 1 (head-to-head, plan section 2.2.1): stock Muon at the record
+# config on the airbench_smoke harness. Comparison-table run: eval seed
+# policy, single GPU type (A6000 class; aggregate.py enforces one gpu_type per
+# table), recipe identical across every wp22_* comparison config.
+#
+# Optimizer hyperparameters are the airbench94_muon.py record values
+# (vendor/airbench/airbench94_muon.py:363 -- lr 0.24, momentum 0.6, nesterov,
+# NS steps 3), matching configs/dev/airbench_smoke_muon.yaml.
+#
+# Launch: uv run python scripts/sweep.py configs/wp22_headtohead_muon.yaml
+# (seeds 0-99 resolved at launch time; never written here -- CLAUDE.md rule 2).
+# The top-level 'seed' is a dev seed for single debug runs only; sweep.py
+# strips it. Requires CUDA.
+experiment: airbench_smoke
+seed: 2201
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true   # airbench94_muon.py:83, applied harness-side
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: muon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+
+sweep:
+  seeds: eval          # -> seeds 0-99 at launch time; comparison-table set

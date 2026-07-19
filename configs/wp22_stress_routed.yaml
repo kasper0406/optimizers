@@ -1,0 +1,56 @@
+# WP2.2 Group 6 (LR stress test, plan section 2.2.5): Routed Muon at LR
+# multipliers {1.0, 1.5, 2.0} x record lr 0.24 -> {0.24, 0.36, 0.48}.
+# The cleanest demo of the multiplicative LR-ceiling argument if routed holds
+# where stock Muon (wp22_stress_muon.yaml) degrades. Feeds the secondary
+# success criterion (plan 2.3: max stable LR ratio routed/stock >= 1.3).
+#
+# Metrics: divergence rate + accuracy of surviving seeds. Dev seeds, n=10 per
+# LR point (deviation from n=100-everywhere; flagged in docs/wp22-run-plan.md).
+#
+# Routing values are frozen at constructor defaults; TBD-CHECK-GATE1 as in
+# wp22_headtohead_routed.yaml.
+experiment: airbench_smoke
+seed: 2217
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: routed
+  lr: 0.24             # overridden by the grid
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+  # -- routing (constructor defaults; TBD-CHECK-GATE1)
+  k: 16
+  t_refresh: 50
+  beta: 0.99
+  tau_sig: 4.0
+  tau_noise: 2.0
+  rho_osc: 0.5
+  g_noise: 0.25
+  n_min: 50
+  align_min: 0.9
+  enable_noise_channel: true
+  enable_oscillation_channel: true
+  rho_ignored: false
+  random_gating: false
+  seed: 2600           # optimizer-internal RNG (dev literal, fixed per config)
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 10      # -> seeds 1000-1009 at launch time (stress probe)
+  grid:
+    optimizer.lr: [0.24, 0.36, 0.48]   # 1.0x, 1.5x, 2.0x record

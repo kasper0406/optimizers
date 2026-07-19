@@ -1,0 +1,45 @@
+# WP2.2 Group 4b (null ablation, plan section 2.2.4): stock Muon with a
+# global LR bump (1.5x record = 0.36) plus gradient clipping -- tests whether
+# routing's oscillation channel is just clipping in disguise. Eval n=100
+# comparison-table run.
+#
+# NOT-RUNNABLE-YET -- HARNESS ADDITION REQUIRED. src/optim/airbench_zoo.py
+# currently has NO gradient-clipping support and silently IGNORES unknown
+# recipe keys, so launching this config today would run WITHOUT clipping and
+# produce a wrong-but-valid-looking result. Required (~5-line) addition to
+# run_airbench_smoke, outside this task's file ownership:
+#   clip = recipe_cfg.get("grad_clip")   # clip filter-param grad norm
+#   if clip is not None:
+#       torch.nn.utils.clip_grad_norm_(filter_params, float(clip))
+#   (applied after backward, before the optimizer steps)
+# The human removes the status marker once the harness supports and honors
+# recipe.grad_clip. clip value 1.0 is provisional (TBD-tunable on dev seeds
+# after the harness addition). Flagged in docs/wp22-run-plan.md.
+experiment: airbench_smoke
+status: "NOT-RUNNABLE-YET -- requires recipe.grad_clip support in src/optim/airbench_zoo.py (currently silently ignored)"
+seed: 2211
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+  grad_clip: 1.0       # filter-param grad-norm clip; provisional, TBD-tunable
+
+optimizer:
+  name: muon
+  lr: 0.36             # 1.5x record lr 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+
+sweep:
+  seeds: eval          # -> seeds 0-99 at launch time; comparison-table set

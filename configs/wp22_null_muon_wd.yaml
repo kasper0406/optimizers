@@ -1,0 +1,38 @@
+# WP2.2 Group 4a (null ablation, plan section 2.2.4): stock Muon at record lr
+# with RETUNED weight decay -- tests whether routing's noise channel is just
+# weight decay in disguise. Eval n=100 comparison-table run.
+#
+# PLACEHOLDER -- NOT RUNNABLE AS WRITTEN. weight_decay is filled from the
+# stage-A muon grid (wp22_tuneA_muon.yaml): the argmax over the WD axis at
+# fixed record lr 0.24 (the "small dev grid" of plan 2.2.4a; no separate dev
+# sweep is spent -- flagged in docs/wp22-run-plan.md). Fill via:
+#   uv run python scripts/plan_wp22.py fill-tuneB \
+#       --csv <stageA_aggregate.csv> --manifest <stageA_manifest.json> \
+#       --target configs/wp22_null_muon_wd.yaml --fix optimizer.lr=0.24
+experiment: airbench_smoke
+status: "PLACEHOLDER-TBD-STAGE-A -- not runnable; fill weight_decay from the stage-A muon aggregate at lr 0.24"
+seed: 2210
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: muon
+  lr: 0.24             # record lr, held fixed for this ablation
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: TBD-STAGE-A  # argmax over WD axis at lr 0.24 in stage A
+
+sweep:
+  seeds: eval          # -> seeds 0-99 at launch time; comparison-table set

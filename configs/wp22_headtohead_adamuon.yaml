@@ -1,0 +1,35 @@
+# WP2.2 Group 1 (head-to-head, plan section 2.2.3): AdaMuon baseline
+# (arXiv:2507.11005, Algorithm 1) on the airbench_smoke harness.
+# Comparison-table run: eval seed policy, single GPU type (A6000 class),
+# recipe identical to wp22_headtohead_muon.yaml.
+#
+# Settings carried over from the WP0.4 smoke config
+# (configs/dev/airbench_smoke_adamuon.yaml). The RMS-aligned rescaling targets
+# Adam-like update RMS (0.2), so lr lives on an Adam-like scale. lr remains
+# the WP0.4 dev starting point; no matched LR x WD sweep is budgeted for
+# baselines (flagged deviation in docs/wp22-run-plan.md).
+experiment: airbench_smoke
+seed: 2204
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: adamuon
+  lr: 0.01
+  momentum: 0.6
+  ns_steps: 3
+  weight_decay: 0.0
+
+sweep:
+  seeds: eval          # -> seeds 0-99 at launch time; comparison-table set

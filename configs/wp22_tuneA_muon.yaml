@@ -1,0 +1,47 @@
+# WP2.2 Group 2 (fair-tuning stage A, plan section 2.2.2): 3x3 LR x WD grid
+# for stock Muon, SELECTION stage on dev seeds (n=25).
+#
+# DEVIATION from plan (n=100 everywhere): two-stage tuning to fit the budget
+# envelope -- stage A selects the argmax on 25 dev seeds; only the selected
+# point is re-run at full eval n=100 (wp22_tuneB_muon.yaml). Flagged in
+# docs/wp22-run-plan.md for the gate record.
+#
+# WD axis: the airbench_smoke harness has NO harness-level weight decay for
+# filter params (recipe.sgd_weight_decay covers only biases/head on the SGD
+# side, default 2e-6 * batch_size = 0.004). Filter-param WD therefore rides
+# optimizer.weight_decay; grid values {0, 0.004, 0.008} = {record value 0,
+# harness-default equivalent 2e-6*2000, 2x}. Documented adaptation in
+# docs/wp22-run-plan.md.
+#
+# LR axis centered at the record lr 0.24: {0.12, 0.24, 0.48}.
+experiment: airbench_smoke
+seed: 2206
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: muon
+  lr: 0.24             # overridden by the grid
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0    # overridden by the grid
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 25      # -> seeds 1000-1024 at launch time (selection stage)
+  grid:
+    optimizer.lr: [0.12, 0.24, 0.48]
+    optimizer.weight_decay: [0.0, 0.004, 0.008]

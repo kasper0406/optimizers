@@ -1,0 +1,47 @@
+# WP2.2 Group 1 (head-to-head, plan section 2.2.3): DynMuon baseline on the
+# airbench_smoke harness. Comparison-table run: eval seed policy, single GPU
+# type (A6000 class), recipe identical to wp22_headtohead_muon.yaml.
+#
+# Settings carried over from the WP0.4 smoke config
+# (configs/dev/airbench_smoke_dynmuon.yaml). Schedule semantics per
+# vendor/DynMuon/dynmuon/dynmuon.py (logistic anneal of the spectral exponent
+# p from p_max to p_min); total_steps matches 8 epochs x 25 steps/epoch = 200
+# optimizer steps at batch_size 2000.
+#
+# TBD-TUNABLE: lr 0.05 is the best available dev-verified value under
+# DynMuon's own adjust_lr=spectral_norm per-shape rescaling; DynMuon's tuning
+# on this harness is an OPEN ISSUE from WP0.4 (no matched LR x WD sweep is
+# budgeted for baselines -- flagged deviation in docs/wp22-run-plan.md). The
+# human may replace lr with a better dev-verified value before launch.
+experiment: airbench_smoke
+seed: 2203
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: dynmuon
+  lr: 0.05             # TBD-TUNABLE (see header)
+  momentum: 0.6
+  nesterov: true
+  weight_decay: 0.0
+  total_steps: 200     # must match epochs x steps/epoch for this recipe
+  p_max: 1.0
+  p_min: -0.25
+  tau_ratio: 0.02
+  width_ratio: 0.08
+  adjust_lr: spectral_norm
+  spectral_impl: poly
+
+sweep:
+  seeds: eval          # -> seeds 0-99 at launch time; comparison-table set

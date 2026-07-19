@@ -1,0 +1,88 @@
+# WP2.3 lambda-tracking run (plan section 2.2.6): ONE instrumented Routed
+# Muon run spec -- log implied eta*lambda along DAMPED directions over time to
+# check for runaway sharpening under damping (Damian et al. self-stabilization
+# concern). Plateau = safe; runaway = the damper needs lambda tracking.
+#
+# NOT-RUNNABLE-YET -- HARNESS WIRING PENDING. The read-only
+# InstrumentationHub (src/instrument/) is currently wired for the Muon-family
+# momentum buffers on airbench_smoke (see
+# configs/dev/instrumented_airbench_muon.yaml); attaching it to a ROUTED run
+# and cross-referencing the hub's per-direction time series with the
+# optimizer's own routing decisions (which directions were damped, applied
+# gains) has NOT been wired or validated. Required before launch:
+#   1. verify the hub reads routed's momentum state (momentum_key) without
+#      interfering with the optimizer's tracked-pair machinery;
+#   2. export routed's per-step routing decisions (regime labels + gains per
+#      tracked direction) into the instrumentation sidecar so damped
+#      directions can be identified in the lambda time series;
+#   3. a smoke run on dev seeds confirming overhead and schema.
+# The human (or a follow-up WP) removes the status marker once wired.
+#
+# Analysis: implied eta*lambda from per-direction amplitude ratios
+# (trajectory-derived; HVP stays off -- plan's distributed invariant 3).
+# Dev seeds (measurement, not comparison); 3 seeds for run-to-run sanity.
+experiment: airbench_smoke
+status: "NOT-RUNNABLE-YET -- instrumentation-on-routed wiring pending (see header)"
+seed: 2218
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: routed
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+  # -- routing (constructor defaults; TBD-CHECK-GATE1, as in wp22 configs)
+  k: 16
+  t_refresh: 50
+  beta: 0.99
+  tau_sig: 4.0
+  tau_noise: 2.0
+  rho_osc: 0.5
+  g_noise: 0.25
+  n_min: 50
+  align_min: 0.9
+  enable_noise_channel: true
+  enable_oscillation_channel: true
+  rho_ignored: false
+  random_gating: false
+  seed: 2600           # optimizer-internal RNG (dev literal, fixed per config)
+
+instrumentation:
+  k1: 16               # top singular pairs (match optimizer.k for overlap)
+  k2: 16               # bulk probes, orthogonalized against the top block
+  t_refresh: 50        # match optimizer.t_refresh
+  subspace_iters: 2
+  betas: [0.9, 0.99]
+  align_min: 0.9
+  snapshot_every: 5    # dense cadence: lambda time series is the deliverable
+  seed: 4242           # instrumentation probe RNG (dev seed, >= 1000)
+  min_dim: 8
+  momentum_key: momentum_buffer   # verify against routed's state dict (item 1)
+  hvp: false           # HVP-free by design (plan distributed invariant 3)
+  classifier:          # DEV values; analysis reads raw series, not labels
+    tau_sig: 4.0
+    tau_noise: 2.0
+    rho_osc: 0.5
+    n_min: 50
+    z_reset: 6.0
+    innov_needed: 2
+    innov_window: 4
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 3       # -> seeds 1000-1002 at launch time (measurement run)

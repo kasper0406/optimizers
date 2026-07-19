@@ -1,0 +1,41 @@
+# WP2.2 Group 6 (LR stress test, plan section 2.2.5): stock Muon at LR
+# multipliers {1.0, 1.5, 2.0} x record lr 0.24 -> {0.24, 0.36, 0.48}.
+# Prediction (plan): stock Muon degrades/diverges as LR rises; routed holds
+# via per-direction damping (wp22_stress_routed.yaml is the counterpart).
+#
+# Metrics: divergence rate (fraction of seeds with non-finite / collapsed
+# accuracy) + accuracy of surviving seeds. Dev seeds, n=10 per LR point --
+# this is a stress probe, not a comparison-table entry (deviation from the
+# plan's n=100-everywhere; +-10% divergence-rate resolution; flagged in
+# docs/wp22-run-plan.md). Divergent runs may need `aggregate.py
+# --skip-invalid` / manual counting -- see the run-plan doc.
+experiment: airbench_smoke
+seed: 2216
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: muon
+  lr: 0.24             # overridden by the grid
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 10      # -> seeds 1000-1009 at launch time (stress probe)
+  grid:
+    optimizer.lr: [0.24, 0.36, 0.48]   # 1.0x, 1.5x, 2.0x record

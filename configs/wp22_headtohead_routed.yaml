@@ -1,0 +1,56 @@
+# WP2.2 Group 1 (head-to-head, plan section 2.2.1): Routed Muon at the record
+# Muon lr/momentum with default routing parameters. "Unfair to routed" by
+# design -- the record config is tuned for stock Muon; report anyway (plan).
+# Comparison-table run: eval seed policy, single GPU type (A6000 class),
+# recipe identical to wp22_headtohead_muon.yaml.
+#
+# Routing values below are the src/optim/routed.py constructor defaults
+# (= plan section 2.1 v0 defaults, matching configs/dev/airbench_smoke_routed.yaml).
+# TBD-CHECK-GATE1: if the Gate-1 record fixed different Phase-1-informed
+# thresholds (tau_sig / tau_noise / rho_osc / n_min), the human syncs them here
+# before launch; the agent never adjusts them.
+#
+# optimizer.seed is the ROUTED-INTERNAL RNG (subspace init / placebo gating),
+# a dev literal >= 1000; it is fixed across the eval sweep (see
+# docs/wp22-run-plan.md, limitations). The run seed travels via `run.py --seed`.
+experiment: airbench_smoke
+seed: 2202
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: routed
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+  # -- routing (constructor defaults; TBD-CHECK-GATE1, see header)
+  k: 16
+  t_refresh: 50
+  beta: 0.99
+  tau_sig: 4.0
+  tau_noise: 2.0
+  rho_osc: 0.5
+  g_noise: 0.25
+  n_min: 50
+  align_min: 0.9
+  enable_noise_channel: true
+  enable_oscillation_channel: true
+  rho_ignored: false
+  random_gating: false
+  seed: 2600           # optimizer-internal RNG (dev literal, fixed per config)
+
+sweep:
+  seeds: eval          # -> seeds 0-99 at launch time; comparison-table set
