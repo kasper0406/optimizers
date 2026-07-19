@@ -1,0 +1,59 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_smoke",
+      "optimizer": {
+        "beta1": 0.6,
+        "beta2": 0.95,
+        "lr": 0.02,
+        "name": "normuon",
+        "ns_steps": 3,
+        "weight_decay": 0.0
+      },
+      "recipe": {
+        "compile": false,
+        "normalize_filter_weights": true,
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/wp22_headtohead_normuon.yaml",
+    "sha256": "5e33d4fbe89153af4e8d6b5c55ab83c204dec58685a83c35fd3a3d6d6367f2bf"
+  },
+  "cost_usd": 0.003,
+  "experiment": "airbench_smoke",
+  "finished_at": "2026-07-19T20:00:30.645832+00:00",
+  "git_dirty": false,
+  "git_sha": "7480ca5e557292666207676e0f09a73a4d498c44",
+  "gpu_type": "NVIDIA RTX A6000",
+  "metrics": {
+    "epochs": 8.0,
+    "optimizer": "normuon",
+    "steps": 200,
+    "time_seconds": 8.157595962524415,
+    "train_acc_last": 0.9805000424385071,
+    "tta_val_acc": 0.9375,
+    "val_acc": 0.9264999628067017,
+    "val_accs": [
+      0.6820999979972839,
+      0.7865999937057495,
+      0.8330999612808228,
+      0.8613999485969543,
+      0.8925999999046326,
+      0.9099999666213989,
+      0.9228999614715576,
+      0.9264999628067017
+    ]
+  },
+  "schema_version": 1,
+  "seed": 43,
+  "started_at": "2026-07-19T20:00:19.747159+00:00",
+  "wall_time_s": 10.898573951999424
+}

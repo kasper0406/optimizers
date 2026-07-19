@@ -1,0 +1,58 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_smoke",
+      "optimizer": {
+        "lr": 0.005,
+        "momentum": 0.6,
+        "name": "adamuon",
+        "ns_steps": 3,
+        "weight_decay": 0.0
+      },
+      "recipe": {
+        "compile": true,
+        "normalize_filter_weights": true,
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/lrprobe2_adamuon__lr0.005.yaml",
+    "sha256": "e32243c2efc41b1f5099a61e97d3d2c1a494a453800b9635f2b25d90b579950b"
+  },
+  "cost_usd": 0.003,
+  "experiment": "airbench_smoke",
+  "finished_at": "2026-07-19T17:08:23.926644+00:00",
+  "git_dirty": false,
+  "git_sha": "4883aac136926d66a761ba4a71e5b7a8e9a4c0d9",
+  "gpu_type": "NVIDIA RTX A6000",
+  "metrics": {
+    "epochs": 8.0,
+    "optimizer": "adamuon",
+    "steps": 200,
+    "time_seconds": 13.76837841796875,
+    "train_acc_last": 0.9325000643730164,
+    "tta_val_acc": 0.898099958896637,
+    "val_acc": 0.8851999640464783,
+    "val_accs": [
+      0.4860000014305115,
+      0.7735999822616577,
+      0.7926999926567078,
+      0.8454999923706055,
+      0.859499990940094,
+      0.8743000030517578,
+      0.8836999535560608,
+      0.8851999640464783
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1001,
+  "started_at": "2026-07-19T17:08:07.352231+00:00",
+  "wall_time_s": 16.574330481002107
+}
