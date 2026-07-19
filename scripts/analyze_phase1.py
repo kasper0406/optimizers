@@ -64,7 +64,7 @@ def collect_points(sidecars, beta, phase_lo, phase_hi, burn_in):
                     snr = abs(pb["mu"][i]) / max(np.sqrt(var), SNR_FLOOR)
                     pts["x"].append(np.log10(max(snr, SNR_FLOOR)))
                     pts["rho"].append(pb["rho"][i])
-                    pts["dir_ids"].append((run_name, d["kind"], d["index"]))
+                    pts["dir_ids"].append((run_name, mat, d["kind"], d["index"]))
     return out
 
 
