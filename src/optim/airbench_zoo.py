@@ -256,6 +256,11 @@ class WithReplacementLoader:
     def __iter__(self):
         return iter_batches_with_replacement(self.loader, self._ab)
 
+    def __getattr__(self, name):
+        # Delegate everything else (normalize, images, ...) to the vendored
+        # loader so the harness's whiten-init path works unchanged.
+        return getattr(self.loader, name)
+
 
 # ----------------------------------------------------------------- experiment
 
