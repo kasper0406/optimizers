@@ -70,3 +70,26 @@ looking at any new data; ~$1.50):
   schedule). Airbench outcomes framed as robustness/parameter-freeness.
 - Housekeeping: aggregations over dev stress/tuneA routed grids must filter
   by git SHA (pre-fix routing-inactive duplicates retained by design).
+
+## Secondary criterion — RESOLVED (2026-07-20): **FAIL. Gate 2 = FAIL, FINAL.**
+
+Completion runs executed exactly as pre-registered above (260 runs; one
+GPU-availability interruption mid-batch, remedied by targeted rerun of the
+212 missing (variant, seed) pairs; zero duplicates; results in `results/`).
+
+1. Extended ladder {3,4,6}x, dev n=10/point: zero divergence for either
+   optimizer at any LR (graceful degradation persists to 6x — itself a
+   finding for the stability-law writeup), but both cross the pre-declared
+   93.0% floor between 2x and 3x (muon 92.68% / routed 92.55% at 3x).
+   Max-stable-LR = 0.48 (2x) for BOTH. Ratio = 1.0 < 1.3.
+2. 2x-LR eval confirmation, n=100 seed-paired: routed - muon = -0.024pp
+   (sd 0.176pp, t = -1.34). The dev-n=10 +0.144pp signal did not replicate;
+   sign inverted. Recorded as a multiple-comparisons false positive caught
+   by pre-registered confirmation.
+
+Consequences now final: Phase 3 not reopened; the plan's Phase-2 track ends
+in a fully-adjudicated FAIL (primary: paired equivalence, effect <= 0.042pp
+at 97.5% confidence; secondary: no stability margin, ratio 1.0). Deliverables
+proceed per the amended consequences: measurement paper (incl. the graceful-
+degradation-to-6x observation) and the pre-registered temporal-trust-ratio
+protocol before any new spend.
