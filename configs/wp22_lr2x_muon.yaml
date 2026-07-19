@@ -1,0 +1,23 @@
+# Gate-2 secondary-criterion completion: 2x-record-LR (0.48) eval
+# confirmation, n=100 eval seeds, seed-paired vs the muon h2h arm.
+experiment: airbench_smoke
+seed: 2201
+device: cuda
+data:
+  root: data/cifar10
+train:
+  epochs: 8
+  batch_size: 2000
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+optimizer:
+  name: muon
+  lr: 0.48
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+sweep:
+  seeds: eval

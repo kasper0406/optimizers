@@ -1,0 +1,31 @@
+# Gate-2 secondary-criterion completion (reports/gate2-decision.md):
+# extended LR ladder {3,4,6}x record for muon; dev n=10/point;
+# pre-registered stability operationalization in the gate record.
+experiment: airbench_smoke
+seed: 2216
+device: cuda
+data:
+  root: data/cifar10
+train:
+  epochs: 8
+  batch_size: 2000
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+optimizer:
+  name: muon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 10
+  grid:
+    optimizer.lr:
+    - 0.72
+    - 0.96
+    - 1.44
