@@ -165,6 +165,98 @@ def load_vendor_airbench():
     return module
 
 
+# ------------------------------------------------- batch-sampling ablation
+
+VALID_SAMPLING = (None, "with_replacement")
+
+
+def _resolve_sampling(recipe_cfg: Dict[str, Any]):
+    """Validate recipe.sampling.
+
+    ``None`` (key absent) = the vendored CifarLoader behavior, bit-identical
+    to the reference: an epoch is a random permutation of the training set,
+    partitioned into batches (sampling WITHOUT replacement within an epoch).
+
+    ``"with_replacement"`` = the Phase-1 disambiguation ablation: each
+    training step draws its ``batch_size`` indices i.i.d. WITH replacement
+    from the training set (see :func:`iter_batches_with_replacement`).
+    """
+    sampling = recipe_cfg.get("sampling", None)
+    if sampling not in VALID_SAMPLING:
+        raise SystemExit(
+            f"recipe.sampling must be one of {VALID_SAMPLING}, got {sampling!r}"
+        )
+    return sampling
+
+
+def iter_batches_with_replacement(loader, ab):
+    """One epoch over the vendored CifarLoader with i.i.d. WITH-replacement
+    batch index draws (Phase-1 sampling ablation).
+
+    Faithful replica of ``CifarLoader.__iter__`` (airbench94_muon.py:148-173)
+    -- identical epoch-0 preprocessing cache (normalize -> pre-flip -> reflect
+    pad), identical per-epoch random crop of the whole padded set, identical
+    deterministic every-other-epoch full flip, identical number of batches
+    per epoch -- EXCEPT the final index generation: the reference partitions
+    one ``torch.randperm`` (each image exactly once per epoch); this draws
+    each batch's indices via ``torch.randint`` (i.i.d. with replacement).
+
+    Documented deviations from the vendored path (and the only ones):
+    1. An image may appear 0 or several times per epoch, even within one
+       batch; repeated draws within an epoch share the SAME augmentation
+       realization (crop/flip are materialized once per epoch for the whole
+       set, exactly as in the reference, and then indexed).
+    2. The index RNG consumes the device RNG stream via ``torch.randint``
+       (one call per batch) instead of one ``torch.randperm`` per epoch, so
+       downstream RNG draws differ from the reference stream (inherent to
+       any sampling change).
+    """
+    if loader.epoch == 0:
+        images = loader.proc_images["norm"] = loader.normalize(loader.images)
+        if loader.aug.get("flip", False):
+            images = loader.proc_images["flip"] = ab.batch_flip_lr(images)
+        pad = loader.aug.get("translate", 0)
+        if pad > 0:
+            loader.proc_images["pad"] = torch.nn.functional.pad(
+                images, (pad,) * 4, "reflect"
+            )
+    if loader.aug.get("translate", 0) > 0:
+        images = ab.batch_crop(loader.proc_images["pad"], loader.images.shape[-2])
+    elif loader.aug.get("flip", False):
+        images = loader.proc_images["flip"]
+    else:
+        images = loader.proc_images["norm"]
+    if loader.aug.get("flip", False):
+        if loader.epoch % 2 == 1:
+            images = images.flip(-1)
+
+    loader.epoch += 1
+
+    n = len(images)
+    for _ in range(len(loader)):
+        idxs = torch.randint(n, (loader.batch_size,), device=images.device)
+        yield (images[idxs], loader.labels[idxs])
+
+
+class WithReplacementLoader:
+    """Iteration wrapper engaging :func:`iter_batches_with_replacement`.
+
+    Only constructed when ``recipe.sampling: with_replacement`` is set; the
+    default path never touches this class and keeps the vendored loader's
+    iterator bit-identical to the reference.
+    """
+
+    def __init__(self, loader, ab):
+        self.loader = loader
+        self._ab = ab
+
+    def __len__(self):
+        return len(self.loader)
+
+    def __iter__(self):
+        return iter_batches_with_replacement(self.loader, self._ab)
+
+
 # ----------------------------------------------------------------- experiment
 
 
@@ -172,6 +264,7 @@ def run_airbench_smoke(
     config: Dict[str, Any],
     device: torch.device,
     _hub_factory=None,
+    _batch_hook=None,
 ) -> Dict[str, Any]:
     """One airbench94 training run with a zoo optimizer on the filter params.
 
@@ -192,8 +285,17 @@ def run_airbench_smoke(
     ``after_step()`` right after, before ``zero_grad``.  Instrumentation is
     strictly read-only: it never modifies parameters, gradients, optimizer
     state, or any update.
+
+    ``_batch_hook`` (internal; used by the HVP-enabled instrumented runs):
+    callable ``(inputs, labels)`` invoked once per training step with the
+    current (augmented, normalized) batch, right before ``capture_grads()``.
+    ``None`` (default) leaves the loop untouched.
     """
     from src.optim.registry import build_optimizer
+
+    # Config validation first (CPU-safe): recipe.sampling gates the Phase-1
+    # with-replacement ablation; absent = vendored behavior, bit-identical.
+    sampling = _resolve_sampling(config.get("recipe", {}))
 
     if device.type != "cuda":
         raise SystemExit(
@@ -226,6 +328,10 @@ def run_airbench_smoke(
     train_loader = ab.CifarLoader(
         data_root, train=True, batch_size=batch_size, aug=dict(flip=True, translate=2)
     )
+    if sampling == "with_replacement":
+        # Phase-1 sampling ablation; len() and per-epoch augmentation are
+        # identical to the vendored loader, only the index draw changes.
+        train_loader = WithReplacementLoader(train_loader, ab)
     total_train_steps = math.ceil(epochs * len(train_loader))
     whiten_bias_train_steps = min(
         math.ceil(3 * len(train_loader)), total_train_steps
@@ -308,6 +414,8 @@ def run_airbench_smoke(
                 # airbench94_muon.py:83 (recipe step, applied uniformly)
                 for p in filter_params:
                     p.data.mul_(len(p.data) ** 0.5 / p.data.norm())
+            if _batch_hook is not None:
+                _batch_hook(inputs, labels)  # current batch for HVP probes
             if hub is not None:
                 hub.capture_grads()  # raw pre-momentum G, before any step()
             for opt in optimizers:
@@ -331,7 +439,7 @@ def run_airbench_smoke(
     )
     stop_timer()
 
-    return {
+    metrics = {
         "optimizer": opt_name,
         "epochs": epochs,
         "steps": step,
@@ -341,6 +449,9 @@ def run_airbench_smoke(
         "tta_val_acc": tta_val_acc,
         "time_seconds": time_seconds,
     }
+    if sampling is not None:
+        metrics["sampling"] = sampling  # ablation provenance; absent = vendor
+    return metrics
 
 
 def run_airbench(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]:
@@ -382,8 +493,16 @@ def run_airbench_instrumented(
     Muon's momentum buffers; per-step raw PRE-momentum gradient projections
     s_i = u^T G v (grabbed via ``hub.capture_grads()`` before
     ``optimizer2.step()``); per-matrix top sigma and ||G||_F; both betas.
-    The HVP callback stays None on airbench (the amplitude-ratio path is the
-    core estimator; HVPs are validation-only and optional here).
+
+    HVP probes (``instrumentation.hvp: true``, default false): once per
+    tracked pair per refresh, lambda_i = vec(u_i v_i^T)^T H vec(u_i v_i^T)
+    restricted to that matrix, on the CURRENT batch, via
+    :class:`src.instrument.hvp.AirbenchHvpProbe` (fp32 functional re-forward
+    + double-backward; read-only w.r.t. training).  Phase-1 VALIDATION ONLY
+    -- they calibrate the amplitude-ratio implied-eta*lambda estimator and
+    are forbidden in any optimizer update path.  Requires
+    ``recipe.compile: false`` (double-backward through torch.compile is
+    unsupported; the config must opt out of the stock compile explicitly).
 
     Zero behavior change to training itself: the hub is read-only and the
     recipe, schedules, and optimizers are exactly those of the ``airbench``
@@ -419,6 +538,15 @@ def run_airbench_instrumented(
     recipe.setdefault("compile", True)  # the reference compiles the model
     merged["recipe"] = recipe
 
+    hvp_requested = bool(instr_cfg.get("hvp", False))
+    if hvp_requested and recipe.get("compile", True):
+        raise SystemExit(
+            "instrumentation.hvp: true requires recipe.compile: false -- "
+            "double-backward (create_graph) through a torch.compile'd model "
+            "is unsupported; the HVP calibration run must opt out of the "
+            "stock compile explicitly in its config."
+        )
+
     holder: Dict[str, Any] = {}
 
     def factory(model, optimizer2, filter_params):
@@ -427,12 +555,30 @@ def run_airbench_instrumented(
             (names.get(id(p), f"filter_{i}"), p)
             for i, p in enumerate(filter_params)
         ]
-        # HVP callback stays None for airbench (validation-only, optional).
-        holder["hub"] = hub_from_config(instr_cfg, named, optimizer2, hvp_fn=None)
+        hvp_fn = None
+        if hvp_requested:
+            # Phase-1 validation only; lives in src.instrument (never
+            # importable from any optimizer update path).
+            from src.instrument.hvp import AirbenchHvpProbe
+
+            hvp_fn = holder["hvp_probe"] = AirbenchHvpProbe(
+                model, filter_params, label_smoothing=0.2
+            )
+        holder["hub"] = hub_from_config(instr_cfg, named, optimizer2, hvp_fn=hvp_fn)
         return holder["hub"]
 
-    metrics = run_airbench_smoke(merged, device, _hub_factory=factory)
+    batch_hook = None
+    if hvp_requested:
+
+        def batch_hook(inputs, labels):
+            holder["hvp_probe"].set_batch(inputs, labels)
+
+    metrics = run_airbench_smoke(
+        merged, device, _hub_factory=factory, _batch_hook=batch_hook
+    )
     metrics["instrumented"] = True
+    if hvp_requested:
+        metrics["hvp_graph_builds"] = holder["hvp_probe"].n_graph_builds
     metrics["optimizer_lr"] = AIRBENCH_STOCK_LR  # for the eta*lambda plot
     metrics["_instrumentation_log"] = holder["hub"].to_log()
     return metrics

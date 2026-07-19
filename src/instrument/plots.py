@@ -36,7 +36,7 @@ import argparse
 import json
 import math
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import matplotlib
 
@@ -56,6 +56,7 @@ __all__ = [
     "plot_regime_scatter",
     "plot_regime_occupancy",
     "plot_eta_lambda_calibration",
+    "collect_calibration_points",
     "load_sidecar_directory",
     "make_all_plots",
 ]
@@ -352,29 +353,50 @@ def plot_regime_occupancy(log: Dict[str, Any], out_path: Path) -> Path:
 # --------------------------------------------------------------- plot 3 of 3
 
 
+def collect_calibration_points(
+    log: Dict[str, Any], *, lr: float
+) -> Dict[str, Tuple[List[float], List[float]]]:
+    """Per beta, the (x, y) pairs of the eta*lambda calibration plot:
+    x = HVP-measured eta*lambda (lr * lambda_hvp), y = implied eta*lambda
+    from the amplitude ratio, one pair per HVP record whose latest snapshot
+    at or before the record step is classified oscillating.
+
+    Shared by :func:`plot_eta_lambda_calibration` and the disambiguation
+    analysis (scripts/analyze_disambiguation.py) so both consume the exact
+    same matching rule.
+    """
+    out: Dict[str, Tuple[List[float], List[float]]] = {}
+    for beta in _betas(log):
+        xs: List[float] = []
+        ys: List[float] = []
+        for _, _, d in iter_directions(log):
+            series = d["per_beta"][beta]
+            for hstep, lam in zip(
+                d["lambda_hvp"]["step"], d["lambda_hvp"]["value"]
+            ):
+                idx = _snapshot_index_at(series["step"], hstep)
+                if idx is None or series["regime"][idx] != "oscillating":
+                    continue
+                xs.append(lr * float(lam))
+                ys.append(float(series["implied_eta_lambda"][idx]))
+        out[beta] = (xs, ys)
+    return out
+
+
 def plot_eta_lambda_calibration(
     log: Dict[str, Any], out_path: Path, *, lr: float
 ) -> Path:
     """Implied eta*lambda (amplitude ratio) vs HVP eta*lambda = lr * lambda,
     for snapshots where the direction is classified oscillating."""
     betas = _betas(log)
+    points = collect_calibration_points(log, lr=lr)
     markers = ["o", "^", "s", "D"]
     with plt.rc_context(_RC):
         fig, ax = plt.subplots(figsize=(5.2, 5.0))
         any_points = False
         all_vals: List[float] = []
         for bi, beta in enumerate(betas):
-            xs, ys = [], []
-            for _, _, d in iter_directions(log):
-                series = d["per_beta"][beta]
-                for hstep, lam in zip(
-                    d["lambda_hvp"]["step"], d["lambda_hvp"]["value"]
-                ):
-                    idx = _snapshot_index_at(series["step"], hstep)
-                    if idx is None or series["regime"][idx] != "oscillating":
-                        continue
-                    xs.append(lr * float(lam))
-                    ys.append(series["implied_eta_lambda"][idx])
+            xs, ys = points[beta]
             if xs:
                 any_points = True
                 all_vals += xs + ys
