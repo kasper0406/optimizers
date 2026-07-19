@@ -23,12 +23,21 @@ Update rule per Muon-managed matrix W (flattened to 2-D, m x n):
                      exists to feed).
         OSCILLATING  (rho <= -rho_osc) AND amplitude non-decaying
                      (amplitude_ratio >= 1 - amp_decay_margin):
-                     g = clip(1 / (eta_lambda_implied - 1), g_osc_min, 1)
-                       = clip(1 / amplitude_ratio,          g_osc_min, 1)
-                     targeting critical damping eta*lambda -> 1, with
-                     eta_lambda_implied = 1 + amplitude_ratio read from the
-                     trajectory (src.stats machinery). A decaying oscillation
-                     is left alone (g = 1): it is already self-damping.
+                     adaptive mode (default, g_osc_const is None):
+                       g = clip(1 / (eta_lambda_implied - 1), g_osc_min, 1)
+                         = clip(1 / amplitude_ratio,          g_osc_min, 1)
+                       targeting critical damping eta*lambda -> 1, with
+                       eta_lambda_implied = 1 + amplitude_ratio read from the
+                       trajectory (src.stats machinery).
+                     constant mode (Gate-1 amendment A2, g_osc_const set):
+                       g = g_osc_const exactly (fixed attenuation), because
+                       the Gate-1 record found the adaptive values match the
+                       pure-noise null of the ratio statistic (~0.53
+                       near-constant); the constant arm adjudicates
+                       "adaptive vs constant attenuation".
+                     In BOTH modes a decaying oscillation
+                     (amplitude_ratio < 1 - amp_decay_margin) is left alone
+                     (g = 1): it is already self-damping.
 
 Confidence (plan section 2.1): every direction starts in SIGNAL (= stock
 behavior) and only leaves it once the classifier's n_min effective-sample
@@ -138,6 +147,23 @@ class _TrackedTier:
         self.last_gains: Optional[np.ndarray] = None
         self.last_regimes: Optional[List[Regime]] = None
         self.last_alignment: Optional[np.ndarray] = None
+        # Routing telemetry (Gate-1 amendment A5): cheap per-step counters,
+        # accumulated per matrix; read out via RoutedMuon.routing_stats().
+        self.n_rotation_resets = 0  # refresh-alignment confidence resets
+        self._n_innovation_resets = 0  # classifier z-detector resets (mirror)
+        self.last_stats: Optional[Dict[str, Any]] = None
+        self.cum = {
+            "n_steps": 0,
+            "direction_steps": 0,
+            "signal_direction_steps": 0,
+            "noise_direction_steps": 0,
+            "oscillating_direction_steps": 0,
+            "treated_direction_steps": 0,
+            "in_confidence_window_direction_steps": 0,
+            "gain_sum": 0.0,
+            "gain_min": None,  # min/max over all direction-steps so far
+            "gain_max": None,
+        }
 
     # ------------------------------------------------------------- internals
 
@@ -191,6 +217,7 @@ class _TrackedTier:
             if rotated.size:
                 # Innovation -> confidence reset -> start-in-SIGNAL.
                 self.classifier.reset_directions(rotated.tolist())
+                self.n_rotation_resets += int(rotated.size)
         self.n_refreshes += 1
 
     # ------------------------------------------------------------ projections
@@ -201,6 +228,72 @@ class _TrackedTier:
         assert self.U is not None and self.V is not None
         G = G.detach().to(dtype=self.dtype, device=self.device)
         return ((self.U.T @ G) * self.V.T).sum(dim=1)
+
+    # -------------------------------------------------------------- telemetry
+
+    def record_step(self, step: int, gains: np.ndarray) -> None:
+        """Accumulate per-step routing telemetry (Gate-1 amendment A5).
+
+        Cheap: a handful of numpy reductions over the (k,) gain vector and
+        the classifier's (k,) label/count arrays; no tensors, no copies of
+        anything large. Called once per matrix per step from
+        RoutedMuon.shape_spectrum after the applied gains are known
+        (post-random_gating: these ARE the applied gains).
+        """
+        clf = self.classifier
+        regimes = clf.regimes  # (k,) labels, one list build per step
+        n_signal = sum(r is Regime.SIGNAL for r in regimes)
+        n_noise = sum(r is Regime.NOISE for r in regimes)
+        n_osc = self.k - n_signal - n_noise
+        n_treated = int(np.count_nonzero(gains != 1.0))
+        n_in_window = int(np.count_nonzero(clf.n_since_reset < clf.n_min))
+        g_sum = float(gains.sum())
+        g_min = float(gains.min())
+        g_max = float(gains.max())
+        n_innov_resets = sum(len(r) for r in clf.reset_steps)
+
+        self.last_stats = {
+            "step": int(step),
+            "k": self.k,
+            "n_signal": n_signal,
+            "n_noise": n_noise,
+            "n_oscillating": n_osc,
+            "n_treated": n_treated,
+            "treated_fraction": n_treated / self.k,
+            "n_in_confidence_window": n_in_window,
+            "gain_sum": g_sum,
+            "gain_min": g_min,
+            "gain_max": g_max,
+        }
+        cum = self.cum
+        cum["n_steps"] += 1
+        cum["direction_steps"] += self.k
+        cum["signal_direction_steps"] += n_signal
+        cum["noise_direction_steps"] += n_noise
+        cum["oscillating_direction_steps"] += n_osc
+        cum["treated_direction_steps"] += n_treated
+        cum["in_confidence_window_direction_steps"] += n_in_window
+        cum["gain_sum"] += g_sum
+        cum["gain_min"] = g_min if cum["gain_min"] is None else min(cum["gain_min"], g_min)
+        cum["gain_max"] = g_max if cum["gain_max"] is None else max(cum["gain_max"], g_max)
+        # Stored, not accumulated (already cumulative at the source).
+        self._n_innovation_resets = n_innov_resets
+
+    def stats_snapshot(self) -> Dict[str, Any]:
+        """JSON-able per-matrix telemetry: last step + cumulative + resets."""
+        cum = dict(self.cum)
+        ds = max(cum["direction_steps"], 1)
+        cum["treated_fraction"] = cum["treated_direction_steps"] / ds
+        return {
+            "shape": [self.m, self.n],
+            "k": self.k,
+            "n_refreshes": self.n_refreshes,
+            "n_rotation_resets": self.n_rotation_resets,
+            "n_innovation_resets": self._n_innovation_resets,
+            "n_confidence_resets": self.n_rotation_resets + self._n_innovation_resets,
+            "last": None if self.last_stats is None else dict(self.last_stats),
+            "cumulative": cum,
+        }
 
 
 class RoutedMuon(Muon):
@@ -227,9 +320,19 @@ class RoutedMuon(Muon):
         align_min            refresh alignment below this = innovation ->
                              confidence reset (0.9).
         subspace_iters       warm-started power iterations per refresh (2).
-        g_osc_min            lower clip of the oscillation gain (0.1).
+        g_osc_min            lower clip of the oscillation gain (0.1;
+                             adaptive mode only).
+        g_osc_const          Gate-1 amendment A2: when set (None default),
+                             the oscillation channel applies THIS fixed gain
+                             to oscillation-classified, non-decaying
+                             directions instead of the adaptive
+                             clip(1/(eta*lambda_implied - 1), g_osc_min, 1)
+                             formula. The amp_decay_margin escape (decaying
+                             oscillation -> g = 1) applies unchanged in both
+                             modes.
         amp_decay_margin     amplitude_ratio < 1 - margin counts as decaying
-                             -> oscillation gain not applied (0.05).
+                             -> oscillation gain not applied (0.05); applies
+                             in adaptive AND constant (g_osc_const) mode.
         enable_noise_channel / enable_oscillation_channel
                              channel switches (both True); both False =
                              bit-for-bit stock Muon.
@@ -268,6 +371,7 @@ class RoutedMuon(Muon):
         align_min: float = 0.9,
         subspace_iters: int = 2,
         g_osc_min: float = 0.1,
+        g_osc_const: Optional[float] = None,
         amp_decay_margin: float = 0.05,
         enable_noise_channel: bool = True,
         enable_oscillation_channel: bool = True,
@@ -286,6 +390,10 @@ class RoutedMuon(Muon):
             raise ValueError(f"g_noise must be in [0, 1], got {g_noise}")
         if not 0.0 < g_osc_min <= 1.0:
             raise ValueError(f"g_osc_min must be in (0, 1], got {g_osc_min}")
+        if g_osc_const is not None and not 0.0 < g_osc_const <= 1.0:
+            raise ValueError(
+                f"g_osc_const must be in (0, 1] or None, got {g_osc_const}"
+            )
         if n_min < 1:
             raise ValueError(f"n_min must be >= 1, got {n_min}")
         if tau_noise > tau_sig:
@@ -317,6 +425,7 @@ class RoutedMuon(Muon):
         self.align_min = float(align_min)
         self.subspace_iters = int(subspace_iters)
         self.g_osc_min = float(g_osc_min)
+        self.g_osc_const = None if g_osc_const is None else float(g_osc_const)
         self.amp_decay_margin = float(amp_decay_margin)
         self.enable_noise_channel = bool(enable_noise_channel)
         self.enable_oscillation_channel = bool(enable_oscillation_channel)
@@ -370,6 +479,7 @@ class RoutedMuon(Muon):
         gains = self._compute_gains(tier)
         tier.last_gains = gains
         tier.last_regimes = regimes
+        tier.record_step(state["step"], gains)  # A5 telemetry (cheap)
 
         if np.all(gains == 1.0):
             # No deviation from stock Muon (also guarantees the bit-for-bit
@@ -436,16 +546,115 @@ class RoutedMuon(Muon):
         if self.enable_oscillation_channel:
             osc = np.array([r is Regime.OSCILLATING for r in regimes])
             if osc.any():
-                amp = clf.stats.amplitude_ratio  # eta*lambda_implied - 1
                 non_decaying = ~clf.stats.is_decaying(self.amp_decay_margin)
                 active = osc & non_decaying
-                # g_osc = 1 / (eta*lambda_implied - 1), clipped: critical
-                # damping target eta*lambda -> 1 from the amplitude ratio.
-                g_osc = 1.0 / np.maximum(amp, 1e-12)
-                gains[active] = np.clip(g_osc[active], self.g_osc_min, 1.0)
+                if self.g_osc_const is not None:
+                    # Constant mode (Gate-1 amendment A2): fixed attenuation
+                    # for oscillation-classified, non-decaying directions.
+                    gains[active] = self.g_osc_const
+                else:
+                    amp = clf.stats.amplitude_ratio  # eta*lambda_implied - 1
+                    # g_osc = 1 / (eta*lambda_implied - 1), clipped: critical
+                    # damping target eta*lambda -> 1 from the amplitude ratio.
+                    g_osc = 1.0 / np.maximum(amp, 1e-12)
+                    gains[active] = np.clip(g_osc[active], self.g_osc_min, 1.0)
 
         if self.random_gating:
             # Placebo (ablation 4d): same gain multiset -- same gated
             # fraction, same magnitudes -- randomly assigned to directions.
             gains = tier.gating_rng.permutation(gains)
         return gains
+
+    # -------------------------------------------------------------- telemetry
+
+    def routing_stats(self) -> Dict[str, Any]:
+        """Per-matrix + aggregate routing telemetry (Gate-1 amendment A5).
+
+        JSON-able dict; all counters are accumulated per matrix inside the
+        step (``_TrackedTier.record_step``), so this call is pure read-out
+        and can be invoked at any cadence (the airbench harness samples the
+        aggregate every 10 steps and stores the full dict at end of run).
+
+        Shape::
+
+            {"per_matrix": {"matrix0_24x27": {"shape", "k", "n_refreshes",
+                            "n_rotation_resets", "n_innovation_resets",
+                            "n_confidence_resets", "last": {...},
+                            "cumulative": {...}}, ...},
+             "aggregate": {"last": {...} | None, "cumulative": {...} | None}}
+
+        ``last`` holds the most recent step's per-channel counts, treated
+        count/fraction, gain sum/min/max, and in-confidence-window count;
+        ``cumulative`` the direction-step totals of the same quantities plus
+        reset counts. Aggregate entries are None until the first routed step.
+        """
+        per_matrix: Dict[str, Any] = {}
+        tiers = []
+        i = 0
+        for group in self.param_groups:
+            for p in group["params"]:
+                tier = self.state.get(p, {}).get("routing")
+                if tier is None:
+                    continue
+                per_matrix[f"matrix{i}_{tier.m}x{tier.n}"] = tier.stats_snapshot()
+                tiers.append(tier)
+                i += 1
+
+        stepped = [t for t in tiers if t.last_stats is not None]
+        agg_last: Optional[Dict[str, Any]] = None
+        agg_cum: Optional[Dict[str, Any]] = None
+        if stepped:
+            k_tot = sum(t.k for t in stepped)
+            n_treated = sum(t.last_stats["n_treated"] for t in stepped)
+            agg_last = {
+                "step": max(t.last_stats["step"] for t in stepped),
+                "n_matrices": len(stepped),
+                "k_total": k_tot,
+                "n_signal": sum(t.last_stats["n_signal"] for t in stepped),
+                "n_noise": sum(t.last_stats["n_noise"] for t in stepped),
+                "n_oscillating": sum(
+                    t.last_stats["n_oscillating"] for t in stepped
+                ),
+                "n_treated": n_treated,
+                "treated_fraction": n_treated / k_tot,
+                "n_in_confidence_window": sum(
+                    t.last_stats["n_in_confidence_window"] for t in stepped
+                ),
+                "gain_sum": sum(t.last_stats["gain_sum"] for t in stepped),
+                "gain_min": min(t.last_stats["gain_min"] for t in stepped),
+                "gain_max": max(t.last_stats["gain_max"] for t in stepped),
+            }
+            ds = sum(t.cum["direction_steps"] for t in stepped)
+            treated_ds = sum(t.cum["treated_direction_steps"] for t in stepped)
+            agg_cum = {
+                "n_matrices": len(stepped),
+                "direction_steps": ds,
+                "signal_direction_steps": sum(
+                    t.cum["signal_direction_steps"] for t in stepped
+                ),
+                "noise_direction_steps": sum(
+                    t.cum["noise_direction_steps"] for t in stepped
+                ),
+                "oscillating_direction_steps": sum(
+                    t.cum["oscillating_direction_steps"] for t in stepped
+                ),
+                "treated_direction_steps": treated_ds,
+                "treated_fraction": treated_ds / max(ds, 1),
+                "in_confidence_window_direction_steps": sum(
+                    t.cum["in_confidence_window_direction_steps"]
+                    for t in stepped
+                ),
+                "gain_sum": sum(t.cum["gain_sum"] for t in stepped),
+                "gain_min": min(t.cum["gain_min"] for t in stepped),
+                "gain_max": max(t.cum["gain_max"] for t in stepped),
+                "n_refreshes": sum(t.n_refreshes for t in stepped),
+                "n_rotation_resets": sum(t.n_rotation_resets for t in stepped),
+                "n_innovation_resets": sum(
+                    t._n_innovation_resets for t in stepped
+                ),
+                "n_confidence_resets": sum(
+                    t.n_rotation_resets + t._n_innovation_resets
+                    for t in stepped
+                ),
+            }
+        return {"per_matrix": per_matrix, "aggregate": {"last": agg_last, "cumulative": agg_cum}}

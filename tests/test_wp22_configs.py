@@ -44,8 +44,16 @@ WP22_CONFIGS = sorted(CONFIG_DIR.glob("wp22_*.yaml"))
 WP23_CONFIG = CONFIG_DIR / "wp23_lambda_tracking.yaml"
 ALL_CONFIGS = WP22_CONFIGS + [WP23_CONFIG]
 
-# Group membership by filename prefix (mirrors docs/wp22-run-plan.md).
-EVAL_PREFIXES = ("wp22_headtohead_", "wp22_tuneB_", "wp22_null_", "wp22_channel_")
+# Group membership by filename prefix (mirrors docs/wp22-run-plan.md,
+# Gate-1-amended matrix: reports/gate1-decision.md A1/A2/A5).
+EVAL_PREFIXES = (
+    "wp22_headtohead_",
+    "wp22_tuneB_",
+    "wp22_null_",
+    "wp22_channel_",
+    "wp22_goscconst_",
+    "wp22_exploratory_",
+)
 PLACEHOLDER_CONFIGS = {  # TBD-STAGE-A: filled by scripts/plan_wp22.py
     "wp22_tuneB_muon.yaml",
     "wp22_tuneB_routed.yaml",
@@ -54,6 +62,29 @@ PLACEHOLDER_CONFIGS = {  # TBD-STAGE-A: filled by scripts/plan_wp22.py
 BLOCKED_CONFIGS = {  # NOT-RUNNABLE-YET: need harness work before launch
     "wp22_null_muon_lrclip.yaml",
     "wp23_lambda_tracking.yaml",
+}
+
+# Gate-1 amendment A1: the oscillation-only scope, as config contracts.
+OSC_ONLY_ROUTED_CONFIGS = {  # enable_noise_channel must be false
+    "wp22_headtohead_routed.yaml",
+    "wp22_tuneA_routed.yaml",
+    "wp22_tuneB_routed.yaml",
+    "wp22_null_routed_randomgating.yaml",
+    "wp22_stress_routed.yaml",
+    "wp22_goscconst_025.yaml",
+    "wp22_goscconst_050.yaml",
+    "wp22_goscconst_075.yaml",
+    "wp22_beta09_oscarm.yaml",
+}
+EXPLORATORY_CONFIGS = {  # demoted arms: no pre-registered claim
+    "wp22_exploratory_fullrouted.yaml",
+    "wp22_channel_noise_only.yaml",
+    "wp22_null_routed_rhoignored.yaml",
+}
+GOSCCONST_VALUES = {  # Gate-1 amendment A2: fixed-gain arms
+    "wp22_goscconst_025.yaml": 0.25,
+    "wp22_goscconst_050.yaml": 0.5,
+    "wp22_goscconst_075.yaml": 0.75,
 }
 
 
@@ -66,7 +97,7 @@ def test_expected_config_set_present():
     names = {p.name for p in WP22_CONFIGS}
     assert names == {
         "wp22_headtohead_muon.yaml",
-        "wp22_headtohead_routed.yaml",
+        "wp22_headtohead_routed.yaml",  # Gate-1 A1: osc-only primary arm
         "wp22_headtohead_dynmuon.yaml",
         "wp22_headtohead_adamuon.yaml",
         "wp22_headtohead_normuon.yaml",
@@ -78,10 +109,19 @@ def test_expected_config_set_present():
         "wp22_null_muon_lrclip.yaml",
         "wp22_null_routed_rhoignored.yaml",
         "wp22_null_routed_randomgating.yaml",
-        "wp22_channel_osc_only.yaml",
+        # Gate-1 A2: constant-attenuation arms.
+        "wp22_goscconst_025.yaml",
+        "wp22_goscconst_050.yaml",
+        "wp22_goscconst_075.yaml",
+        # Gate-1 A1: exploratory appendix arms (former full-routing
+        # head-to-head + noise-only); wp22_channel_osc_only.yaml was DELETED
+        # (byte-duplicate of the amended osc-only primary).
+        "wp22_exploratory_fullrouted.yaml",
         "wp22_channel_noise_only.yaml",
         "wp22_stress_muon.yaml",
         "wp22_stress_routed.yaml",
+        # Gate-1 A5: beta-sensitivity dev probe.
+        "wp22_beta09_oscarm.yaml",
     }
     assert WP23_CONFIG.exists()
 
@@ -159,6 +199,10 @@ def test_seed_policy_matches_group(path):
         assert policy == "dev" and seeds == list(range(1000, 1010)), (
             f"{name}: LR stress is dev n=10 per point"
         )
+    elif name == "wp22_beta09_oscarm.yaml":
+        assert policy == "dev" and seeds == list(range(1000, 1010)), (
+            f"{name}: beta sensitivity is a dev n=10 probe (Gate-1 A5)"
+        )
     elif name == "wp23_lambda_tracking.yaml":
         assert policy == "dev" and seeds == list(range(1000, 1003)), (
             f"{name}: lambda tracking is dev n=3 (measurement)"
@@ -205,7 +249,7 @@ def test_grid_counts_and_totals_match_run_plan():
             group_runs += len(variants) * len(seeds)
         assert group_runs == group["runs"], f"{group['group']}: runs mismatch"
         total_runs += group_runs
-    assert total_runs == manifest["total_runs"] == 1810
+    assert total_runs == manifest["total_runs"] == 2120  # Gate-1-amended matrix
     # Budget arithmetic stays consistent with the declared assumptions.
     hours = total_runs * manifest["sec_per_run"] / 3600.0
     assert abs(hours - manifest["total_gpu_hours"]) < 0.05
@@ -222,6 +266,67 @@ def test_tuning_grids_are_3x3_lr_x_wd_and_stress_is_lr_only():
         grid = load(CONFIG_DIR / name)["sweep"]["grid"]
         assert grid["optimizer.lr"] == [0.24, 0.36, 0.48], name  # 1x, 1.5x, 2x record
         assert set(grid) == {"optimizer.lr"}, name
+
+
+# ------------------------------------------- Gate-1 amendment contracts
+
+
+def test_osc_only_scope_flags(  # Gate-1 A1
+):
+    for name in sorted(OSC_ONLY_ROUTED_CONFIGS):
+        opt = load(CONFIG_DIR / name)["optimizer"]
+        assert opt["name"] == "routed", name
+        assert opt["enable_noise_channel"] is False, (
+            f"{name}: primary-scope routed config must be oscillation-only"
+        )
+        assert opt["enable_oscillation_channel"] is True, name
+
+
+def test_exploratory_arms_marked_and_full_scope():  # Gate-1 A1
+    for name in sorted(EXPLORATORY_CONFIGS):
+        path = CONFIG_DIR / name
+        assert "EXPLORATORY" in path.read_text(), (
+            f"{name}: demoted arm must carry the EXPLORATORY header marker"
+        )
+        opt = load(path)["optimizer"]
+        # The exploratory arms are the ones that still exercise the noise
+        # channel (no pre-registered claim).
+        assert opt["enable_noise_channel"] is True, name
+    # And no primary-scope config is accidentally marked exploratory.
+    for name in sorted(OSC_ONLY_ROUTED_CONFIGS):
+        assert "EXPLORATORY" not in (CONFIG_DIR / name).read_text(), name
+
+
+def test_goscconst_arms_carry_fixed_gain():  # Gate-1 A2
+    for name, value in sorted(GOSCCONST_VALUES.items()):
+        opt = load(CONFIG_DIR / name)["optimizer"]
+        assert opt["g_osc_const"] == pytest.approx(value), name
+        assert opt["enable_oscillation_channel"] is True, name
+    # The adaptive primary arm must NOT set g_osc_const.
+    for name in ("wp22_headtohead_routed.yaml", "wp22_tuneA_routed.yaml"):
+        assert "g_osc_const" not in load(CONFIG_DIR / name)["optimizer"], (
+            f"{name}: adaptive arm must not fix g_osc_const"
+        )
+
+
+def test_beta_sensitivity_probe_is_beta09():  # Gate-1 A5
+    opt = load(CONFIG_DIR / "wp22_beta09_oscarm.yaml")["optimizer"]
+    assert opt["beta"] == pytest.approx(0.9)
+    reference = load(CONFIG_DIR / "wp22_headtohead_routed.yaml")["optimizer"]
+    assert reference["beta"] == pytest.approx(0.99)
+    # Identical to the primary arm apart from beta (and nothing else).
+    assert {k: v for k, v in opt.items() if k != "beta"} == {
+        k: v for k, v in reference.items() if k != "beta"
+    }
+
+
+def test_tuneA_routed_grid_matches_muon_but_osc_only():  # Gate-1 A1
+    routed = load(CONFIG_DIR / "wp22_tuneA_routed.yaml")
+    muon = load(CONFIG_DIR / "wp22_tuneA_muon.yaml")
+    assert routed["sweep"]["grid"] == muon["sweep"]["grid"], (
+        "stage-A grid must stay identical across optimizers (equal tuning "
+        "effort); only the routed rows' channel scope changed"
+    )
 
 
 # -------------------------------------------------- non-runnable markers

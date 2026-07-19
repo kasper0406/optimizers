@@ -7,6 +7,11 @@
 # Metrics: divergence rate + accuracy of surviving seeds. Dev seeds, n=10 per
 # LR point (deviation from n=100-everywhere; flagged in docs/wp22-run-plan.md).
 #
+# GATE-1 SCOPE (amendment A1): OSC-ONLY (enable_noise_channel: false) -- the
+# stress test IS the oscillation-channel story (per-direction damping raising
+# the multiplicative LR ceiling), and it must stress the primary-arm
+# optimizer.
+#
 # Routing values are frozen at constructor defaults; TBD-CHECK-GATE1 as in
 # wp22_headtohead_routed.yaml.
 experiment: airbench_smoke
@@ -42,7 +47,7 @@ optimizer:
   g_noise: 0.25
   n_min: 50
   align_min: 0.9
-  enable_noise_channel: true
+  enable_noise_channel: false        # <- Gate-1 A1: oscillation-only primary
   enable_oscillation_channel: true
   rho_ignored: false
   random_gating: false

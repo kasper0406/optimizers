@@ -1,0 +1,57 @@
+# WP2.2 constant-attenuation arm (Gate-1 amendment A2): OSC-ONLY Routed Muon
+# with a FIXED oscillation gain g_osc_const = 0.5 instead of the adaptive
+# clip(1/(eta*lambda_implied - 1), g_osc_min, 1) formula. Motivation (Gate-1
+# record, evidence item 3): the adaptive implied-eta*lambda estimator is
+# statistically indistinguishable from its pure-noise null (~2.05), making
+# v0's adaptive g_osc a ~0.53 near-constant attenuator in practice, and its
+# amplitude-decay escape gate fired on 0/12,851 snapshots. The three constant
+# arms (0.25 / 0.5 / 0.75) adjudicate "adaptive vs constant attenuation"
+# against wp22_headtohead_routed.yaml (adaptive, osc-only primary).
+# The amp_decay_margin escape (decaying oscillation -> g = 1) applies
+# unchanged in constant mode (src/optim/routed.py).
+# Eval n=100 comparison-table run; recipe identical to the primary arm.
+#
+# Routing values otherwise = constructor defaults; TBD-CHECK-GATE1 as in
+# wp22_headtohead_routed.yaml.
+experiment: airbench_smoke
+seed: 2220
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: routed
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+  # -- routing (constructor defaults; TBD-CHECK-GATE1)
+  k: 16
+  t_refresh: 50
+  beta: 0.99
+  tau_sig: 4.0
+  tau_noise: 2.0
+  rho_osc: 0.5
+  g_noise: 0.25
+  n_min: 50
+  align_min: 0.9
+  enable_noise_channel: false        # <- Gate-1 A1: oscillation-only
+  enable_oscillation_channel: true
+  g_osc_const: 0.5                  # <- Gate-1 A2: fixed oscillation gain
+  rho_ignored: false
+  random_gating: false
+  seed: 2600           # optimizer-internal RNG (dev literal, fixed per config)
+
+sweep:
+  seeds: eval          # -> seeds 0-99 at launch time; comparison-table set

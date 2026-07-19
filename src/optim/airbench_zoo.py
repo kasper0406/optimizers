@@ -264,6 +264,10 @@ class WithReplacementLoader:
 
 # ----------------------------------------------------------------- experiment
 
+# Routing-telemetry time-series cadence (Gate-1 amendment A5): every N steps
+# the aggregate last-step stats are appended to metrics["routing_timeseries"].
+ROUTING_TS_EVERY = 10
+
 
 def run_airbench_smoke(
     config: Dict[str, Any],
@@ -378,6 +382,13 @@ def run_airbench_smoke(
     if _hub_factory is not None:
         hub = _hub_factory(model, optimizer2, filter_params)
 
+    # Routing telemetry (Gate-1 amendment A5): optimizers exposing
+    # routing_stats() (RoutedMuon) get their per-channel occupancy / treated
+    # fraction / gain distribution recorded -- full dict at end of run plus a
+    # coarse aggregate time series every ROUTING_TS_EVERY steps. Read-only.
+    track_routing = hasattr(optimizer2, "routing_stats")
+    routing_timeseries = []
+
     starter = torch.cuda.Event(enable_timing=True)
     ender = torch.cuda.Event(enable_timing=True)
     time_seconds = 0.0
@@ -429,6 +440,22 @@ def run_airbench_smoke(
                 hub.after_step()  # reads captured G + post-step momentum
             model.zero_grad(set_to_none=True)
             step += 1
+            if track_routing and step % ROUTING_TS_EVERY == 0:
+                agg = optimizer2.routing_stats()["aggregate"]["last"]
+                if agg is not None:
+                    routing_timeseries.append(
+                        {
+                            "step": step,
+                            "treated_fraction": agg["treated_fraction"],
+                            "n_signal": agg["n_signal"],
+                            "n_noise": agg["n_noise"],
+                            "n_oscillating": agg["n_oscillating"],
+                            "n_treated": agg["n_treated"],
+                            "n_in_confidence_window": agg[
+                                "n_in_confidence_window"
+                            ],
+                        }
+                    )
             if step >= total_train_steps:
                 break
         stop_timer()
@@ -456,6 +483,10 @@ def run_airbench_smoke(
     }
     if sampling is not None:
         metrics["sampling"] = sampling  # ablation provenance; absent = vendor
+    if track_routing:
+        # Gate-1 amendment A5: end-of-run routing telemetry + coarse series.
+        metrics["routing_stats"] = optimizer2.routing_stats()
+        metrics["routing_timeseries"] = routing_timeseries
     return metrics
 
 
@@ -486,6 +517,55 @@ def run_airbench(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]
 
 AIRBENCH_STOCK_LR = 0.24  # vendored record hyperparameter (airbench94_muon.py:362)
 
+# Gate-1 amendment A4 (mechanism probes): the ONLY optimizer keys a
+# 'probe_overrides' block may touch in the instrumented experiment.
+PROBE_OVERRIDE_KEYS = ("lr", "momentum", "nesterov")
+
+
+def _validate_probe_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate the A4 ``probe_overrides:`` block of an instrumented config.
+
+    Returns the (possibly empty) override dict. CPU-safe (called before any
+    CUDA work). Refuses: non-dict/empty blocks, keys outside
+    ``PROBE_OVERRIDE_KEYS``, an 'eval' sweep-seed policy, and a base config
+    seed < 1000 -- mechanism probes are dev-seed measurement runs, never
+    comparison-table entries.
+    """
+    probe = config.get("probe_overrides")
+    if probe is None:
+        return {}
+    if not isinstance(probe, dict) or not probe:
+        raise SystemExit(
+            "probe_overrides must be a non-empty mapping of vendored-Muon "
+            f"hyperparameters (allowed keys: {PROBE_OVERRIDE_KEYS})"
+        )
+    unknown = sorted(set(probe) - set(PROBE_OVERRIDE_KEYS))
+    if unknown:
+        raise SystemExit(
+            f"probe_overrides may only touch {PROBE_OVERRIDE_KEYS}; "
+            f"got unknown key(s): {unknown}"
+        )
+    sweep_spec = (config.get("sweep") or {}).get("seeds")
+    policy = (
+        sweep_spec
+        if isinstance(sweep_spec, str)
+        else sweep_spec.get("policy")
+        if isinstance(sweep_spec, dict)
+        else None
+    )
+    if policy == "eval":
+        raise SystemExit(
+            "probe_overrides configs are dev-seed mechanism probes (Gate-1 "
+            "amendment A4) and must never use the eval seed policy"
+        )
+    seed = config.get("seed")
+    if isinstance(seed, int) and seed < 1000:
+        raise SystemExit(
+            f"probe_overrides config carries seed {seed} < 1000; mechanism "
+            "probes are dev-seed only"
+        )
+    return dict(probe)
+
 
 def run_airbench_instrumented(
     config: Dict[str, Any], device: torch.device
@@ -515,6 +595,20 @@ def run_airbench_instrumented(
     under the private key ``"_instrumentation_log"``; scripts/run.py pops it
     and writes the src.instrument.schema sidecar next to the results JSON.
 
+    MECHANISM PROBES (Gate-1 amendment A4): a clearly-marked top-level
+    ``probe_overrides:`` block may override ONLY the vendored-Muon
+    hyperparameters lr / momentum / nesterov, for the instrumented mechanism
+    probes (momentum=0 run, LR ladder). This is the single sanctioned
+    deviation from the hard-pinned stock record recipe, honored by THIS
+    experiment only (``run_airbench_smoke``/``run_airbench`` never read it).
+    Dev-seeds only: a config carrying ``probe_overrides`` is refused if its
+    ``sweep.seeds`` policy is 'eval' or its base ``seed`` is < 1000
+    (materialized sweep variants inherit dev seeds from the source config,
+    whose expansion already enforces this via scripts/sweep.py). Probe runs
+    are measurement, never comparison-table entries. The effective optimizer
+    hyperparameters are recorded in metrics (``optimizer_lr``,
+    ``probe_overrides``) so downstream eta*lambda analyses use the real lr.
+
     LAUNCH PRECONDITION (WP1.2, enforced in scripts/run.py): the
     human-authored ``criteria/phase1_preregistration.md`` must exist before
     any run of this experiment.
@@ -525,8 +619,10 @@ def run_airbench_instrumented(
         raise SystemExit(
             "experiment 'airbench_instrumented' is the stock WP0.1 recipe "
             "plus read-only instrumentation; it does not accept an optimizer "
-            "override."
+            "override. (Mechanism probes use the restricted 'probe_overrides' "
+            "block instead.)"
         )
+    probe = _validate_probe_overrides(config)
     instr_cfg = config.get("instrumentation")
     if not isinstance(instr_cfg, dict):
         raise SystemExit(
@@ -535,9 +631,12 @@ def run_airbench_instrumented(
         )
 
     merged = dict(config)
+    merged.pop("probe_overrides", None)  # consumed here, never forwarded
     merged["optimizer"] = dict(
         name="vendor_muon", lr=AIRBENCH_STOCK_LR, momentum=0.6, nesterov=True
     )
+    if probe:
+        merged["optimizer"].update(probe)  # A4 mechanism probe, dev-only
     recipe = dict(config.get("recipe", {}))
     recipe["normalize_filter_weights"] = False  # vendored Muon.step does it
     recipe.setdefault("compile", True)  # the reference compiles the model
@@ -584,7 +683,11 @@ def run_airbench_instrumented(
     metrics["instrumented"] = True
     if hvp_requested:
         metrics["hvp_graph_builds"] = holder["hvp_probe"].n_graph_builds
-    metrics["optimizer_lr"] = AIRBENCH_STOCK_LR  # for the eta*lambda plot
+    # Effective lr for the eta*lambda plot (equals the stock record lr unless
+    # an A4 probe override changed it -- analyses must use the real value).
+    metrics["optimizer_lr"] = merged["optimizer"]["lr"]
+    if probe:
+        metrics["probe_overrides"] = dict(probe)
     metrics["_instrumentation_log"] = holder["hub"].to_log()
     return metrics
 

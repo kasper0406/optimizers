@@ -95,11 +95,15 @@ def run_smoke(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]:
     out_dim = int(model_cfg.get("out_dim", 4))
     batch_size = int(data_cfg.get("batch_size", 16))
     steps = int(train_cfg.get("steps", 10))
+    # model.bias: false gives an all-2-D-parameter MLP so matrix-only
+    # optimizers (Muon family / routed) can smoke-run on CPU -- mirrors the
+    # airbench harness's filter-params split. Default true (original smoke).
+    use_bias = bool(model_cfg.get("bias", True))
 
     model = torch.nn.Sequential(
-        torch.nn.Linear(in_dim, hidden_dim),
+        torch.nn.Linear(in_dim, hidden_dim, bias=use_bias),
         torch.nn.ReLU(),
-        torch.nn.Linear(hidden_dim, out_dim),
+        torch.nn.Linear(hidden_dim, out_dim, bias=use_bias),
     ).to(device)
     optimizer = build_optimizer(opt_name, model.parameters(), opt_cfg)
     loss_fn = torch.nn.CrossEntropyLoss()
@@ -121,7 +125,7 @@ def run_smoke(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]:
         for p, p0 in zip(model.parameters(), initial_params)
     )
 
-    return {
+    metrics = {
         "steps": steps,
         "loss_first": losses[0],
         "loss_last": losses[-1],
@@ -129,6 +133,12 @@ def run_smoke(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]:
         "max_param_delta": max_param_delta,
         "optimizer": opt_name,
     }
+    if hasattr(optimizer, "routing_stats"):
+        # Gate-1 amendment A5 (mirrors the airbench harness wiring): routed
+        # optimizers report per-channel occupancy / treated-fraction / gain
+        # telemetry; the smoke experiment is the CPU-verifiable path.
+        metrics["routing_stats"] = optimizer.routing_stats()
+    return metrics
 
 
 from src.optim.airbench_zoo import (  # noqa: E402

@@ -440,6 +440,246 @@ def test_random_gating_permutes_the_same_gain_multiset():
     assert torch.equal(p_rand.detach(), p_rand2.detach())
 
 
+# ----------------------------- constant oscillation gain (Gate-1 A2)
+
+
+class _StubStats:
+    def __init__(self, amp):
+        self.amplitude_ratio = np.asarray(amp, dtype=np.float64)
+
+    def is_decaying(self, margin):
+        return self.amplitude_ratio < 1.0 - float(margin)
+
+
+class _StubTier:
+    """Minimal tier facade for _compute_gains: labels + amplitude ratios."""
+
+    def __init__(self, regimes, amp, seed=SEED):
+        self.k = len(regimes)
+        self.gating_rng = np.random.default_rng(seed)
+        self.classifier = type(
+            "Clf", (), {"regimes": list(regimes), "stats": _StubStats(amp)}
+        )()
+
+
+def _gains(opt_kwargs, regimes, amp):
+    opt = RoutedMuon(
+        [torch.nn.Parameter(torch.zeros(6, 5))], **{**BASE_KW, **ROUTE_KW, **opt_kwargs}
+    )
+    return opt._compute_gains(_StubTier(regimes, amp))
+
+
+def test_g_osc_const_validation_and_default():
+    p = [torch.nn.Parameter(torch.zeros(4, 3))]
+    assert RoutedMuon(p).g_osc_const is None  # adaptive is the default
+    assert RoutedMuon(p, g_osc_const=0.5).g_osc_const == 0.5
+    for bad in (0.0, -0.25, 1.5):
+        with pytest.raises(ValueError, match="g_osc_const"):
+            RoutedMuon(p, g_osc_const=bad)
+
+
+def test_constant_mode_applies_exactly_g_osc_const():
+    regimes = [Regime.OSCILLATING, Regime.NOISE, Regime.SIGNAL]
+    amp = [1.6, 1.0, 1.0]  # osc non-decaying; adaptive would give 1/1.6
+    for g_const in (0.25, 0.5, 0.75):
+        gains = _gains({"g_osc_const": g_const}, regimes, amp)
+        assert gains[0] == g_const  # exact, no clip/formula involvement
+        assert gains[1] == ROUTE_KW["g_noise"]
+        assert gains[2] == 1.0
+    # Adaptive mode on the identical state: the clip formula, not a constant.
+    adaptive = _gains({}, regimes, amp)
+    assert adaptive[0] == pytest.approx(1.0 / 1.6)
+
+
+def test_decay_escape_identical_in_both_modes():
+    """amp_decay_margin behavior is unchanged by g_osc_const: a decaying
+    oscillation (amplitude_ratio < 1 - margin) is left alone (g = 1)."""
+    regimes = [Regime.OSCILLATING, Regime.OSCILLATING]
+    amp = [0.9, 1.2]  # first decaying (margin 0.05), second not
+    for kwargs in ({}, {"g_osc_const": 0.5}):
+        gains = _gains(kwargs, regimes, amp)
+        assert gains[0] == 1.0, f"decaying direction gated in mode {kwargs}"
+        assert gains[1] < 1.0
+    assert _gains({"g_osc_const": 0.5}, regimes, amp)[1] == 0.5
+    assert _gains({}, regimes, amp)[1] == pytest.approx(1.0 / 1.2)
+
+
+def test_constant_mode_end_to_end_on_planted_oscillation():
+    """Driven through real steps: the planted oscillating direction gets
+    exactly g_osc_const while noise/signal gains are untouched."""
+    stream = three_regime_stream(r_osc=PLANTED_R)
+    param = torch.nn.Parameter(
+        0.1 * torch.randn(14, 12, generator=torch.Generator().manual_seed(SEED))
+    )
+    opt = RoutedMuon([param], **{**BASE_KW, **ROUTE_KW, "g_osc_const": 0.5})
+    drive(opt, param, stream, PLANTED_STEPS + 1)
+    tier = opt.state[param]["routing"]
+    i_sig, i_noise, i_osc = _planted_indices(stream, tier)
+    assert tier.last_regimes[i_osc] is Regime.OSCILLATING
+    assert tier.last_gains[i_osc] == 0.5  # exactly the constant
+    assert tier.last_gains[i_noise] == ROUTE_KW["g_noise"]
+    assert tier.last_gains[i_sig] == 1.0
+
+
+# ------------------------------------- routing telemetry (Gate-1 A5)
+
+
+def test_routing_stats_empty_before_any_step():
+    opt = RoutedMuon([torch.nn.Parameter(torch.zeros(6, 5))], **BASE_KW, **ROUTE_KW)
+    stats = opt.routing_stats()
+    assert stats["per_matrix"] == {}
+    assert stats["aggregate"] == {"last": None, "cumulative": None}
+
+
+def test_routing_stats_counts_and_json_roundtrip():
+    import json
+
+    stream = three_regime_stream()
+    param = torch.nn.Parameter(
+        0.1 * torch.randn(14, 12, generator=torch.Generator().manual_seed(SEED))
+    )
+    other = torch.nn.Parameter(
+        0.1 * torch.randn(6, 5, generator=torch.Generator().manual_seed(SEED + 1))
+    )
+    opt = RoutedMuon([param, other], **{**BASE_KW, **ROUTE_KW, "k": 3})
+    n_steps = 80
+    for t in range(1, n_steps + 1):
+        param.grad = stream.grad(t)
+        other.grad = torch.randn(6, 5, generator=torch.Generator().manual_seed(2000 + t))
+        opt.step()
+
+    stats = opt.routing_stats()
+    json.loads(json.dumps(stats))  # fully JSON-able
+    assert set(stats["per_matrix"]) == {"matrix0_14x12", "matrix1_6x5"}
+
+    tier = opt.state[param]["routing"]
+    m = stats["per_matrix"]["matrix0_14x12"]
+    last = m["last"]
+    # Last-step channel counts match the classifier's current labels...
+    assert last["n_signal"] == sum(r is Regime.SIGNAL for r in tier.last_regimes)
+    assert last["n_noise"] == sum(r is Regime.NOISE for r in tier.last_regimes)
+    assert last["n_oscillating"] == sum(
+        r is Regime.OSCILLATING for r in tier.last_regimes
+    )
+    assert last["n_signal"] + last["n_noise"] + last["n_oscillating"] == tier.k
+    # ... and the treated/gain figures match the applied gains exactly.
+    g = tier.last_gains
+    assert last["n_treated"] == int(np.sum(g != 1.0))
+    assert last["treated_fraction"] == pytest.approx(np.mean(g != 1.0))
+    assert last["gain_sum"] == pytest.approx(g.sum())
+    assert last["gain_min"] == pytest.approx(g.min())
+    assert last["gain_max"] == pytest.approx(g.max())
+    assert last["step"] == n_steps
+    # In-confidence-window count from the classifier's n_min clock.
+    n_min = ROUTE_KW["n_min"]
+    assert last["n_in_confidence_window"] == int(
+        np.sum(tier.classifier.n_since_reset < n_min)
+    )
+    # Cumulative bookkeeping.
+    cum = m["cumulative"]
+    assert cum["n_steps"] == n_steps
+    assert cum["direction_steps"] == n_steps * tier.k
+    assert (
+        cum["signal_direction_steps"]
+        + cum["noise_direction_steps"]
+        + cum["oscillating_direction_steps"]
+        == cum["direction_steps"]
+    )
+    assert cum["treated_direction_steps"] <= cum["direction_steps"]
+    assert 0.0 < cum["gain_min"] <= cum["gain_max"] == 1.0
+    # Confidence window: the first n_min - 1 steps of every direction at
+    # minimum (no resets in this stream for matrix 0).
+    assert cum["in_confidence_window_direction_steps"] >= (n_min - 1) * tier.k
+    # Aggregate = sum over matrices.
+    agg = stats["aggregate"]
+    assert agg["last"]["k_total"] == tier.k + opt.state[other]["routing"].k
+    assert agg["last"]["n_treated"] == sum(
+        stats["per_matrix"][k]["last"]["n_treated"] for k in stats["per_matrix"]
+    )
+    assert agg["cumulative"]["direction_steps"] == sum(
+        stats["per_matrix"][k]["cumulative"]["direction_steps"]
+        for k in stats["per_matrix"]
+    )
+    assert agg["cumulative"]["n_refreshes"] == sum(
+        stats["per_matrix"][k]["n_refreshes"] for k in stats["per_matrix"]
+    )
+
+
+def test_routing_stats_counts_confidence_resets():
+    """The rotation-reset counter mirrors the refresh-innovation reset of
+    test_refresh_resets_rotated_directions."""
+    m, n, r = 10, 8, 1.05
+    U, V = orthonormal_pairs(m, n, 2, SEED + 10)
+    switch_at = 30
+
+    def s0(t):
+        return 0.4 * (-r) ** t if t <= switch_at else 0.0
+
+    def s1(t):
+        return 0.0 if t <= switch_at else 0.4 * (-r) ** (t - switch_at)
+
+    stream = PlantedStream(m, n, U, V, [s0, s1], seed=SEED + 11)
+    param = torch.nn.Parameter(
+        0.1 * torch.randn(m, n, generator=torch.Generator().manual_seed(SEED))
+    )
+    kw = {**BASE_KW, **ROUTE_KW, "k": 2, "t_refresh": 20, "n_min": 10}
+    opt = RoutedMuon([param], **kw)
+    drive(opt, param, stream, 41)  # through the rotating refresh at step 41
+    snap = opt.routing_stats()["per_matrix"]["matrix0_10x8"]
+    assert snap["n_rotation_resets"] >= 1
+    assert snap["n_confidence_resets"] >= snap["n_rotation_resets"]
+    assert snap["last"]["n_in_confidence_window"] >= 1  # freshly reset
+
+
+def test_smoke_experiment_records_routing_stats_on_cpu():
+    """The scripts/run.py 'smoke' experiment (CPU MLP) is the CPU-verifiable
+    harness path for the A5 telemetry wiring (airbench itself needs CUDA)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "run_module_routed_smoke", REPO_ROOT / "scripts" / "run.py"
+    )
+    run_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(run_mod)
+
+    config = {
+        "experiment": "smoke",
+        "seed": 1000,
+        "model": {"in_dim": 16, "hidden_dim": 24, "out_dim": 4, "bias": False},
+        "train": {"steps": 40},
+        "optimizer": {
+            "name": "routed",
+            "lr": 1e-3,
+            "k": 4,
+            "n_min": 10,
+            "t_refresh": 20,
+            "beta": 0.9,
+            "seed": 1500,
+        },
+    }
+    metrics = run_mod.run_smoke(config, torch.device("cpu"))
+    stats = metrics["routing_stats"]
+    assert len(stats["per_matrix"]) == 2  # both weight matrices routed
+    agg = stats["aggregate"]
+    assert agg["last"]["step"] == 40
+    assert agg["cumulative"]["direction_steps"] == 40 * agg["last"]["k_total"]
+    for key in (
+        "n_signal",
+        "n_noise",
+        "n_oscillating",
+        "n_treated",
+        "treated_fraction",
+        "n_in_confidence_window",
+        "gain_sum",
+        "gain_min",
+        "gain_max",
+    ):
+        assert key in agg["last"], key
+    import json
+
+    json.loads(json.dumps(metrics))  # results-JSON safe
+
+
 # ------------------------------------------- stock-Muon equivalence
 
 

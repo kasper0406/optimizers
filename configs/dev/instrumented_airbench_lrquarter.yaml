@@ -1,0 +1,69 @@
+# Gate-1 amendment A4 — mechanism probe 3/3: instrumented STOCK-Muon airbench
+# with LR = 0.06 (record 0.24 x0.25); momentum/nesterov stock. NOT a routed run, NOT a comparison
+# run: this reuses the WP1.2 'airbench_instrumented' measurement experiment
+# (vendored Muon, read-only InstrumentationHub) to test the momentum-overshoot
+# hypothesis for the Gate-1 negative-rho population: if the broadband
+# negative-rho excess (bulk out-oscillating top in phase 1, Gate-1 record
+# item 5) is an overshoot phenomenon, its magnitude should DECREASE
+# MONOTONICALLY down the LR ladder (x1 -> x0.5 -> x0.25). Analysis: scripts/analyze_mechanism.py (descriptive only).
+#
+# probe_overrides is the ONLY sanctioned deviation from the hard-pinned stock
+# record recipe (lr=0.24, momentum=0.6, nesterov=true), honored exclusively
+# by the 'airbench_instrumented' experiment, restricted to lr/momentum/
+# nesterov, and refused with eval-seed policies (dev-seed measurement only).
+# CAUTION: a non-record lr changes optimization dynamics; accuracy/loss of
+# these runs is diagnostic context, never a table entry.
+#
+# Everything else is identical to configs/wp12_airbench_instrumented.yaml
+# (same instrumentation block, classifier thresholds, recipe). Dev seeds
+# 1304-1305, disjoint from WP1.2's 1000-1019, the with-replacement ablation's
+# 1100-1102, and the HVP run's 1200-1202. Sweep-expandable:
+#   uv run python scripts/sweep.py configs/dev/instrumented_airbench_lrquarter.yaml
+#   bash sweeps/instrumented_airbench_lrquarter/run_all.sh
+#
+# LAUNCH PRECONDITION (WP1.2, CLAUDE.md): criteria/phase1_preregistration.md
+# must exist; scripts/run.py enforces this for airbench_instrumented.
+
+experiment: airbench_instrumented
+seed: 1304
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  tta_level: 2
+  # compile: true and normalize_filter_weights: false are forced by the
+  # experiment itself (stock vendored-Muon recipe); no overrides here.
+
+# -- A4 MECHANISM PROBE (the one and only recipe deviation) ------------------
+probe_overrides:
+  lr: 0.06             # <- probe: LR ladder point (record 0.24 x 0.25)
+
+instrumentation:
+  k1: 16               # top singular pairs of M_t (plan section 1.1)
+  k2: 16               # bulk probes, orthogonalized against the top block
+  t_refresh: 50        # subspace refresh cadence (steps)
+  subspace_iters: 2    # warm-started subspace iterations per refresh
+  betas: [0.9, 0.99]   # both EMA timescales (timescale sensitivity is a finding)
+  align_min: 0.9       # refresh alignment below this = innovation reset
+  snapshot_every: 5    # per-direction stat snapshot cadence (steps)
+  seed: 4242           # instrumentation probe RNG (dev seed, >= 1000)
+  min_dim: 8           # skip matrices whose flattened min dim is below this
+  momentum_key: momentum_buffer
+  hvp: false           # HVP probes stay off (amplitude-ratio path only)
+  classifier:          # identical to the WP1.2 baseline config
+    tau_sig: 4.0
+    tau_noise: 2.0
+    rho_osc: 0.5
+    n_min: 50
+    z_reset: 6.0
+    innov_needed: 2
+    innov_window: 4
+
+sweep:
+  seeds: [1304, 1305]  # explicit dev seeds; 2 seeds per probe (A4 budget ~$0.30)

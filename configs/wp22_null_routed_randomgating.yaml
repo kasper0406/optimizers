@@ -4,6 +4,10 @@
 # comparison-table run; identical to wp22_headtohead_routed.yaml except
 # random_gating: true.
 #
+# GATE-1 SCOPE (amendment A1): OSC-ONLY like the primary arm it placebos --
+# the permuted gain multiset is the oscillation-channel gains
+# (enable_noise_channel: false).
+#
 # LIMITATION (flagged in docs/wp22-run-plan.md): optimizer.seed drives the
 # placebo RNG and is a fixed dev literal, so the random gating pattern's RNG
 # stream does not vary across the 100 eval seeds (model init / data order
@@ -44,7 +48,7 @@ optimizer:
   g_noise: 0.25
   n_min: 50
   align_min: 0.9
-  enable_noise_channel: true
+  enable_noise_channel: false        # <- Gate-1 A1: placebo of the osc-only arm
   enable_oscillation_channel: true
   rho_ignored: false
   random_gating: true  # <- the placebo: same gated fraction, random choice

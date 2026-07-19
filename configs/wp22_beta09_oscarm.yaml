@@ -1,0 +1,55 @@
+# WP2.2 beta-sensitivity probe (Gate-1 amendment A5, second clause): the
+# OSC-ONLY primary arm with the routing-statistics EMA timescale beta = 0.9
+# (default 0.99). Motivation (Gate-1 record, evidence item 4): the
+# oscillating sets at beta 0.9 vs 0.99 overlap at Jaccard 0.36 --
+# "oscillating" is a (direction, window) property -- so the osc-arm dev
+# sweep must include beta = 0.9 alongside the default before the eval
+# comparison is interpreted. DEV SEEDS, n=10: sensitivity probe, never a
+# comparison-table entry. Identical to wp22_headtohead_routed.yaml except
+# beta and the seed policy.
+#
+# Routing values otherwise = constructor defaults; TBD-CHECK-GATE1 as in
+# wp22_headtohead_routed.yaml.
+experiment: airbench_smoke
+seed: 2222
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: routed
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+  # -- routing (constructor defaults except beta; TBD-CHECK-GATE1)
+  k: 16
+  t_refresh: 50
+  beta: 0.9            # <- Gate-1 A5: timescale sensitivity (default 0.99)
+  tau_sig: 4.0
+  tau_noise: 2.0
+  rho_osc: 0.5
+  g_noise: 0.25
+  n_min: 50
+  align_min: 0.9
+  enable_noise_channel: false        # <- Gate-1 A1: oscillation-only primary
+  enable_oscillation_channel: true
+  rho_ignored: false
+  random_gating: false
+  seed: 2600           # optimizer-internal RNG (dev literal, fixed per config)
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 10      # -> seeds 1000-1009 at launch time (sensitivity probe)

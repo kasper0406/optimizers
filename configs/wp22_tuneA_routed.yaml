@@ -8,6 +8,11 @@
 # hyperparameters are FROZEN at defaults for WP2.2; only lr x wd is swept.
 # Flagged in docs/wp22-run-plan.md.
 #
+# GATE-1 SCOPE NOTE (amendment A1): the stage-A grid itself is unchanged
+# (same 3x3 LR x WD axes as wp22_tuneA_muon.yaml, equal tuning effort), but
+# every routed row is OSC-ONLY (enable_noise_channel: false) -- the tuned
+# optimizer must be the same optimizer the primary claim is about.
+#
 # Routing values are the src/optim/routed.py constructor defaults;
 # TBD-CHECK-GATE1 as in wp22_headtohead_routed.yaml.
 experiment: airbench_smoke
@@ -43,7 +48,7 @@ optimizer:
   g_noise: 0.25
   n_min: 50
   align_min: 0.9
-  enable_noise_channel: true
+  enable_noise_channel: false        # <- Gate-1 A1: oscillation-only primary
   enable_oscillation_channel: true
   rho_ignored: false
   random_gating: false

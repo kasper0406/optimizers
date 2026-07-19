@@ -4,11 +4,18 @@
 # Comparison-table run: eval seed policy, single GPU type (A6000 class),
 # recipe identical to wp22_headtohead_muon.yaml.
 #
+# GATE-1 SCOPE (reports/gate1-decision.md, amendment A1): this is the
+# OSCILLATION-ONLY PRIMARY ARM -- the Phase-2 pre-registered claim attaches
+# to the oscillation channel only, so enable_noise_channel is false here
+# (plan section 2.4 branch: per-direction edge-of-stability damping). The
+# full three-channel variant lives in wp22_exploratory_fullrouted.yaml with
+# no pre-registered claim. Adaptive g_osc mode (g_osc_const unset); the
+# constant-attenuation arms are wp22_goscconst_{025,050,075}.yaml (A2).
+#
 # Routing values below are the src/optim/routed.py constructor defaults
 # (= plan section 2.1 v0 defaults, matching configs/dev/airbench_smoke_routed.yaml).
-# TBD-CHECK-GATE1: if the Gate-1 record fixed different Phase-1-informed
-# thresholds (tau_sig / tau_noise / rho_osc / n_min), the human syncs them here
-# before launch; the agent never adjusts them.
+# TBD-CHECK-GATE1: the Gate-1 record (agent-decided under explicit full
+# delegation) kept the Phase-1 dev thresholds; resync here if that changes.
 #
 # optimizer.seed is the ROUTED-INTERNAL RNG (subspace init / placebo gating),
 # a dev literal >= 1000; it is fixed across the eval sweep (see
@@ -46,7 +53,7 @@ optimizer:
   g_noise: 0.25
   n_min: 50
   align_min: 0.9
-  enable_noise_channel: true
+  enable_noise_channel: false        # <- Gate-1 A1: oscillation-only primary
   enable_oscillation_channel: true
   rho_ignored: false
   random_gating: false

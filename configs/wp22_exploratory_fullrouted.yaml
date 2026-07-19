@@ -1,0 +1,57 @@
+# EXPLORATORY (Gate-1 amendment A1; NO pre-registered claim): full
+# three-channel Routed Muon (noise + oscillation) at the record Muon
+# lr/momentum. The Gate-1 record found NO detectable signal population and
+# no empirical basis for the noise channel (signal/noise separation not
+# observed; maximal misclassification-asymmetry exposure, plan risk 4), so
+# full routing is demoted from the primary comparison to an exploratory
+# appendix arm. Results are reported descriptively; they cannot satisfy or
+# fail the Phase-2 pre-registered criteria.
+#
+# Content is the pre-amendment wp22_headtohead_routed.yaml (both channels
+# on); the amended primary arm is wp22_headtohead_routed.yaml (osc-only).
+# Companion exploratory null: wp22_null_routed_rhoignored.yaml.
+# Eval n=100 so the exploratory table has the same resolution as the primary.
+#
+# Routing values are the src/optim/routed.py constructor defaults;
+# TBD-CHECK-GATE1 as in wp22_headtohead_routed.yaml.
+experiment: airbench_smoke
+seed: 2218
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: routed
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+  # -- routing (constructor defaults; TBD-CHECK-GATE1)
+  k: 16
+  t_refresh: 50
+  beta: 0.99
+  tau_sig: 4.0
+  tau_noise: 2.0
+  rho_osc: 0.5
+  g_noise: 0.25
+  n_min: 50
+  align_min: 0.9
+  enable_noise_channel: true         # <- EXPLORATORY: full routing
+  enable_oscillation_channel: true
+  rho_ignored: false
+  random_gating: false
+  seed: 2600           # optimizer-internal RNG (dev literal, fixed per config)
+
+sweep:
+  seeds: eval          # -> seeds 0-99 at launch time; exploratory appendix table

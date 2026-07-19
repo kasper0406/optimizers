@@ -1,4 +1,4 @@
-# WP2.2 / WP2.3 — Airbench experiment matrix: run plan
+# WP2.2 / WP2.3 — Airbench experiment matrix: run plan (Gate-1-amended)
 
 Agent-authored plan for the plan-§2.2 experiment matrix (adapted for budget;
 all deviations from the research plan are listed in §Deviations below and are
@@ -6,6 +6,23 @@ part of the Gate-2 record). Companion configs: `configs/wp22_*.yaml`,
 `configs/wp23_lambda_tracking.yaml`. Config-consistency tests:
 `tests/test_wp22_configs.py` (cross-checks the manifest in this file against
 the actual configs).
+
+**AMENDED per `reports/gate1-decision.md` (binding; oscillation-focused
+scope, amendments A1/A2/A4/A5).** The pre-registered Phase-2 claim attaches
+to the **oscillation channel only**: `wp22_headtohead_routed.yaml` is the
+osc-only primary arm; three constant-attenuation arms
+`wp22_goscconst_{025,050,075}.yaml` (A2) adjudicate adaptive vs constant
+g_osc; full three-channel routing and noise-only are demoted to
+**EXPLORATORY** appendix arms (`wp22_exploratory_fullrouted.yaml`,
+`wp22_channel_noise_only.yaml`, plus companion null
+`wp22_null_routed_rhoignored.yaml`) with no pre-registered claim; a β=0.9
+osc-arm dev probe `wp22_beta09_oscarm.yaml` covers timescale sensitivity
+(A5); all routed runs log treated-fraction / per-channel gain telemetry
+(A5, `metrics["routing_stats"]` + `metrics["routing_timeseries"]`);
+mechanism probes (A4, `configs/dev/instrumented_airbench_{mom0,lrhalf,
+lrquarter}.yaml`) run before/alongside stage A. Config edits implementing
+this scope were made by the agent under the same explicit full delegation
+recorded in the Gate-1 decision record.
 
 ## Design constraints (all groups)
 
@@ -50,13 +67,26 @@ grids and seed sets are identical).
 
 | Group | Configs | Stage | Seeds | n | Variants | Runs |
 |---|---|---|---|---|---|---|
-| G1 head-to-head (§2.2.1/.3) | `wp22_headtohead_{muon,routed,dynmuon,adamuon,normuon}.yaml` | eval | eval 0–99 | 100 | 1 each | 500 |
-| G2 fair-tuning stage A (§2.2.2) | `wp22_tuneA_{muon,routed}.yaml` | dev | 1000–1024 | 25 | 9 each (3×3 LR×WD) | 450 |
-| G3 fair-tuning stage B (§2.2.2) | `wp22_tuneB_{muon,routed}.yaml` (placeholders) | eval | eval 0–99 | 100 | 1 each | 200 |
-| G4 null ablations (§2.2.4) | `wp22_null_muon_wd.yaml` (placeholder), `wp22_null_muon_lrclip.yaml` (blocked), `wp22_null_routed_{rhoignored,randomgating}.yaml` | eval | eval 0–99 | 100 | 1 each | 400 |
-| G5 channel ablations (§2.2/§2.4) | `wp22_channel_{osc_only,noise_only}.yaml` | eval | eval 0–99 | 100 | 1 each | 200 |
-| G6 LR stress (§2.2.5) | `wp22_stress_{muon,routed}.yaml` | dev | 1000–1009 | 10 | 3 each (LR ×{1,1.5,2}) | 60 |
-| G7 λ-tracking (§2.2.6, WP2.3) | `wp23_lambda_tracking.yaml` (blocked) | dev | 1000–1002 | 3 | 1 | 3 |
+| G1 head-to-head (§2.2.1/.3) | `wp22_headtohead_{muon,routed,dynmuon,adamuon,normuon}.yaml` — routed = **osc-only primary** (A1) | eval | eval 0–99 | 100 | 1 each | 500 |
+| G2 fair-tuning stage A (§2.2.2) | `wp22_tuneA_{muon,routed}.yaml` — routed rows osc-only (A1) | dev | 1000–1024 | 25 | 9 each (3×3 LR×WD) | 450 |
+| G3 fair-tuning stage B (§2.2.2) | `wp22_tuneB_{muon,routed}.yaml` (placeholders; routed osc-only) | eval | eval 0–99 | 100 | 1 each | 200 |
+| G4 null ablations (§2.2.4) | `wp22_null_muon_wd.yaml` (placeholder), `wp22_null_muon_lrclip.yaml` (blocked), `wp22_null_routed_rhoignored.yaml` (**EXPLORATORY**, full-routing companion), `wp22_null_routed_randomgating.yaml` (osc-only placebo) | eval | eval 0–99 | 100 | 1 each | 400 |
+| G5 constant-g_osc arms (A2) | `wp22_goscconst_{025,050,075}.yaml` (osc-only, fixed g_osc) | eval | eval 0–99 | 100 | 1 each | 300 |
+| G6 LR stress (§2.2.5) | `wp22_stress_{muon,routed}.yaml` (routed osc-only) | dev | 1000–1009 | 10 | 3 each (LR ×{1,1.5,2}) | 60 |
+| G7 exploratory arms (A1) | `wp22_exploratory_fullrouted.yaml`, `wp22_channel_noise_only.yaml` — **EXPLORATORY**, no pre-registered claim | eval | eval 0–99 | 100 | 1 each | 200 |
+| G8 β sensitivity (A5) | `wp22_beta09_oscarm.yaml` (osc-only, β=0.9) | dev | 1000–1009 | 10 | 1 | 10 |
+| G9 λ-tracking (§2.2.6, WP2.3) | `wp23_lambda_tracking.yaml` (blocked) | dev | 1000–1002 | 3 | 1 | 3 |
+
+Dropped vs the pre-amendment matrix: `wp22_channel_osc_only.yaml` — it would
+be byte-identical to the amended osc-only `wp22_headtohead_routed.yaml` (it
+existed precisely so the osc-only branch needed no new configs).
+
+Off-manifest (A4, instrumented measurement, not comparison runs):
+`configs/dev/instrumented_airbench_{mom0,lrhalf,lrquarter}.yaml` — 2 dev
+seeds each (1300–1305), stock WP1.2 instrumented recipe with a restricted
+`probe_overrides:` block (momentum=0 / lr×0.5 / lr×0.25); analysis via
+`scripts/analyze_mechanism.py` (descriptive). ~6 × ~3 min uncompiled
+instrumented runs ≈ 0.3 h ≈ $0.12–0.30 on the A6000 class.
 
 Grid details:
 
@@ -79,14 +109,19 @@ below. Price: $0.4067/h (A6000 spot class).
 | G2 stage A | 450 | 2.75 h | $1.12 |
 | G3 stage B | 200 | 1.22 h | $0.50 |
 | G4 null ablations | 400 | 2.44 h | $0.99 |
-| G5 channel ablations | 200 | 1.22 h | $0.50 |
+| G5 constant-g_osc arms (A2) | 300 | 1.83 h | $0.75 |
 | G6 LR stress | 60 | 0.37 h | $0.15 |
-| **Total (G1–G6)** | **1810** | **11.06 h** | **$4.50** |
-| G7 λ-tracking (pending wiring) | 3 | ~0.03 h | ~$0.01 |
+| G7 exploratory arms | 200 | 1.22 h | $0.50 |
+| G8 β sensitivity | 10 | 0.06 h | $0.02 |
+| **Total (G1–G8)** | **2120** | **12.96 h** | **$5.27** |
+| G9 λ-tracking (pending wiring) | 3 | ~0.03 h | ~$0.01 |
+| A4 mechanism probes (off-manifest, dev) | 6 | ~0.3 h | ~$0.12 |
 
-Headroom to the ~15 GPU-h envelope: ~3.9 h (~35%) — absorbs routing
-overhead, retries, and stress-run tails. Cost fields in results JSONs are
-human-filled per CLAUDE.md rule 5.
+Headroom to the ~15 GPU-h envelope: ~2.0 h (~14%) — absorbs routing
+overhead, retries, and stress-run tails. If the envelope tightens, the
+exploratory G7 arms are the pre-declared first cut (they carry no
+pre-registered claim). Cost fields in results JSONs are human-filled per
+CLAUDE.md rule 5.
 
 ### Machine-readable manifest (parsed by tests/test_wp22_configs.py)
 
@@ -142,14 +177,15 @@ human-filled per CLAUDE.md rule 5.
       "runs": 400
     },
     {
-      "group": "G5-channel",
+      "group": "G5-goscconst",
       "seed_policy": "eval",
       "n_seeds": 100,
       "configs": {
-        "configs/wp22_channel_osc_only.yaml": 1,
-        "configs/wp22_channel_noise_only.yaml": 1
+        "configs/wp22_goscconst_025.yaml": 1,
+        "configs/wp22_goscconst_050.yaml": 1,
+        "configs/wp22_goscconst_075.yaml": 1
       },
-      "runs": 200
+      "runs": 300
     },
     {
       "group": "G6-stress",
@@ -160,13 +196,32 @@ human-filled per CLAUDE.md rule 5.
         "configs/wp22_stress_routed.yaml": 3
       },
       "runs": 60
+    },
+    {
+      "group": "G7-exploratory",
+      "seed_policy": "eval",
+      "n_seeds": 100,
+      "configs": {
+        "configs/wp22_exploratory_fullrouted.yaml": 1,
+        "configs/wp22_channel_noise_only.yaml": 1
+      },
+      "runs": 200
+    },
+    {
+      "group": "G8-beta-sensitivity",
+      "seed_policy": "dev",
+      "n_seeds": 10,
+      "configs": {
+        "configs/wp22_beta09_oscarm.yaml": 1
+      },
+      "runs": 10
     }
   ],
-  "total_runs": 1810,
-  "total_gpu_hours": 11.06,
-  "total_cost_usd": 4.5,
+  "total_runs": 2120,
+  "total_gpu_hours": 12.96,
+  "total_cost_usd": 5.27,
   "pending": {
-    "group": "G7-lambda-tracking",
+    "group": "G9-lambda-tracking",
     "seed_policy": "dev",
     "n_seeds": 3,
     "configs": { "configs/wp23_lambda_tracking.yaml": 1 },
@@ -178,46 +233,67 @@ human-filled per CLAUDE.md rule 5.
 
 ## Execution order
 
-1. **Preflight (human):** sync `TBD-CHECK-GATE1` routing thresholds in all
-   routed configs against the Gate-1 record; settle DynMuon's `lr`
-   (TBD-TUNABLE, open WP0.4 tuning issue) — dev-seed probes only if spent.
-2. **G2 stage A** (dev, 450 runs). Aggregate with
+1. **Preflight (human unless delegated):** confirm the Gate-1 threshold sync
+   (`TBD-CHECK-GATE1` — the Gate-1 record kept the Phase-1 dev thresholds,
+   so no edit is currently required); settle DynMuon's `lr` (TBD-TUNABLE,
+   open WP0.4 tuning issue) — dev-seed probes only if spent.
+2. **A4 mechanism probes** (dev, 6 instrumented runs, off-manifest) —
+   before/alongside stage A per the Gate-1 record; analyze with
+   `scripts/analyze_mechanism.py` (descriptive; the bulk-vs-top anomaly is
+   reported either way).
+3. **G2 stage A** (dev, 450 runs). Aggregate with
    `scripts/aggregate.py --out-csv`, then
    `scripts/plan_wp22.py fill-tuneB` to materialize
    `wp22_tuneB_{muon,routed}.yaml` and `wp22_null_muon_wd.yaml`
    (WD argmax at lr 0.24). Human eyeballs the filled values before launch.
-3. **G6 stress** (dev, 60 runs) — early, because a stock-Muon divergence at
-   1.5× is itself a Gate-2-relevant finding and cheap to get.
-4. **G1 head-to-head** (eval, 500 runs).
-5. **G3 stage B + G4 + G5** (eval, 800 runs; `wp22_null_muon_lrclip.yaml`
+4. **G8 β sensitivity + G6 stress** (dev, 70 runs) — early: a stock-Muon
+   divergence at 1.5× and a β-fragile oscillating set are both
+   Gate-2-relevant findings and cheap to get.
+5. **G1 head-to-head + G5 constant-g_osc** (eval, 800 runs) — the amended
+   primary table: muon vs routed(osc-only, adaptive) vs constant-g_osc
+   {0.25, 0.5, 0.75} vs baselines.
+6. **G3 stage B + G4** (eval, 600 runs; `wp22_null_muon_lrclip.yaml`
    only after the harness `grad_clip` addition lands — otherwise it runs
    without clipping and looks valid; see Deviation 6).
-6. **G7 λ-tracking** once instrumentation-on-routed is wired (WP2.3).
-7. Aggregate everything into the comparison table
+7. **G7 exploratory arms** (eval, 200 runs) — last; first cut on budget
+   pressure; reported in the appendix only.
+8. **G9 λ-tracking** once instrumentation-on-routed is wired (WP2.3).
+9. Aggregate everything into the comparison table
    (`aggregate.py --gpu-type <A6000 string>`); descriptive report vs
-   `criteria/phase2_success.yaml`; **stop at the Gate-2 human checkpoint.**
+   `criteria/phase2_success.yaml` (to be drafted for the osc-only scope per
+   amendment A1 **before** the eval-seed comparison runs); **stop at the
+   Gate-2 human checkpoint.**
 
 All eval sweeps are cloud runs launched by the human via
 `scripts/launch_cloud.sh sweep <config>` per the compute boundary; the agent
-consumes synced `results/` JSONs.
+consumes synced `results/` JSONs. All routed comparison runs record
+`metrics["routing_stats"]` and `metrics["routing_timeseries"]` (A5) — a
+null result without treated-fraction / gain-distribution logs would be
+uninterpretable (n_min=50 leaves the first 50 of 200 steps untreated and
+~67% of directions reset per refresh at align_min=0.9).
 
-## Gate-1 scope dependency
+## Gate-1 scope (resolved)
 
-- **Full-routing scope (both channels):** run everything above as written.
-- **Oscillation-only scope (plan §2.4 branch):**
-  - **Dropped:** `wp22_channel_noise_only.yaml` (−100 runs) and the noise
-    channel everywhere: the human flips `enable_noise_channel: false` in
-    `wp22_headtohead_routed.yaml`, `wp22_tuneA_routed.yaml`,
-    `wp22_tuneB_routed.yaml`, `wp22_null_routed_rhoignored.yaml`,
-    `wp22_null_routed_randomgating.yaml`, `wp22_stress_routed.yaml`
-    (config edits are a human action since they change pre-registered scope).
-  - `wp22_channel_osc_only.yaml` then duplicates the head-to-head routed
-    config and is also dropped (−100 more runs); it exists precisely so the
-    branch needs no new configs.
-  - `wp22_null_muon_wd.yaml` (noise-channel null) becomes optional; keep
-    unless budget forces the cut — it still bounds "WD alone" on this
-    harness.
-  - Oscillation-only total: ~1610 runs ≈ 9.8 h ≈ $4.00.
+The Gate-1 decision (`reports/gate1-decision.md`) selected the
+**oscillation-only** branch; the section that previously enumerated both
+scopes is resolved as follows, and the config edits are DONE (agent, under
+the delegation recorded in the gate record):
+
+- Osc-only (`enable_noise_channel: false`) in: `wp22_headtohead_routed.yaml`
+  (primary), `wp22_tuneA_routed.yaml`, `wp22_tuneB_routed.yaml`,
+  `wp22_null_routed_randomgating.yaml`, `wp22_stress_routed.yaml`,
+  `wp22_goscconst_{025,050,075}.yaml`, `wp22_beta09_oscarm.yaml`.
+- `wp22_null_routed_rhoignored.yaml` **keeps both channels** and is marked
+  EXPLORATORY: rho_ignored disables the oscillation label, so osc-only +
+  rho_ignored would be bit-for-bit stock Muon (a meaningless null); it is
+  only interpretable as the companion null of the exploratory full-routing
+  arm.
+- `wp22_channel_osc_only.yaml` deleted (byte-duplicate of the amended
+  primary); `wp22_channel_noise_only.yaml` and the former full-routing
+  head-to-head (now `wp22_exploratory_fullrouted.yaml`) kept as EXPLORATORY
+  appendix arms at eval n=100.
+- `wp22_null_muon_wd.yaml` kept (bounds "WD alone" on this harness) but,
+  like the noise channel it nulls, carries no pre-registered claim.
 
 ## What stage B fills in
 
