@@ -87,8 +87,10 @@ def test_each_zoo_member_steps_on_cpu(name):
 
 
 def test_all_five_smoke_configs_exist():
+    # WP2.1 added airbench_smoke_routed.yaml alongside the five zoo configs
+    # (routed's own coverage lives in tests/test_optim_routed*.py).
     stems = {p.stem for p in SMOKE_CONFIGS}
-    assert stems == {f"airbench_smoke_{n}" for n in ZOO_NAMES}
+    assert stems == {f"airbench_smoke_{n}" for n in ZOO_NAMES + ["routed"]}
 
 
 @pytest.mark.parametrize("path", SMOKE_CONFIGS, ids=lambda p: p.stem)
