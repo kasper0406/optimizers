@@ -1,0 +1,79 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_instrumented",
+      "instrumentation": {
+        "align_min": 0.9,
+        "betas": [
+          0.9,
+          0.99
+        ],
+        "classifier": {
+          "innov_needed": 2,
+          "innov_window": 4,
+          "n_min": 50,
+          "rho_osc": 0.5,
+          "tau_noise": 2.0,
+          "tau_sig": 4.0,
+          "z_reset": 6.0
+        },
+        "hvp": false,
+        "k1": 16,
+        "k2": 16,
+        "min_dim": 8,
+        "momentum_key": "momentum_buffer",
+        "seed": 4242,
+        "snapshot_every": 5,
+        "subspace_iters": 2,
+        "t_refresh": 50
+      },
+      "recipe": {
+        "sampling": "with_replacement",
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/instrumented_airbench_withreplacement.yaml",
+    "sha256": "17abf942a5f3183e658916ff09296eec4e0e5c996156b18d20deb163366bc0f9"
+  },
+  "cost_usd": 0.02,
+  "experiment": "airbench_instrumented",
+  "finished_at": "2026-07-19T09:22:57.793843+00:00",
+  "git_dirty": false,
+  "git_sha": "3cd7a59ebab304343fdadcc230737b97a727d9c6",
+  "gpu_type": "NVIDIA RTX A6000",
+  "metrics": {
+    "epochs": 8.0,
+    "instrumentation_sidecar": "airbench_instrumented_seed1100_20260719T092212.instrumentation.json",
+    "instrumented": true,
+    "optimizer": "vendor_muon",
+    "optimizer_lr": 0.24,
+    "sampling": "with_replacement",
+    "steps": 200,
+    "time_seconds": 36.28131809997559,
+    "train_acc_last": 0.9820000529289246,
+    "tta_val_acc": 0.9333999752998352,
+    "val_acc": 0.9187999963760376,
+    "val_accs": [
+      0.47360000014305115,
+      0.7723999619483948,
+      0.7561999559402466,
+      0.8102999925613403,
+      0.8707000017166138,
+      0.8831999897956848,
+      0.9089999794960022,
+      0.9187999963760376
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1100,
+  "started_at": "2026-07-19T09:22:12.865444+00:00",
+  "wall_time_s": 44.92836257299996
+}

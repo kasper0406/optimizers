@@ -1,0 +1,79 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_instrumented",
+      "instrumentation": {
+        "align_min": 0.9,
+        "betas": [
+          0.9,
+          0.99
+        ],
+        "classifier": {
+          "innov_needed": 2,
+          "innov_window": 4,
+          "n_min": 50,
+          "rho_osc": 0.5,
+          "tau_noise": 2.0,
+          "tau_sig": 4.0,
+          "z_reset": 6.0
+        },
+        "hvp": false,
+        "k1": 16,
+        "k2": 16,
+        "min_dim": 8,
+        "momentum_key": "momentum_buffer",
+        "seed": 4242,
+        "snapshot_every": 5,
+        "subspace_iters": 2,
+        "t_refresh": 50
+      },
+      "recipe": {
+        "sampling": "with_replacement",
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/instrumented_airbench_withreplacement.yaml",
+    "sha256": "17abf942a5f3183e658916ff09296eec4e0e5c996156b18d20deb163366bc0f9"
+  },
+  "cost_usd": 0.02,
+  "experiment": "airbench_instrumented",
+  "finished_at": "2026-07-19T09:23:44.886624+00:00",
+  "git_dirty": false,
+  "git_sha": "3cd7a59ebab304343fdadcc230737b97a727d9c6",
+  "gpu_type": "NVIDIA RTX A6000",
+  "metrics": {
+    "epochs": 8.0,
+    "instrumentation_sidecar": "airbench_instrumented_seed1102_20260719T092327.instrumentation.json",
+    "instrumented": true,
+    "optimizer": "vendor_muon",
+    "optimizer_lr": 0.24,
+    "sampling": "with_replacement",
+    "steps": 200,
+    "time_seconds": 14.46407371520996,
+    "train_acc_last": 0.983500063419342,
+    "tta_val_acc": 0.9337999820709229,
+    "val_acc": 0.9239999651908875,
+    "val_accs": [
+      0.633899986743927,
+      0.7209999561309814,
+      0.7560999989509583,
+      0.854200005531311,
+      0.8448999524116516,
+      0.8915999531745911,
+      0.9160999655723572,
+      0.9239999651908875
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1102,
+  "started_at": "2026-07-19T09:23:27.686234+00:00",
+  "wall_time_s": 17.200322214000153
+}

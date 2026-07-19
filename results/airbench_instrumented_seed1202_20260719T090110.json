@@ -1,0 +1,79 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_instrumented",
+      "instrumentation": {
+        "align_min": 0.9,
+        "betas": [
+          0.9,
+          0.99
+        ],
+        "classifier": {
+          "innov_needed": 2,
+          "innov_window": 4,
+          "n_min": 50,
+          "rho_osc": 0.5,
+          "tau_noise": 2.0,
+          "tau_sig": 4.0,
+          "z_reset": 6.0
+        },
+        "hvp": true,
+        "k1": 16,
+        "k2": 16,
+        "min_dim": 8,
+        "momentum_key": "momentum_buffer",
+        "seed": 4242,
+        "snapshot_every": 5,
+        "subspace_iters": 2,
+        "t_refresh": 50
+      },
+      "recipe": {
+        "compile": false,
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/instrumented_airbench_hvp.yaml",
+    "sha256": "2fa554d96ec2fc527ba99dccb6ca6aaabfc0ccbdb335012c094ac8008c7e02ab"
+  },
+  "cost_usd": 0.02,
+  "experiment": "airbench_instrumented",
+  "finished_at": "2026-07-19T09:02:40.001060+00:00",
+  "git_dirty": false,
+  "git_sha": "808cb6fb2134892a0aadff9e147b53364b04db79",
+  "gpu_type": "NVIDIA RTX A6000",
+  "metrics": {
+    "epochs": 8.0,
+    "hvp_graph_builds": 4,
+    "instrumentation_sidecar": "airbench_instrumented_seed1202_20260719T090110.instrumentation.json",
+    "instrumented": true,
+    "optimizer": "vendor_muon",
+    "optimizer_lr": 0.24,
+    "steps": 200,
+    "time_seconds": 86.97727648925782,
+    "train_acc_last": 0.9770000576972961,
+    "tta_val_acc": 0.9411999583244324,
+    "val_acc": 0.9334999918937683,
+    "val_accs": [
+      0.7002999782562256,
+      0.6402999758720398,
+      0.7989000082015991,
+      0.821399986743927,
+      0.8700999617576599,
+      0.9042999744415283,
+      0.9243999719619751,
+      0.9334999918937683
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1202,
+  "started_at": "2026-07-19T09:01:10.409508+00:00",
+  "wall_time_s": 89.59144436100019
+}
