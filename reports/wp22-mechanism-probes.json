@@ -1,0 +1,4893 @@
+{
+ "mechanism_comparison": {
+  "betas": [
+   "0.9",
+   "0.99"
+  ],
+  "ci_percentiles": [
+   2.5,
+   97.5
+  ],
+  "n_boot": 2000,
+  "n_runs": {
+   "baseline": 20,
+   "lrhalf": 2,
+   "lrquarter": 2,
+   "mom0": 2
+  },
+  "phases": [
+   [
+    0,
+    50
+   ],
+   [
+    50,
+    100
+   ],
+   [
+    100,
+    150
+   ],
+   [
+    150,
+    200
+   ]
+  ],
+  "prediction_context": "momentum-overshoot predicts a large drop at momentum=0 and a monotone decrease with lr; stated for context, not judged here",
+  "rho_threshold": -0.2,
+  "runs": {
+   "baseline": [
+    "airbench_instrumented_seed1000_20260719T074133.instrumentation.json",
+    "airbench_instrumented_seed1001_20260719T074229.instrumentation.json",
+    "airbench_instrumented_seed1002_20260719T074252.instrumentation.json",
+    "airbench_instrumented_seed1003_20260719T074315.instrumentation.json",
+    "airbench_instrumented_seed1004_20260719T074338.instrumentation.json",
+    "airbench_instrumented_seed1005_20260719T074401.instrumentation.json",
+    "airbench_instrumented_seed1006_20260719T074424.instrumentation.json",
+    "airbench_instrumented_seed1007_20260719T074447.instrumentation.json",
+    "airbench_instrumented_seed1008_20260719T074510.instrumentation.json",
+    "airbench_instrumented_seed1009_20260719T074533.instrumentation.json",
+    "airbench_instrumented_seed1010_20260719T074555.instrumentation.json",
+    "airbench_instrumented_seed1011_20260719T074619.instrumentation.json",
+    "airbench_instrumented_seed1012_20260719T074642.instrumentation.json",
+    "airbench_instrumented_seed1013_20260719T074706.instrumentation.json",
+    "airbench_instrumented_seed1014_20260719T074729.instrumentation.json",
+    "airbench_instrumented_seed1015_20260719T074752.instrumentation.json",
+    "airbench_instrumented_seed1016_20260719T074816.instrumentation.json",
+    "airbench_instrumented_seed1017_20260719T074839.instrumentation.json",
+    "airbench_instrumented_seed1018_20260719T074901.instrumentation.json",
+    "airbench_instrumented_seed1019_20260719T074925.instrumentation.json"
+   ],
+   "lrhalf": [
+    "airbench_instrumented_seed1302_20260719T100456.instrumentation.json",
+    "airbench_instrumented_seed1303_20260719T100547.instrumentation.json"
+   ],
+   "lrquarter": [
+    "airbench_instrumented_seed1304_20260719T100617.instrumentation.json",
+    "airbench_instrumented_seed1305_20260719T100708.instrumentation.json"
+   ],
+   "mom0": [
+    "airbench_instrumented_seed1300_20260719T100335.instrumentation.json",
+    "airbench_instrumented_seed1301_20260719T100426.instrumentation.json"
+   ]
+  },
+  "sets": [
+   "baseline",
+   "mom0",
+   "lrhalf",
+   "lrquarter"
+  ],
+  "variants": {
+   "burn_in_10": {
+    "burn_in": 10,
+    "cells": [
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         0.002917,
+         0.021339
+        ],
+        "mean": 0.011945
+       },
+       "lrquarter": {
+        "ci": [
+         -0.002675,
+         0.046693
+        ],
+        "mean": 0.021946
+       },
+       "mom0": {
+        "ci": [
+         0.023554,
+         0.045418
+        ],
+        "mean": 0.03431
+       }
+      },
+      "kind": "all",
+      "phase": 1,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.693887,
+         0.708275
+        ],
+        "mean_frac": 0.701434,
+        "n_runs_used": 20,
+        "n_snapshots_total": 34555,
+        "per_run_frac": [
+         0.71412,
+         0.722801,
+         0.673611,
+         0.708333,
+         0.690972,
+         0.710892,
+         0.728431,
+         0.667824,
+         0.700231,
+         0.683449,
+         0.697338,
+         0.706597,
+         0.722801,
+         0.713542,
+         0.717014,
+         0.698725,
+         0.706019,
+         0.677662,
+         0.695023,
+         0.693287
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.708912,
+         0.717845
+        ],
+        "mean_frac": 0.713378,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3454,
+        "per_run_frac": [
+         0.708912,
+         0.717845
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.703125,
+         0.743634
+        ],
+        "mean_frac": 0.72338,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3456,
+        "per_run_frac": [
+         0.743634,
+         0.703125
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.729589,
+         0.741898
+        ],
+        "mean_frac": 0.735744,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3455,
+        "per_run_frac": [
+         0.729589,
+         0.741898
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         0.030317,
+         0.072512
+        ],
+        "mean": 0.050694
+       },
+       "lrquarter": {
+        "ci": [
+         0.075231,
+         0.175927
+        ],
+        "mean": 0.125926
+       },
+       "mom0": {
+        "ci": [
+         0.01921,
+         0.071589
+        ],
+        "mean": 0.045486
+       }
+      },
+      "kind": "top",
+      "phase": 1,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.561168,
+         0.59242
+        ],
+        "mean_frac": 0.57662,
+        "n_runs_used": 20,
+        "n_snapshots_total": 17280,
+        "per_run_frac": [
+         0.607639,
+         0.627315,
+         0.519676,
+         0.615741,
+         0.603009,
+         0.583333,
+         0.596065,
+         0.523148,
+         0.563657,
+         0.548611,
+         0.581019,
+         0.576389,
+         0.631944,
+         0.564815,
+         0.601852,
+         0.552083,
+         0.62037,
+         0.537037,
+         0.525463,
+         0.553241
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.615741,
+         0.638889
+        ],
+        "mean_frac": 0.627315,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.638889,
+         0.615741
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.662037,
+         0.743056
+        ],
+        "mean_frac": 0.702546,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.743056,
+         0.662037
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.606481,
+         0.637731
+        ],
+        "mean_frac": 0.622106,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.606481,
+         0.637731
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.053879,
+         8e-06
+        ],
+        "mean": -0.026726
+       },
+       "lrquarter": {
+        "ci": [
+         -0.092368,
+         -0.072685
+        ],
+        "mean": -0.082073
+       },
+       "mom0": {
+        "ci": [
+         0.012477,
+         0.033613
+        ],
+        "mean": 0.023165
+       }
+      },
+      "kind": "bulk",
+      "phase": 1,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.816698,
+         0.835148
+        ],
+        "mean_frac": 0.826286,
+        "n_runs_used": 20,
+        "n_snapshots_total": 17275,
+        "per_run_frac": [
+         0.820602,
+         0.818287,
+         0.827546,
+         0.800926,
+         0.778935,
+         0.838747,
+         0.86095,
+         0.8125,
+         0.836806,
+         0.818287,
+         0.813657,
+         0.836806,
+         0.813657,
+         0.862269,
+         0.832176,
+         0.845708,
+         0.791667,
+         0.818287,
+         0.864583,
+         0.833333
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.778935,
+         0.820186
+        ],
+        "mean_frac": 0.79956,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1726,
+        "per_run_frac": [
+         0.778935,
+         0.820186
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.744213,
+         0.744213
+        ],
+        "mean_frac": 0.744213,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.744213,
+         0.744213
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.846065,
+         0.852839
+        ],
+        "mean_frac": 0.849452,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1727,
+        "per_run_frac": [
+         0.852839,
+         0.846065
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.074016,
+         -0.057948
+        ],
+        "mean": -0.066006
+       },
+       "lrquarter": {
+        "ci": [
+         -0.177823,
+         -0.100212
+        ],
+        "mean": -0.139458
+       },
+       "mom0": {
+        "ci": [
+         0.02232,
+         0.038062
+        ],
+        "mean": 0.030244
+       }
+      },
+      "kind": "all",
+      "phase": 2,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.792163,
+         0.806197
+        ],
+        "mean_frac": 0.799041,
+        "n_runs_used": 20,
+        "n_snapshots_total": 35793,
+        "per_run_frac": [
+         0.79374,
+         0.790711,
+         0.802345,
+         0.820212,
+         0.803801,
+         0.79183,
+         0.802124,
+         0.786592,
+         0.801117,
+         0.810056,
+         0.801339,
+         0.810509,
+         0.785355,
+         0.789385,
+         0.796089,
+         0.824581,
+         0.812849,
+         0.760045,
+         0.827181,
+         0.77095
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.730168,
+         0.735902
+        ],
+        "mean_frac": 0.733035,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3581,
+        "per_run_frac": [
+         0.730168,
+         0.735902
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.625698,
+         0.693467
+        ],
+        "mean_frac": 0.659583,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3581,
+        "per_run_frac": [
+         0.625698,
+         0.693467
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.826354,
+         0.832215
+        ],
+        "mean_frac": 0.829284,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3579,
+        "per_run_frac": [
+         0.832215,
+         0.826354
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.049769,
+         -0.032287
+        ],
+        "mean": -0.041088
+       },
+       "lrquarter": {
+        "ci": [
+         -0.162905,
+         -0.074188
+        ],
+        "mean": -0.118634
+       },
+       "mom0": {
+        "ci": [
+         0.029803,
+         0.040683
+        ],
+        "mean": 0.035301
+       }
+      },
+      "kind": "top",
+      "phase": 2,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.950693,
+         0.961111
+        ],
+        "mean_frac": 0.956019,
+        "n_runs_used": 20,
+        "n_snapshots_total": 17280,
+        "per_run_frac": [
+         0.939815,
+         0.9375,
+         0.949074,
+         0.953704,
+         0.939815,
+         0.976852,
+         0.969907,
+         0.945602,
+         0.961806,
+         0.971065,
+         0.959491,
+         0.969907,
+         0.947917,
+         0.960648,
+         0.961806,
+         0.950231,
+         0.969907,
+         0.947917,
+         0.967593,
+         0.939815
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.909722,
+         0.920139
+        ],
+        "mean_frac": 0.914931,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.909722,
+         0.920139
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.796296,
+         0.878472
+        ],
+        "mean_frac": 0.837384,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.796296,
+         0.878472
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.990741,
+         0.991898
+        ],
+        "mean_frac": 0.991319,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.991898,
+         0.990741
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.101717,
+         -0.076114
+        ],
+        "mean": -0.089108
+       },
+       "lrquarter": {
+        "ci": [
+         -0.193511,
+         -0.123687
+        ],
+        "mean": -0.158739
+       },
+       "mom0": {
+        "ci": [
+         0.011149,
+         0.038962
+        ],
+        "mean": 0.025501
+       }
+      },
+      "kind": "bulk",
+      "phase": 2,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.639354,
+         0.664601
+        ],
+        "mean_frac": 0.652518,
+        "n_runs_used": 20,
+        "n_snapshots_total": 18513,
+        "per_run_frac": [
+         0.657297,
+         0.653304,
+         0.665588,
+         0.695793,
+         0.676757,
+         0.618635,
+         0.645405,
+         0.638229,
+         0.651188,
+         0.659827,
+         0.654095,
+         0.661622,
+         0.633514,
+         0.62959,
+         0.641469,
+         0.707343,
+         0.666307,
+         0.585129,
+         0.695887,
+         0.613391
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.562635,
+         0.564186
+        ],
+        "mean_frac": 0.56341,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1853,
+        "per_run_frac": [
+         0.562635,
+         0.564186
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.466523,
+         0.521036
+        ],
+        "mean_frac": 0.493779,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1853,
+        "per_run_frac": [
+         0.466523,
+         0.521036
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.673139,
+         0.6829
+        ],
+        "mean_frac": 0.67802,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1851,
+        "per_run_frac": [
+         0.6829,
+         0.673139
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.234805,
+         -0.126028
+        ],
+        "mean": -0.180341
+       },
+       "lrquarter": {
+        "ci": [
+         -0.228115,
+         -0.181518
+        ],
+        "mean": -0.204739
+       },
+       "mom0": {
+        "ci": [
+         0.037719,
+         0.081712
+        ],
+        "mean": 0.059615
+       }
+      },
+      "kind": "all",
+      "phase": 3,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.654956,
+         0.676462
+        ],
+        "mean_frac": 0.665274,
+        "n_runs_used": 20,
+        "n_snapshots_total": 35838,
+        "per_run_frac": [
+         0.650112,
+         0.648438,
+         0.667411,
+         0.686942,
+         0.637277,
+         0.687535,
+         0.672991,
+         0.65923,
+         0.642299,
+         0.654769,
+         0.655884,
+         0.688616,
+         0.676897,
+         0.677834,
+         0.644333,
+         0.645647,
+         0.72433,
+         0.628348,
+         0.706473,
+         0.650112
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.4375,
+         0.532366
+        ],
+        "mean_frac": 0.484933,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3584,
+        "per_run_frac": [
+         0.532366,
+         0.4375
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.444506,
+         0.476562
+        ],
+        "mean_frac": 0.460534,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3585,
+        "per_run_frac": [
+         0.476562,
+         0.444506
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.709821,
+         0.739955
+        ],
+        "mean_frac": 0.724888,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3584,
+        "per_run_frac": [
+         0.709821,
+         0.739955
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.269967,
+         -0.14207
+        ],
+        "mean": -0.205671
+       },
+       "lrquarter": {
+        "ci": [
+         -0.266726,
+         -0.216897
+        ],
+        "mean": -0.241551
+       },
+       "mom0": {
+        "ci": [
+         0.056594,
+         0.105382
+        ],
+        "mean": 0.081366
+       }
+      },
+      "kind": "top",
+      "phase": 3,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.849362,
+         0.871645
+        ],
+        "mean_frac": 0.860185,
+        "n_runs_used": 20,
+        "n_snapshots_total": 17280,
+        "per_run_frac": [
+         0.824074,
+         0.836806,
+         0.836806,
+         0.87037,
+         0.842593,
+         0.871528,
+         0.913194,
+         0.855324,
+         0.841435,
+         0.857639,
+         0.83912,
+         0.872685,
+         0.880787,
+         0.87037,
+         0.834491,
+         0.84375,
+         0.922454,
+         0.83912,
+         0.887731,
+         0.863426
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.59838,
+         0.710648
+        ],
+        "mean_frac": 0.654514,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.710648,
+         0.59838
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.601852,
+         0.635417
+        ],
+        "mean_frac": 0.618634,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.635417,
+         0.601852
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.924769,
+         0.958333
+        ],
+        "mean_frac": 0.941551,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.924769,
+         0.958333
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.204989,
+         -0.108521
+        ],
+        "mean": -0.156739
+       },
+       "lrquarter": {
+        "ci": [
+         -0.193969,
+         -0.146189
+        ],
+        "mean": -0.17037
+       },
+       "mom0": {
+        "ci": [
+         0.017662,
+         0.061045
+        ],
+        "mean": 0.039381
+       }
+      },
+      "kind": "bulk",
+      "phase": 3,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.469776,
+         0.496642
+        ],
+        "mean_frac": 0.483787,
+        "n_runs_used": 20,
+        "n_snapshots_total": 18558,
+        "per_run_frac": [
+         0.488147,
+         0.47306,
+         0.509698,
+         0.516164,
+         0.446121,
+         0.515676,
+         0.449353,
+         0.476857,
+         0.456897,
+         0.466093,
+         0.485468,
+         0.517241,
+         0.487069,
+         0.498382,
+         0.467098,
+         0.461207,
+         0.539871,
+         0.432112,
+         0.537716,
+         0.451509
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.287716,
+         0.366379
+        ],
+        "mean_frac": 0.327047,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1856,
+        "per_run_frac": [
+         0.366379,
+         0.287716
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.29817,
+         0.328664
+        ],
+        "mean_frac": 0.313417,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1857,
+        "per_run_frac": [
+         0.328664,
+         0.29817
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.509698,
+         0.536638
+        ],
+        "mean_frac": 0.523168,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1856,
+        "per_run_frac": [
+         0.509698,
+         0.536638
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.176114,
+         -0.056206
+        ],
+        "mean": -0.115565
+       },
+       "lrquarter": {
+        "ci": [
+         -0.155512,
+         -0.117602
+        ],
+        "mean": -0.136904
+       },
+       "mom0": {
+        "ci": [
+         0.033529,
+         0.066304
+        ],
+        "mean": 0.049661
+       }
+      },
+      "kind": "all",
+      "phase": 4,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.352591,
+         0.377718
+        ],
+        "mean_frac": 0.365007,
+        "n_runs_used": 20,
+        "n_snapshots_total": 35841,
+        "per_run_frac": [
+         0.379464,
+         0.334077,
+         0.42514,
+         0.365513,
+         0.398996,
+         0.341885,
+         0.349136,
+         0.388393,
+         0.356585,
+         0.323103,
+         0.397321,
+         0.375,
+         0.37221,
+         0.376884,
+         0.391183,
+         0.321987,
+         0.358259,
+         0.313616,
+         0.394531,
+         0.336866
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.198103,
+         0.300781
+        ],
+        "mean_frac": 0.249442,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3584,
+        "per_run_frac": [
+         0.300781,
+         0.198103
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.217634,
+         0.238573
+        ],
+        "mean_frac": 0.228103,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3586,
+        "per_run_frac": [
+         0.238573,
+         0.217634
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.407697,
+         0.42164
+        ],
+        "mean_frac": 0.414668,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3586,
+        "per_run_frac": [
+         0.407697,
+         0.42164
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.282179,
+         -0.090275
+        ],
+        "mean": -0.186169
+       },
+       "lrquarter": {
+        "ci": [
+         -0.259782,
+         -0.214061
+        ],
+        "mean": -0.237095
+       },
+       "mom0": {
+        "ci": [
+         0.090324,
+         0.134957
+        ],
+        "mean": 0.113021
+       }
+      },
+      "kind": "top",
+      "phase": 4,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.414695,
+         0.454863
+        ],
+        "mean_frac": 0.43559,
+        "n_runs_used": 20,
+        "n_snapshots_total": 17280,
+        "per_run_frac": [
+         0.451389,
+         0.387731,
+         0.50463,
+         0.475694,
+         0.472222,
+         0.391204,
+         0.40162,
+         0.47338,
+         0.434028,
+         0.372685,
+         0.484954,
+         0.494213,
+         0.381944,
+         0.489583,
+         0.458333,
+         0.349537,
+         0.430556,
+         0.362269,
+         0.454861,
+         0.440972
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.166667,
+         0.332176
+        ],
+        "mean_frac": 0.249421,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.332176,
+         0.166667
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.190972,
+         0.206019
+        ],
+        "mean_frac": 0.198495,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.206019,
+         0.190972
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.541667,
+         0.555556
+        ],
+        "mean_frac": 0.548611,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.555556,
+         0.541667
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.08084,
+         -0.019057
+        ],
+        "mean": -0.04983
+       },
+       "lrquarter": {
+        "ci": [
+         -0.06568,
+         -0.022095
+        ],
+        "mean": -0.043655
+       },
+       "mom0": {
+        "ci": [
+         -0.037776,
+         0.019327
+        ],
+        "mean": -0.009195
+       }
+      },
+      "kind": "bulk",
+      "phase": 4,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.285681,
+         0.312885
+        ],
+        "mean_frac": 0.299292,
+        "n_runs_used": 20,
+        "n_snapshots_total": 18561,
+        "per_run_frac": [
+         0.3125,
+         0.284177,
+         0.350972,
+         0.262931,
+         0.330819,
+         0.296017,
+         0.300323,
+         0.309267,
+         0.284483,
+         0.27694,
+         0.315733,
+         0.264009,
+         0.363147,
+         0.271845,
+         0.328664,
+         0.296336,
+         0.290948,
+         0.268319,
+         0.338362,
+         0.240043
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.227371,
+         0.271552
+        ],
+        "mean_frac": 0.249461,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1856,
+        "per_run_frac": [
+         0.271552,
+         0.227371
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.242457,
+         0.268817
+        ],
+        "mean_frac": 0.255637,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1858,
+        "per_run_frac": [
+         0.268817,
+         0.242457
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.270183,
+         0.310011
+        ],
+        "mean_frac": 0.290097,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1858,
+        "per_run_frac": [
+         0.270183,
+         0.310011
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.026223,
+         -0.006812
+        ],
+        "mean": -0.016245
+       },
+       "lrquarter": {
+        "ci": [
+         -0.058438,
+         0.009487
+        ],
+        "mean": -0.024972
+       },
+       "mom0": {
+        "ci": [
+         0.009176,
+         0.042519
+        ],
+        "mean": 0.025921
+       }
+      },
+      "kind": "all",
+      "phase": 1,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.589665,
+         0.607988
+        ],
+        "mean_frac": 0.599046,
+        "n_runs_used": 20,
+        "n_snapshots_total": 34555,
+        "per_run_frac": [
+         0.609954,
+         0.622106,
+         0.57581,
+         0.586806,
+         0.58044,
+         0.61066,
+         0.623046,
+         0.548611,
+         0.583333,
+         0.576389,
+         0.622685,
+         0.604745,
+         0.637153,
+         0.605903,
+         0.601273,
+         0.596176,
+         0.611111,
+         0.597801,
+         0.606481,
+         0.58044
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.579954,
+         0.585648
+        ],
+        "mean_frac": 0.582801,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3454,
+        "per_run_frac": [
+         0.585648,
+         0.579954
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.545718,
+         0.602431
+        ],
+        "mean_frac": 0.574074,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3456,
+        "per_run_frac": [
+         0.602431,
+         0.545718
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.61436,
+         0.635574
+        ],
+        "mean_frac": 0.624967,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3453,
+        "per_run_frac": [
+         0.61436,
+         0.635574
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.038657,
+         0.01713
+        ],
+        "mean": -0.010532
+       },
+       "lrquarter": {
+        "ci": [
+         -0.025,
+         0.082873
+        ],
+        "mean": 0.028241
+       },
+       "mom0": {
+        "ci": [
+         0.013715,
+         0.052953
+        ],
+        "mean": 0.033449
+       }
+      },
+      "kind": "top",
+      "phase": 1,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.346583,
+         0.37662
+        ],
+        "mean_frac": 0.361227,
+        "n_runs_used": 20,
+        "n_snapshots_total": 17280,
+        "per_run_frac": [
+         0.376157,
+         0.392361,
+         0.333333,
+         0.372685,
+         0.388889,
+         0.37963,
+         0.383102,
+         0.287037,
+         0.329861,
+         0.319444,
+         0.395833,
+         0.364583,
+         0.436343,
+         0.357639,
+         0.362269,
+         0.34375,
+         0.402778,
+         0.354167,
+         0.328704,
+         0.315972
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.333333,
+         0.368056
+        ],
+        "mean_frac": 0.350694,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.368056,
+         0.333333
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.344907,
+         0.434028
+        ],
+        "mean_frac": 0.389468,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.434028,
+         0.344907
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.385417,
+         0.403935
+        ],
+        "mean_frac": 0.394676,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.385417,
+         0.403935
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.039536,
+         -0.002301
+        ],
+        "mean": -0.021742
+       },
+       "lrquarter": {
+        "ci": [
+         -0.097326,
+         -0.059117
+        ],
+        "mean": -0.078255
+       },
+       "mom0": {
+        "ci": [
+         -1e-05,
+         0.037586
+        ],
+        "mean": 0.018724
+       }
+      },
+      "kind": "bulk",
+      "phase": 1,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.826544,
+         0.846178
+        ],
+        "mean_frac": 0.836936,
+        "n_runs_used": 20,
+        "n_snapshots_total": 17275,
+        "per_run_frac": [
+         0.84375,
+         0.851852,
+         0.818287,
+         0.800926,
+         0.771991,
+         0.842227,
+         0.863268,
+         0.810185,
+         0.836806,
+         0.833333,
+         0.849537,
+         0.844907,
+         0.837963,
+         0.854167,
+         0.840278,
+         0.849188,
+         0.819444,
+         0.841435,
+         0.884259,
+         0.844907
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.803241,
+         0.827146
+        ],
+        "mean_frac": 0.815193,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1726,
+        "per_run_frac": [
+         0.803241,
+         0.827146
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.746528,
+         0.770833
+        ],
+        "mean_frac": 0.758681,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.770833,
+         0.746528
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.843569,
+         0.867749
+        ],
+        "mean_frac": 0.855659,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1725,
+        "per_run_frac": [
+         0.843569,
+         0.867749
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.061012,
+         -0.022499
+        ],
+        "mean": -0.041477
+       },
+       "lrquarter": {
+        "ci": [
+         -0.16641,
+         -0.097783
+        ],
+        "mean": -0.132238
+       },
+       "mom0": {
+        "ci": [
+         0.023347,
+         0.03826
+        ],
+        "mean": 0.030805
+       }
+      },
+      "kind": "all",
+      "phase": 2,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.878748,
+         0.892958
+        ],
+        "mean_frac": 0.88593,
+        "n_runs_used": 20,
+        "n_snapshots_total": 35793,
+        "per_run_frac": [
+         0.889324,
+         0.881925,
+         0.87828,
+         0.902848,
+         0.871996,
+         0.894236,
+         0.895472,
+         0.858659,
+         0.883799,
+         0.908939,
+         0.90346,
+         0.901062,
+         0.886529,
+         0.881006,
+         0.863687,
+         0.901676,
+         0.876536,
+         0.863839,
+         0.91443,
+         0.860894
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.830168,
+         0.858738
+        ],
+        "mean_frac": 0.844453,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3581,
+        "per_run_frac": [
+         0.830168,
+         0.858738
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.724022,
+         0.783361
+        ],
+        "mean_frac": 0.753692,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3581,
+        "per_run_frac": [
+         0.724022,
+         0.783361
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.914989,
+         0.918481
+        ],
+        "mean_frac": 0.916735,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3579,
+        "per_run_frac": [
+         0.914989,
+         0.918481
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.070082,
+         -0.035937
+        ],
+        "mean": -0.052894
+       },
+       "lrquarter": {
+        "ci": [
+         -0.170312,
+         -0.045253
+        ],
+        "mean": -0.10787
+       },
+       "mom0": {
+        "ci": [
+         0.017708,
+         0.02691
+        ],
+        "mean": 0.022338
+       }
+      },
+      "kind": "top",
+      "phase": 2,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.973205,
+         0.982118
+        ],
+        "mean_frac": 0.977662,
+        "n_runs_used": 20,
+        "n_snapshots_total": 17280,
+        "per_run_frac": [
+         0.974537,
+         0.962963,
+         0.969907,
+         0.975694,
+         0.975694,
+         0.987269,
+         0.983796,
+         0.965278,
+         0.972222,
+         0.989583,
+         0.986111,
+         0.998843,
+         0.960648,
+         0.976852,
+         0.976852,
+         0.975694,
+         0.978009,
+         0.989583,
+         0.991898,
+         0.961806
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.91088,
+         0.938657
+        ],
+        "mean_frac": 0.924769,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.91088,
+         0.938657
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.810185,
+         0.929398
+        ],
+        "mean_frac": 0.869792,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.810185,
+         0.929398
+        ]
+       },
+       "mom0": {
+        "ci": [
+         1.0,
+         1.0
+        ],
+        "mean_frac": 1.0,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         1.0,
+         1.0
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.053698,
+         -0.008837
+        ],
+        "mean": -0.030757
+       },
+       "lrquarter": {
+        "ci": [
+         -0.166509,
+         -0.142006
+        ],
+        "mean": -0.154873
+       },
+       "mom0": {
+        "ci": [
+         0.025527,
+         0.052266
+        ],
+        "mean": 0.038688
+       }
+      },
+      "kind": "bulk",
+      "phase": 2,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.788142,
+         0.812302
+        ],
+        "mean_frac": 0.800312,
+        "n_runs_used": 20,
+        "n_snapshots_total": 18513,
+        "per_run_frac": [
+         0.80973,
+         0.806067,
+         0.79288,
+         0.834951,
+         0.775135,
+         0.807151,
+         0.812973,
+         0.759179,
+         0.801296,
+         0.833693,
+         0.826509,
+         0.80973,
+         0.817297,
+         0.791577,
+         0.758099,
+         0.832613,
+         0.781857,
+         0.746767,
+         0.841991,
+         0.766739
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.75486,
+         0.78425
+        ],
+        "mean_frac": 0.769555,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1853,
+        "per_run_frac": [
+         0.75486,
+         0.78425
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.643629,
+         0.647249
+        ],
+        "mean_frac": 0.645439,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1853,
+        "per_run_frac": [
+         0.643629,
+         0.647249
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.835498,
+         0.842503
+        ],
+        "mean_frac": 0.839,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1851,
+        "per_run_frac": [
+         0.835498,
+         0.842503
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.252179,
+         -0.102167
+        ],
+        "mean": -0.177219
+       },
+       "lrquarter": {
+        "ci": [
+         -0.269747,
+         -0.226714
+        ],
+        "mean": -0.248508
+       },
+       "mom0": {
+        "ci": [
+         0.060041,
+         0.103374
+        ],
+        "mean": 0.082268
+       }
+      },
+      "kind": "all",
+      "phase": 3,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.753117,
+         0.774263
+        ],
+        "mean_frac": 0.763714,
+        "n_runs_used": 20,
+        "n_snapshots_total": 35838,
+        "per_run_frac": [
+         0.762835,
+         0.741071,
+         0.796317,
+         0.789621,
+         0.731027,
+         0.764114,
+         0.782366,
+         0.750139,
+         0.784598,
+         0.759063,
+         0.751813,
+         0.764509,
+         0.760045,
+         0.763819,
+         0.730877,
+         0.781808,
+         0.796875,
+         0.714844,
+         0.813058,
+         0.735491
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.517857,
+         0.655134
+        ],
+        "mean_frac": 0.586496,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3584,
+        "per_run_frac": [
+         0.655134,
+         0.517857
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.500837,
+         0.529576
+        ],
+        "mean_frac": 0.515206,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3585,
+        "per_run_frac": [
+         0.529576,
+         0.500837
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.830915,
+         0.861049
+        ],
+        "mean_frac": 0.845982,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3584,
+        "per_run_frac": [
+         0.830915,
+         0.861049
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.348553,
+         -0.127601
+        ],
+        "mean": -0.237674
+       },
+       "lrquarter": {
+        "ci": [
+         -0.293637,
+         -0.268691
+        ],
+        "mean": -0.280498
+       },
+       "mom0": {
+        "ci": [
+         0.047568,
+         0.095602
+        ],
+        "mean": 0.071354
+       }
+      },
+      "kind": "top",
+      "phase": 3,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.890566,
+         0.915337
+        ],
+        "mean_frac": 0.902604,
+        "n_runs_used": 20,
+        "n_snapshots_total": 17280,
+        "per_run_frac": [
+         0.872685,
+         0.902778,
+         0.890046,
+         0.914352,
+         0.886574,
+         0.91088,
+         0.967593,
+         0.900463,
+         0.900463,
+         0.872685,
+         0.878472,
+         0.866898,
+         0.908565,
+         0.896991,
+         0.881944,
+         0.905093,
+         0.971065,
+         0.872685,
+         0.930556,
+         0.921296
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.5625,
+         0.767361
+        ],
+        "mean_frac": 0.664931,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.767361,
+         0.5625
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.62037,
+         0.623843
+        ],
+        "mean_frac": 0.622106,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.62037,
+         0.623843
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.958333,
+         0.989583
+        ],
+        "mean_frac": 0.973958,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.958333,
+         0.989583
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.171121,
+         -0.072638
+        ],
+        "mean": -0.120917
+       },
+       "lrquarter": {
+        "ci": [
+         -0.259343,
+         -0.178182
+        ],
+        "mean": -0.218646
+       },
+       "mom0": {
+        "ci": [
+         0.065842,
+         0.118786
+        ],
+        "mean": 0.092445
+       }
+      },
+      "kind": "bulk",
+      "phase": 3,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.617114,
+         0.652619
+        ],
+        "mean_frac": 0.634386,
+        "n_runs_used": 20,
+        "n_snapshots_total": 18558,
+        "per_run_frac": [
+         0.66056,
+         0.590517,
+         0.709052,
+         0.673491,
+         0.586207,
+         0.627027,
+         0.609914,
+         0.610334,
+         0.676724,
+         0.653391,
+         0.634015,
+         0.669181,
+         0.621767,
+         0.639698,
+         0.590076,
+         0.667026,
+         0.634698,
+         0.567888,
+         0.703664,
+         0.5625
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.476293,
+         0.550647
+        ],
+        "mean_frac": 0.51347,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1856,
+        "per_run_frac": [
+         0.550647,
+         0.476293
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.386437,
+         0.445043
+        ],
+        "mean_frac": 0.41574,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1857,
+        "per_run_frac": [
+         0.445043,
+         0.386437
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.712284,
+         0.741379
+        ],
+        "mean_frac": 0.726832,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1856,
+        "per_run_frac": [
+         0.712284,
+         0.741379
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.247385,
+         -0.103298
+        ],
+        "mean": -0.174549
+       },
+       "lrquarter": {
+        "ci": [
+         -0.266144,
+         -0.208134
+        ],
+        "mean": -0.237452
+       },
+       "mom0": {
+        "ci": [
+         0.071138,
+         0.125063
+        ],
+        "mean": 0.099144
+       }
+      },
+      "kind": "all",
+      "phase": 4,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.424344,
+         0.463175
+        ],
+        "mean_frac": 0.443522,
+        "n_runs_used": 20,
+        "n_snapshots_total": 35841,
+        "per_run_frac": [
+         0.466518,
+         0.392638,
+         0.488268,
+         0.455357,
+         0.472656,
+         0.395427,
+         0.407139,
+         0.474888,
+         0.449219,
+         0.401786,
+         0.479353,
+         0.488839,
+         0.431362,
+         0.450586,
+         0.508929,
+         0.378348,
+         0.457031,
+         0.358817,
+         0.520647,
+         0.392638
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.209821,
+         0.328125
+        ],
+        "mean_frac": 0.268973,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3584,
+        "per_run_frac": [
+         0.328125,
+         0.209821
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.189732,
+         0.222408
+        ],
+        "mean_frac": 0.20607,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3586,
+        "per_run_frac": [
+         0.222408,
+         0.189732
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.529838,
+         0.555494
+        ],
+        "mean_frac": 0.542666,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3586,
+        "per_run_frac": [
+         0.555494,
+         0.529838
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.391149,
+         -0.147565
+        ],
+        "mean": -0.269618
+       },
+       "lrquarter": {
+        "ci": [
+         -0.368461,
+         -0.294323
+        ],
+        "mean": -0.330961
+       },
+       "mom0": {
+        "ci": [
+         0.059485,
+         0.184557
+        ],
+        "mean": 0.122743
+       }
+      },
+      "kind": "top",
+      "phase": 4,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.458853,
+         0.522108
+        ],
+        "mean_frac": 0.49184,
+        "n_runs_used": 20,
+        "n_snapshots_total": 17280,
+        "per_run_frac": [
+         0.489583,
+         0.428241,
+         0.530093,
+         0.524306,
+         0.564815,
+         0.417824,
+         0.46412,
+         0.5625,
+         0.511574,
+         0.390046,
+         0.572917,
+         0.56713,
+         0.440972,
+         0.517361,
+         0.591435,
+         0.334491,
+         0.484954,
+         0.390046,
+         0.574074,
+         0.480324
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.121528,
+         0.322917
+        ],
+        "mean_frac": 0.222222,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.322917,
+         0.121528
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.144676,
+         0.177083
+        ],
+        "mean_frac": 0.16088,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.177083,
+         0.144676
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.572917,
+         0.65625
+        ],
+        "mean_frac": 0.614583,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1728,
+        "per_run_frac": [
+         0.65625,
+         0.572917
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.117424,
+         -0.055288
+        ],
+        "mean": -0.086039
+       },
+       "lrquarter": {
+        "ci": [
+         -0.178068,
+         -0.123813
+        ],
+        "mean": -0.150441
+       },
+       "mom0": {
+        "ci": [
+         0.051496,
+         0.103501
+        ],
+        "mean": 0.077241
+       }
+      },
+      "kind": "bulk",
+      "phase": 4,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.381439,
+         0.415434
+        ],
+        "mean_frac": 0.398539,
+        "n_runs_used": 20,
+        "n_snapshots_total": 18561,
+        "per_run_frac": [
+         0.445043,
+         0.359526,
+         0.449244,
+         0.391164,
+         0.386853,
+         0.374596,
+         0.354144,
+         0.393319,
+         0.391164,
+         0.412716,
+         0.392241,
+         0.415948,
+         0.422414,
+         0.38835,
+         0.432112,
+         0.419181,
+         0.431034,
+         0.329741,
+         0.470905,
+         0.311087
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.292026,
+         0.332974
+        ],
+        "mean_frac": 0.3125,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1856,
+        "per_run_frac": [
+         0.332974,
+         0.292026
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.231681,
+         0.264516
+        ],
+        "mean_frac": 0.248099,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1858,
+        "per_run_frac": [
+         0.264516,
+         0.231681
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.461787,
+         0.489774
+        ],
+        "mean_frac": 0.47578,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1858,
+        "per_run_frac": [
+         0.461787,
+         0.489774
+        ]
+       }
+      }
+     }
+    ]
+   },
+   "raw": {
+    "burn_in": 0,
+    "cells": [
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.00684,
+         0.012479
+        ],
+        "mean": 0.002655
+       },
+       "lrquarter": {
+        "ci": [
+         -0.016104,
+         0.028845
+        ],
+        "mean": 0.006227
+       },
+       "mom0": {
+        "ci": [
+         0.028425,
+         0.055727
+        ],
+        "mean": 0.042368
+       }
+      },
+      "kind": "all",
+      "phase": 1,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.674868,
+         0.689376
+        ],
+        "mean_frac": 0.682151,
+        "n_runs_used": 20,
+        "n_snapshots_total": 38891,
+        "per_run_frac": [
+         0.687468,
+         0.707279,
+         0.651726,
+         0.698616,
+         0.678645,
+         0.694645,
+         0.704791,
+         0.651282,
+         0.674203,
+         0.66838,
+         0.676259,
+         0.678167,
+         0.703133,
+         0.687757,
+         0.703761,
+         0.679216,
+         0.691834,
+         0.66172,
+         0.669579,
+         0.67455
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.680062,
+         0.689549
+        ],
+        "mean_frac": 0.684806,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3893,
+        "per_run_frac": [
+         0.680062,
+         0.689549
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.670782,
+         0.705973
+        ],
+        "mean_frac": 0.688378,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3886,
+        "per_run_frac": [
+         0.705973,
+         0.670782
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.715464,
+         0.733573
+        ],
+        "mean_frac": 0.724518,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3888,
+        "per_run_frac": [
+         0.715464,
+         0.733573
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         0.014394,
+         0.053732
+        ],
+        "mean": 0.034899
+       },
+       "lrquarter": {
+        "ci": [
+         0.037804,
+         0.135988
+        ],
+        "mean": 0.087023
+       },
+       "mom0": {
+        "ci": [
+         0.025029,
+         0.086475
+        ],
+        "mean": 0.055906
+       }
+      },
+      "kind": "top",
+      "phase": 1,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.54739,
+         0.577141
+        ],
+        "mean_frac": 0.562777,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19454,
+        "per_run_frac": [
+         0.588054,
+         0.6138,
+         0.505676,
+         0.605967,
+         0.592402,
+         0.569072,
+         0.576725,
+         0.50668,
+         0.543121,
+         0.538144,
+         0.566872,
+         0.558068,
+         0.617436,
+         0.550205,
+         0.590535,
+         0.54386,
+         0.612539,
+         0.529111,
+         0.509202,
+         0.538066
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.588355,
+         0.606996
+        ],
+        "mean_frac": 0.597676,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1951,
+        "per_run_frac": [
+         0.606996,
+         0.588355
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.610939,
+         0.68866
+        ],
+        "mean_frac": 0.649799,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1939,
+        "per_run_frac": [
+         0.68866,
+         0.610939
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.597938,
+         0.639428
+        ],
+        "mean_frac": 0.618683,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1949,
+        "per_run_frac": [
+         0.597938,
+         0.639428
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.053888,
+         -0.005175
+        ],
+        "mean": -0.029285
+       },
+       "lrquarter": {
+        "ci": [
+         -0.083693,
+         -0.065548
+        ],
+        "mean": -0.074892
+       },
+       "mom0": {
+        "ci": [
+         0.020973,
+         0.03743
+        ],
+        "mean": 0.029194
+       }
+      },
+      "kind": "bulk",
+      "phase": 1,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.794167,
+         0.809417
+        ],
+        "mean_frac": 0.801646,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19437,
+        "per_run_frac": [
+         0.78719,
+         0.801242,
+         0.797325,
+         0.790603,
+         0.764887,
+         0.819959,
+         0.83299,
+         0.795292,
+         0.805556,
+         0.797949,
+         0.785421,
+         0.798762,
+         0.789095,
+         0.826446,
+         0.817337,
+         0.814433,
+         0.771047,
+         0.794872,
+         0.831612,
+         0.810894
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.753354,
+         0.791367
+        ],
+        "mean_frac": 0.77236,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1942,
+        "per_run_frac": [
+         0.753354,
+         0.791367
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.723251,
+         0.730256
+        ],
+        "mean_frac": 0.726754,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1947,
+        "per_run_frac": [
+         0.723251,
+         0.730256
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.828689,
+         0.83299
+        ],
+        "mean_frac": 0.83084,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1939,
+        "per_run_frac": [
+         0.83299,
+         0.828689
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.07724,
+         -0.054346
+        ],
+        "mean": -0.065651
+       },
+       "lrquarter": {
+        "ci": [
+         -0.174143,
+         -0.093801
+        ],
+        "mean": -0.134401
+       },
+       "mom0": {
+        "ci": [
+         0.023698,
+         0.037866
+        ],
+        "mean": 0.030703
+       }
+      },
+      "kind": "all",
+      "phase": 2,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.797863,
+         0.810808
+        ],
+        "mean_frac": 0.804453,
+        "n_runs_used": 20,
+        "n_snapshots_total": 38400,
+        "per_run_frac": [
+         0.8,
+         0.796354,
+         0.803646,
+         0.823958,
+         0.806771,
+         0.802604,
+         0.808854,
+         0.788542,
+         0.808333,
+         0.818229,
+         0.810417,
+         0.815104,
+         0.790104,
+         0.794271,
+         0.801562,
+         0.826042,
+         0.818229,
+         0.76875,
+         0.829688,
+         0.777604
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.731771,
+         0.745833
+        ],
+        "mean_frac": 0.738802,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.731771,
+         0.745833
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.634375,
+         0.705729
+        ],
+        "mean_frac": 0.670052,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.634375,
+         0.705729
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.833333,
+         0.836979
+        ],
+        "mean_frac": 0.835156,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.836979,
+         0.833333
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.058908,
+         -0.030207
+        ],
+        "mean": -0.044271
+       },
+       "lrquarter": {
+        "ci": [
+         -0.155833,
+         -0.067603
+        ],
+        "mean": -0.111979
+       },
+       "mom0": {
+        "ci": [
+         0.030988,
+         0.042135
+        ],
+        "mean": 0.036458
+       }
+      },
+      "kind": "top",
+      "phase": 2,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.950103,
+         0.96125
+        ],
+        "mean_frac": 0.955729,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19200,
+        "per_run_frac": [
+         0.938542,
+         0.938542,
+         0.945833,
+         0.954167,
+         0.938542,
+         0.978125,
+         0.969792,
+         0.941667,
+         0.959375,
+         0.972917,
+         0.9625,
+         0.970833,
+         0.944792,
+         0.959375,
+         0.961458,
+         0.95,
+         0.96875,
+         0.948958,
+         0.96875,
+         0.941667
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.901042,
+         0.921875
+        ],
+        "mean_frac": 0.911458,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.901042,
+         0.921875
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.803125,
+         0.884375
+        ],
+        "mean_frac": 0.84375,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.803125,
+         0.884375
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.991667,
+         0.992708
+        ],
+        "mean_frac": 0.992188,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.992708,
+         0.991667
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.099272,
+         -0.074738
+        ],
+        "mean": -0.087031
+       },
+       "lrquarter": {
+        "ci": [
+         -0.194741,
+         -0.118176
+        ],
+        "mean": -0.156823
+       },
+       "mom0": {
+        "ci": [
+         0.012292,
+         0.038333
+        ],
+        "mean": 0.024948
+       }
+      },
+      "kind": "bulk",
+      "phase": 2,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.641353,
+         0.664484
+        ],
+        "mean_frac": 0.653177,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19200,
+        "per_run_frac": [
+         0.661458,
+         0.654167,
+         0.661458,
+         0.69375,
+         0.675,
+         0.627083,
+         0.647917,
+         0.635417,
+         0.657292,
+         0.663542,
+         0.658333,
+         0.659375,
+         0.635417,
+         0.629167,
+         0.641667,
+         0.702083,
+         0.667708,
+         0.588542,
+         0.690625,
+         0.613542
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.5625,
+         0.569792
+        ],
+        "mean_frac": 0.566146,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.5625,
+         0.569792
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.465625,
+         0.527083
+        ],
+        "mean_frac": 0.496354,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.465625,
+         0.527083
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.675,
+         0.68125
+        ],
+        "mean_frac": 0.678125,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.68125,
+         0.675
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.230158,
+         -0.120938
+        ],
+        "mean": -0.175234
+       },
+       "lrquarter": {
+        "ci": [
+         -0.222658,
+         -0.182968
+        ],
+        "mean": -0.202318
+       },
+       "mom0": {
+        "ci": [
+         0.036872,
+         0.080391
+        ],
+        "mean": 0.05862
+       }
+      },
+      "kind": "all",
+      "phase": 3,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.666275,
+         0.686096
+        ],
+        "mean_frac": 0.675755,
+        "n_runs_used": 20,
+        "n_snapshots_total": 38400,
+        "per_run_frac": [
+         0.661979,
+         0.657292,
+         0.677083,
+         0.695312,
+         0.653646,
+         0.695312,
+         0.683333,
+         0.667708,
+         0.653125,
+         0.666146,
+         0.666146,
+         0.696875,
+         0.684896,
+         0.688542,
+         0.654167,
+         0.661458,
+         0.733333,
+         0.639583,
+         0.716667,
+         0.6625
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.452083,
+         0.548958
+        ],
+        "mean_frac": 0.500521,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.548958,
+         0.452083
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.460417,
+         0.486458
+        ],
+        "mean_frac": 0.473437,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.486458,
+         0.460417
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.719271,
+         0.749479
+        ],
+        "mean_frac": 0.734375,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.719271,
+         0.749479
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.268437,
+         -0.133854
+        ],
+        "mean": -0.200885
+       },
+       "lrquarter": {
+        "ci": [
+         -0.257971,
+         -0.220206
+        ],
+        "mean": -0.238906
+       },
+       "mom0": {
+        "ci": [
+         0.054478,
+         0.104324
+        ],
+        "mean": 0.079323
+       }
+      },
+      "kind": "top",
+      "phase": 3,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.854112,
+         0.875577
+        ],
+        "mean_frac": 0.864427,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19200,
+        "per_run_frac": [
+         0.829167,
+         0.841667,
+         0.842708,
+         0.875,
+         0.848958,
+         0.873958,
+         0.916667,
+         0.85625,
+         0.844792,
+         0.860417,
+         0.846875,
+         0.873958,
+         0.880208,
+         0.876042,
+         0.839583,
+         0.853125,
+         0.923958,
+         0.841667,
+         0.894792,
+         0.86875
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.603125,
+         0.723958
+        ],
+        "mean_frac": 0.663542,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.723958,
+         0.603125
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.613542,
+         0.6375
+        ],
+        "mean_frac": 0.625521,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.6375,
+         0.613542
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.926042,
+         0.961458
+        ],
+        "mean_frac": 0.94375,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.926042,
+         0.961458
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.194376,
+         -0.105464
+        ],
+        "mean": -0.149583
+       },
+       "lrquarter": {
+        "ci": [
+         -0.188283,
+         -0.143799
+        ],
+        "mean": -0.165729
+       },
+       "mom0": {
+        "ci": [
+         0.016665,
+         0.058333
+        ],
+        "mean": 0.037917
+       }
+      },
+      "kind": "bulk",
+      "phase": 3,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.474844,
+         0.49969
+        ],
+        "mean_frac": 0.487083,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19200,
+        "per_run_frac": [
+         0.494792,
+         0.472917,
+         0.511458,
+         0.515625,
+         0.458333,
+         0.516667,
+         0.45,
+         0.479167,
+         0.461458,
+         0.471875,
+         0.485417,
+         0.519792,
+         0.489583,
+         0.501042,
+         0.46875,
+         0.469792,
+         0.542708,
+         0.4375,
+         0.538542,
+         0.45625
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.301042,
+         0.373958
+        ],
+        "mean_frac": 0.3375,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.373958,
+         0.301042
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.307292,
+         0.335417
+        ],
+        "mean_frac": 0.321354,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.335417,
+         0.307292
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.5125,
+         0.5375
+        ],
+        "mean_frac": 0.525,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.5125,
+         0.5375
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.18271,
+         -0.056245
+        ],
+        "mean": -0.119479
+       },
+       "lrquarter": {
+        "ci": [
+         -0.15818,
+         -0.126325
+        ],
+        "mean": -0.142917
+       },
+       "mom0": {
+        "ci": [
+         0.040988,
+         0.070053
+        ],
+        "mean": 0.05526
+       }
+      },
+      "kind": "all",
+      "phase": 4,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.36893,
+         0.396437
+        ],
+        "mean_frac": 0.381979,
+        "n_runs_used": 20,
+        "n_snapshots_total": 38400,
+        "per_run_frac": [
+         0.395313,
+         0.35625,
+         0.442708,
+         0.381771,
+         0.41875,
+         0.358854,
+         0.366667,
+         0.408854,
+         0.375,
+         0.335938,
+         0.413542,
+         0.396354,
+         0.385937,
+         0.391667,
+         0.409896,
+         0.332813,
+         0.375521,
+         0.329688,
+         0.4125,
+         0.351562
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.207813,
+         0.317188
+        ],
+        "mean_frac": 0.2625,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.317188,
+         0.207813
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.232292,
+         0.245833
+        ],
+        "mean_frac": 0.239063,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.245833,
+         0.232292
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.433333,
+         0.441146
+        ],
+        "mean_frac": 0.43724,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.433333,
+         0.441146
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.290525,
+         -0.092233
+        ],
+        "mean": -0.191667
+       },
+       "lrquarter": {
+        "ci": [
+         -0.264115,
+         -0.222186
+        ],
+        "mean": -0.243229
+       },
+       "mom0": {
+        "ci": [
+         0.090984,
+         0.14391
+        ],
+        "mean": 0.117708
+       }
+      },
+      "kind": "top",
+      "phase": 4,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.434738,
+         0.476982
+        ],
+        "mean_frac": 0.45625,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19200,
+        "per_run_frac": [
+         0.473958,
+         0.4125,
+         0.523958,
+         0.492708,
+         0.496875,
+         0.4125,
+         0.425,
+         0.49375,
+         0.45625,
+         0.383333,
+         0.503125,
+         0.516667,
+         0.403125,
+         0.501042,
+         0.4875,
+         0.364583,
+         0.455208,
+         0.38125,
+         0.482292,
+         0.459375
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.178125,
+         0.351042
+        ],
+        "mean_frac": 0.264583,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.351042,
+         0.178125
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.211458,
+         0.214583
+        ],
+        "mean_frac": 0.213021,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.214583,
+         0.211458
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.5625,
+         0.585417
+        ],
+        "mean_frac": 0.573958,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.585417,
+         0.5625
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.9",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.079069,
+         -0.016457
+        ],
+        "mean": -0.047292
+       },
+       "lrquarter": {
+        "ci": [
+         -0.063909,
+         -0.02177
+        ],
+        "mean": -0.042604
+       },
+       "mom0": {
+        "ci": [
+         -0.035469,
+         0.021096
+        ],
+        "mean": -0.007188
+       }
+      },
+      "kind": "bulk",
+      "phase": 4,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.294999,
+         0.321982
+        ],
+        "mean_frac": 0.307708,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19200,
+        "per_run_frac": [
+         0.316667,
+         0.3,
+         0.361458,
+         0.270833,
+         0.340625,
+         0.305208,
+         0.308333,
+         0.323958,
+         0.29375,
+         0.288542,
+         0.323958,
+         0.276042,
+         0.36875,
+         0.282292,
+         0.332292,
+         0.301042,
+         0.295833,
+         0.278125,
+         0.342708,
+         0.24375
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.2375,
+         0.283333
+        ],
+        "mean_frac": 0.260417,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.283333,
+         0.2375
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.253125,
+         0.277083
+        ],
+        "mean_frac": 0.265104,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.277083,
+         0.253125
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.28125,
+         0.319792
+        ],
+        "mean_frac": 0.300521,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.28125,
+         0.319792
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.033368,
+         -0.014754
+        ],
+        "mean": -0.024291
+       },
+       "lrquarter": {
+        "ci": [
+         -0.069369,
+         -0.009232
+        ],
+        "mean": -0.039366
+       },
+       "mom0": {
+        "ci": [
+         0.017917,
+         0.04934
+        ],
+        "mean": 0.033703
+       }
+      },
+      "kind": "all",
+      "phase": 1,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.589892,
+         0.606391
+        ],
+        "mean_frac": 0.598151,
+        "n_runs_used": 20,
+        "n_snapshots_total": 38848,
+        "per_run_frac": [
+         0.605033,
+         0.623971,
+         0.571061,
+         0.595558,
+         0.583979,
+         0.608763,
+         0.622234,
+         0.554012,
+         0.577399,
+         0.581109,
+         0.61297,
+         0.598049,
+         0.634021,
+         0.5965,
+         0.61037,
+         0.597315,
+         0.612255,
+         0.595263,
+         0.599691,
+         0.583462
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.570697,
+         0.577022
+        ],
+        "mean_frac": 0.573859,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3893,
+        "per_run_frac": [
+         0.577022,
+         0.570697
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.53385,
+         0.58372
+        ],
+        "mean_frac": 0.558785,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3876,
+        "per_run_frac": [
+         0.58372,
+         0.53385
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.621732,
+         0.641975
+        ],
+        "mean_frac": 0.631854,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3895,
+        "per_run_frac": [
+         0.621732,
+         0.641975
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.049901,
+         0.006084
+        ],
+        "mean": -0.022297
+       },
+       "lrquarter": {
+        "ci": [
+         -0.055541,
+         0.05302
+        ],
+        "mean": -0.001448
+       },
+       "mom0": {
+        "ci": [
+         0.022849,
+         0.061559
+        ],
+        "mean": 0.042323
+       }
+      },
+      "kind": "top",
+      "phase": 1,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.371889,
+         0.401078
+        ],
+        "mean_frac": 0.386203,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19436,
+        "per_run_frac": [
+         0.401235,
+         0.419487,
+         0.352214,
+         0.405155,
+         0.411399,
+         0.396711,
+         0.408857,
+         0.313079,
+         0.350515,
+         0.354806,
+         0.409887,
+         0.389117,
+         0.457732,
+         0.377184,
+         0.398158,
+         0.376166,
+         0.43107,
+         0.376543,
+         0.352156,
+         0.342593
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.345641,
+         0.382172
+        ],
+        "mean_frac": 0.363907,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1951,
+        "per_run_frac": [
+         0.382172,
+         0.345641
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.340206,
+         0.429303
+        ],
+        "mean_frac": 0.384755,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1946,
+        "per_run_frac": [
+         0.429303,
+         0.340206
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.419487,
+         0.437564
+        ],
+        "mean_frac": 0.428526,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1944,
+        "per_run_frac": [
+         0.419487,
+         0.437564
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.04212,
+         -0.00934
+        ],
+        "mean": -0.025683
+       },
+       "lrquarter": {
+        "ci": [
+         -0.087481,
+         -0.064566
+        ],
+        "mean": -0.076178
+       },
+       "mom0": {
+        "ci": [
+         0.008011,
+         0.041211
+        ],
+        "mean": 0.024074
+       }
+      },
+      "kind": "bulk",
+      "phase": 1,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.801591,
+         0.818404
+        ],
+        "mean_frac": 0.810375,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19412,
+        "per_run_frac": [
+         0.808205,
+         0.829721,
+         0.789907,
+         0.786749,
+         0.75567,
+         0.82213,
+         0.835391,
+         0.79445,
+         0.804752,
+         0.809278,
+         0.815844,
+         0.806982,
+         0.810309,
+         0.816495,
+         0.823893,
+         0.816872,
+         0.793814,
+         0.814433,
+         0.849018,
+         0.82359
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.774093,
+         0.795292
+        ],
+        "mean_frac": 0.784692,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1942,
+        "per_run_frac": [
+         0.774093,
+         0.795292
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.728497,
+         0.739896
+        ],
+        "mean_frac": 0.734197,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1930,
+        "per_run_frac": [
+         0.739896,
+         0.728497
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.82377,
+         0.845128
+        ],
+        "mean_frac": 0.834449,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1951,
+        "per_run_frac": [
+         0.82377,
+         0.845128
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.063229,
+         -0.019817
+        ],
+        "mean": -0.041875
+       },
+       "lrquarter": {
+        "ci": [
+         -0.162501,
+         -0.090883
+        ],
+        "mean": -0.12651
+       },
+       "mom0": {
+        "ci": [
+         0.022911,
+         0.038595
+        ],
+        "mean": 0.030781
+       }
+      },
+      "kind": "all",
+      "phase": 2,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.878488,
+         0.892786
+        ],
+        "mean_frac": 0.885625,
+        "n_runs_used": 20,
+        "n_snapshots_total": 38400,
+        "per_run_frac": [
+         0.888542,
+         0.882292,
+         0.875521,
+         0.901042,
+         0.870833,
+         0.898438,
+         0.895833,
+         0.856771,
+         0.886458,
+         0.910417,
+         0.904687,
+         0.898958,
+         0.884896,
+         0.880729,
+         0.864062,
+         0.897396,
+         0.877604,
+         0.865625,
+         0.910937,
+         0.861458
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.826562,
+         0.860938
+        ],
+        "mean_frac": 0.84375,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.826562,
+         0.860938
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.728125,
+         0.790104
+        ],
+        "mean_frac": 0.759115,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.728125,
+         0.790104
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.914062,
+         0.91875
+        ],
+        "mean_frac": 0.916406,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.914062,
+         0.91875
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.073802,
+         -0.033072
+        ],
+        "mean": -0.053542
+       },
+       "lrquarter": {
+        "ci": [
+         -0.160104,
+         -0.041354
+        ],
+        "mean": -0.100938
+       },
+       "mom0": {
+        "ci": [
+         0.018906,
+         0.028751
+        ],
+        "mean": 0.024062
+       }
+      },
+      "kind": "top",
+      "phase": 2,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.971092,
+         0.980729
+        ],
+        "mean_frac": 0.975938,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19200,
+        "per_run_frac": [
+         0.969792,
+         0.9625,
+         0.966667,
+         0.973958,
+         0.971875,
+         0.988542,
+         0.982292,
+         0.961458,
+         0.970833,
+         0.989583,
+         0.986458,
+         0.997917,
+         0.957292,
+         0.976042,
+         0.975,
+         0.972917,
+         0.976042,
+         0.986458,
+         0.991667,
+         0.961458
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.905208,
+         0.939583
+        ],
+        "mean_frac": 0.922396,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.905208,
+         0.939583
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.81875,
+         0.93125
+        ],
+        "mean_frac": 0.875,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.81875,
+         0.93125
+        ]
+       },
+       "mom0": {
+        "ci": [
+         1.0,
+         1.0
+        ],
+        "mean_frac": 1.0,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         1.0,
+         1.0
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.05469,
+         -0.005207
+        ],
+        "mean": -0.030208
+       },
+       "lrquarter": {
+        "ci": [
+         -0.165573,
+         -0.138228
+        ],
+        "mean": -0.152083
+       },
+       "mom0": {
+        "ci": [
+         0.024113,
+         0.051876
+        ],
+        "mean": 0.0375
+       }
+      },
+      "kind": "bulk",
+      "phase": 2,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.783698,
+         0.806303
+        ],
+        "mean_frac": 0.795312,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19200,
+        "per_run_frac": [
+         0.807292,
+         0.802083,
+         0.784375,
+         0.828125,
+         0.769792,
+         0.808333,
+         0.809375,
+         0.752083,
+         0.802083,
+         0.83125,
+         0.822917,
+         0.8,
+         0.8125,
+         0.785417,
+         0.753125,
+         0.821875,
+         0.779167,
+         0.744792,
+         0.830208,
+         0.761458
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.747917,
+         0.782292
+        ],
+        "mean_frac": 0.765104,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.747917,
+         0.782292
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.6375,
+         0.648958
+        ],
+        "mean_frac": 0.643229,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.6375,
+         0.648958
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.828125,
+         0.8375
+        ],
+        "mean_frac": 0.832812,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.828125,
+         0.8375
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.244272,
+         -0.097369
+        ],
+        "mean": -0.170964
+       },
+       "lrquarter": {
+        "ci": [
+         -0.259847,
+         -0.224426
+        ],
+        "mean": -0.242578
+       },
+       "mom0": {
+        "ci": [
+         0.05789,
+         0.099559
+        ],
+        "mean": 0.079036
+       }
+      },
+      "kind": "all",
+      "phase": 3,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.757734,
+         0.778779
+        ],
+        "mean_frac": 0.768359,
+        "n_runs_used": 20,
+        "n_snapshots_total": 38400,
+        "per_run_frac": [
+         0.76875,
+         0.744271,
+         0.796875,
+         0.792188,
+         0.743229,
+         0.766146,
+         0.786458,
+         0.753125,
+         0.788021,
+         0.764062,
+         0.75625,
+         0.767708,
+         0.764583,
+         0.76875,
+         0.7375,
+         0.789062,
+         0.801042,
+         0.721354,
+         0.815625,
+         0.742188
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.530729,
+         0.664062
+        ],
+        "mean_frac": 0.597396,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.664062,
+         0.530729
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.515104,
+         0.536458
+        ],
+        "mean_frac": 0.525781,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.536458,
+         0.515104
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.832812,
+         0.861979
+        ],
+        "mean_frac": 0.847396,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.832812,
+         0.861979
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.334376,
+         -0.121145
+        ],
+        "mean": -0.22776
+       },
+       "lrquarter": {
+        "ci": [
+         -0.288543,
+         -0.258281
+        ],
+        "mean": -0.272552
+       },
+       "mom0": {
+        "ci": [
+         0.045207,
+         0.092293
+        ],
+        "mean": 0.069115
+       }
+      },
+      "kind": "top",
+      "phase": 3,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.893957,
+         0.917552
+        ],
+        "mean_frac": 0.904844,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19200,
+        "per_run_frac": [
+         0.877083,
+         0.904167,
+         0.890625,
+         0.916667,
+         0.892708,
+         0.909375,
+         0.967708,
+         0.897917,
+         0.902083,
+         0.877083,
+         0.883333,
+         0.870833,
+         0.910417,
+         0.901042,
+         0.886458,
+         0.909375,
+         0.967708,
+         0.875,
+         0.935417,
+         0.921875
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.578125,
+         0.776042
+        ],
+        "mean_frac": 0.677083,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.776042,
+         0.578125
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.625,
+         0.639583
+        ],
+        "mean_frac": 0.632292,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.625,
+         0.639583
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.958333,
+         0.989583
+        ],
+        "mean_frac": 0.973958,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.958333,
+         0.989583
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.159116,
+         -0.068173
+        ],
+        "mean": -0.114167
+       },
+       "lrquarter": {
+        "ci": [
+         -0.252085,
+         -0.172603
+        ],
+        "mean": -0.212604
+       },
+       "mom0": {
+        "ci": [
+         0.06385,
+         0.114844
+        ],
+        "mean": 0.088958
+       }
+      },
+      "kind": "bulk",
+      "phase": 3,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.613331,
+         0.650001
+        ],
+        "mean_frac": 0.631875,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19200,
+        "per_run_frac": [
+         0.660417,
+         0.584375,
+         0.703125,
+         0.667708,
+         0.59375,
+         0.622917,
+         0.605208,
+         0.608333,
+         0.673958,
+         0.651042,
+         0.629167,
+         0.664583,
+         0.61875,
+         0.636458,
+         0.588542,
+         0.66875,
+         0.634375,
+         0.567708,
+         0.695833,
+         0.5625
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.483333,
+         0.552083
+        ],
+        "mean_frac": 0.517708,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.552083,
+         0.483333
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.390625,
+         0.447917
+        ],
+        "mean_frac": 0.419271,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.447917,
+         0.390625
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.707292,
+         0.734375
+        ],
+        "mean_frac": 0.720833,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.707292,
+         0.734375
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.247905,
+         -0.098278
+        ],
+        "mean": -0.173255
+       },
+       "lrquarter": {
+        "ci": [
+         -0.264248,
+         -0.211457
+        ],
+        "mean": -0.236797
+       },
+       "mom0": {
+        "ci": [
+         0.074973,
+         0.129247
+        ],
+        "mean": 0.101484
+       }
+      },
+      "kind": "all",
+      "phase": 4,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.43807,
+         0.476564
+        ],
+        "mean_frac": 0.45763,
+        "n_runs_used": 20,
+        "n_snapshots_total": 38400,
+        "per_run_frac": [
+         0.478646,
+         0.411979,
+         0.503125,
+         0.469792,
+         0.489063,
+         0.411458,
+         0.427083,
+         0.492188,
+         0.463021,
+         0.411458,
+         0.492188,
+         0.505208,
+         0.444792,
+         0.4625,
+         0.520833,
+         0.388542,
+         0.46875,
+         0.374479,
+         0.531771,
+         0.405729
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.221875,
+         0.346875
+        ],
+        "mean_frac": 0.284375,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.346875,
+         0.221875
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.207292,
+         0.234375
+        ],
+        "mean_frac": 0.220833,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.234375,
+         0.207292
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.545833,
+         0.572396
+        ],
+        "mean_frac": 0.559115,
+        "n_runs_used": 2,
+        "n_snapshots_total": 3840,
+        "per_run_frac": [
+         0.572396,
+         0.545833
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.389461,
+         -0.141712
+        ],
+        "mean": -0.264792
+       },
+       "lrquarter": {
+        "ci": [
+         -0.361411,
+         -0.292134
+        ],
+        "mean": -0.327292
+       },
+       "mom0": {
+        "ci": [
+         0.067595,
+         0.189221
+        ],
+        "mean": 0.127396
+       }
+      },
+      "kind": "top",
+      "phase": 4,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.480878,
+         0.539948
+        ],
+        "mean_frac": 0.511667,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19200,
+        "per_run_frac": [
+         0.511458,
+         0.453125,
+         0.55,
+         0.542708,
+         0.584375,
+         0.441667,
+         0.492708,
+         0.580208,
+         0.530208,
+         0.403125,
+         0.5875,
+         0.586458,
+         0.461458,
+         0.53125,
+         0.609375,
+         0.357292,
+         0.50625,
+         0.4125,
+         0.592708,
+         0.498958
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.142708,
+         0.351042
+        ],
+        "mean_frac": 0.246875,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.351042,
+         0.142708
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.172917,
+         0.195833
+        ],
+        "mean_frac": 0.184375,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.195833,
+         0.172917
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.598958,
+         0.679167
+        ],
+        "mean_frac": 0.639063,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.679167,
+         0.598958
+        ]
+       }
+      }
+     },
+     {
+      "beta": "0.99",
+      "difference_probe_minus_baseline": {
+       "lrhalf": {
+        "ci": [
+         -0.113392,
+         -0.05
+        ],
+        "mean": -0.081719
+       },
+       "lrquarter": {
+        "ci": [
+         -0.171776,
+         -0.119423
+        ],
+        "mean": -0.146302
+       },
+       "mom0": {
+        "ci": [
+         0.052025,
+         0.10073
+        ],
+        "mean": 0.075573
+       }
+      },
+      "kind": "bulk",
+      "phase": 4,
+      "sets": {
+       "baseline": {
+        "ci": [
+         0.386717,
+         0.420312
+        ],
+        "mean_frac": 0.403594,
+        "n_runs_used": 20,
+        "n_snapshots_total": 19200,
+        "per_run_frac": [
+         0.445833,
+         0.370833,
+         0.45625,
+         0.396875,
+         0.39375,
+         0.38125,
+         0.361458,
+         0.404167,
+         0.395833,
+         0.419792,
+         0.396875,
+         0.423958,
+         0.428125,
+         0.39375,
+         0.432292,
+         0.419792,
+         0.43125,
+         0.336458,
+         0.470833,
+         0.3125
+        ]
+       },
+       "lrhalf": {
+        "ci": [
+         0.301042,
+         0.342708
+        ],
+        "mean_frac": 0.321875,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.342708,
+         0.301042
+        ]
+       },
+       "lrquarter": {
+        "ci": [
+         0.241667,
+         0.272917
+        ],
+        "mean_frac": 0.257292,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.272917,
+         0.241667
+        ]
+       },
+       "mom0": {
+        "ci": [
+         0.465625,
+         0.492708
+        ],
+        "mean_frac": 0.479167,
+        "n_runs_used": 2,
+        "n_snapshots_total": 1920,
+        "per_run_frac": [
+         0.465625,
+         0.492708
+        ]
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+}

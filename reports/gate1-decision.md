@@ -85,3 +85,14 @@ A6. `scripts/analyze_phase1.py` distinct-directions key omits the matrix
   fails under Muon; literal pre-registered criteria null-satisfiable) and one
   robust positive (large artifact-tested negative-ρ excess with phase
   structure).
+
+## Addendum (2026-07-19, post-sanity): routing-activity fix
+
+The first GPU routed run's telemetry (A5) confirmed the review's dead-zone
+concern quantitatively: with n_min=50, T_refresh=50, align_min=0.9, every
+direction reset at every refresh (288/288) and 98% of direction-steps sat
+inside the confidence window — routing effectively OFF. All routed arms now
+run n_min=25, align_min=0.3 (uniformly applied, documented here BEFORE any
+eval-seed comparison run; treated-fraction telemetry is recorded in every run
+so activity is auditable). The stage-A routed grid that ran with the old
+defaults is retained as an incidental routing-inactive placebo grid.
