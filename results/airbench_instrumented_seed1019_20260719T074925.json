@@ -1,0 +1,77 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_instrumented",
+      "instrumentation": {
+        "align_min": 0.9,
+        "betas": [
+          0.9,
+          0.99
+        ],
+        "classifier": {
+          "innov_needed": 2,
+          "innov_window": 4,
+          "n_min": 50,
+          "rho_osc": 0.5,
+          "tau_noise": 2.0,
+          "tau_sig": 4.0,
+          "z_reset": 6.0
+        },
+        "hvp": false,
+        "k1": 16,
+        "k2": 16,
+        "min_dim": 8,
+        "momentum_key": "momentum_buffer",
+        "seed": 4242,
+        "snapshot_every": 5,
+        "subspace_iters": 2,
+        "t_refresh": 50
+      },
+      "recipe": {
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/wp12_airbench_instrumented.yaml",
+    "sha256": "e86ff4e116a9bf71515211514461b88012c8badb12580c5d57610a18d7a0e9e4"
+  },
+  "cost_usd": 0.003,
+  "experiment": "airbench_instrumented",
+  "finished_at": "2026-07-19T07:49:42.840328+00:00",
+  "git_dirty": false,
+  "git_sha": "b9aab63a6b487da0020f3f67191ee419d13ec77c",
+  "gpu_type": "NVIDIA RTX A6000",
+  "metrics": {
+    "epochs": 8.0,
+    "instrumentation_sidecar": "airbench_instrumented_seed1019_20260719T074925.instrumentation.json",
+    "instrumented": true,
+    "optimizer": "vendor_muon",
+    "optimizer_lr": 0.24,
+    "steps": 200,
+    "time_seconds": 14.731987777709962,
+    "train_acc_last": 0.9725000262260437,
+    "tta_val_acc": 0.9387999773025513,
+    "val_acc": 0.9294999837875366,
+    "val_accs": [
+      0.6098999977111816,
+      0.6692999601364136,
+      0.8154999613761902,
+      0.8409000039100647,
+      0.8886999487876892,
+      0.8910999894142151,
+      0.9247999787330627,
+      0.9294999837875366
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1019,
+  "started_at": "2026-07-19T07:49:25.133170+00:00",
+  "wall_time_s": 17.70707445199878
+}
