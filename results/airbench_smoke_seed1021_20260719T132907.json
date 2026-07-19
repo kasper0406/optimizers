@@ -1,0 +1,514 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_smoke",
+      "optimizer": {
+        "align_min": 0.3,
+        "beta": 0.99,
+        "enable_noise_channel": false,
+        "enable_oscillation_channel": true,
+        "g_noise": 0.25,
+        "k": 16,
+        "lr": 0.24,
+        "momentum": 0.6,
+        "n_min": 25,
+        "name": "routed",
+        "nesterov": true,
+        "ns_steps": 3,
+        "random_gating": false,
+        "rho_ignored": false,
+        "rho_osc": 0.5,
+        "seed": 2600,
+        "t_refresh": 50,
+        "tau_noise": 2.0,
+        "tau_sig": 4.0,
+        "weight_decay": 0.004
+      },
+      "recipe": {
+        "compile": false,
+        "normalize_filter_weights": true,
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/wp22_tuneA_routed__lr0.24_weight_decay0.004.yaml",
+    "sha256": "32fddb0dbb105dfed8ffc047a40d77f65536ecbdd5340d81ba263e5301195212"
+  },
+  "cost_usd": 0.003,
+  "experiment": "airbench_smoke",
+  "finished_at": "2026-07-19T13:29:18.581831+00:00",
+  "git_dirty": false,
+  "git_sha": "411423fd6268a66d040ac049fb3fa388e4241f89",
+  "gpu_type": "NVIDIA RTX A6000",
+  "metrics": {
+    "epochs": 8.0,
+    "optimizer": "routed",
+    "routing_stats": {
+      "aggregate": {
+        "cumulative": {
+          "direction_steps": 19200,
+          "gain_max": 1.0,
+          "gain_min": 0.33126671429922283,
+          "gain_sum": 18211.00228167766,
+          "in_confidence_window_direction_steps": 9216,
+          "n_confidence_resets": 288,
+          "n_innovation_resets": 0,
+          "n_matrices": 6,
+          "n_refreshes": 24,
+          "n_rotation_resets": 288,
+          "noise_direction_steps": 7432,
+          "oscillating_direction_steps": 2471,
+          "signal_direction_steps": 9297,
+          "treated_direction_steps": 2471,
+          "treated_fraction": 0.12869791666666666
+        },
+        "last": {
+          "gain_max": 1.0,
+          "gain_min": 0.46499410157422383,
+          "gain_sum": 94.54934512902636,
+          "k_total": 96,
+          "n_in_confidence_window": 0,
+          "n_matrices": 6,
+          "n_noise": 93,
+          "n_oscillating": 3,
+          "n_signal": 0,
+          "n_treated": 3,
+          "step": 200,
+          "treated_fraction": 0.03125
+        }
+      },
+      "per_matrix": {
+        "matrix0_64x216": {
+          "cumulative": {
+            "direction_steps": 3200,
+            "gain_max": 1.0,
+            "gain_min": 0.4207795949116225,
+            "gain_sum": 3063.420549693543,
+            "in_confidence_window_direction_steps": 1536,
+            "n_steps": 200,
+            "noise_direction_steps": 1316,
+            "oscillating_direction_steps": 322,
+            "signal_direction_steps": 1562,
+            "treated_direction_steps": 322,
+            "treated_fraction": 0.100625
+          },
+          "k": 16,
+          "last": {
+            "gain_max": 1.0,
+            "gain_min": 1.0,
+            "gain_sum": 16.0,
+            "k": 16,
+            "n_in_confidence_window": 0,
+            "n_noise": 16,
+            "n_oscillating": 0,
+            "n_signal": 0,
+            "n_treated": 0,
+            "step": 200,
+            "treated_fraction": 0.0
+          },
+          "n_confidence_resets": 48,
+          "n_innovation_resets": 0,
+          "n_refreshes": 4,
+          "n_rotation_resets": 48,
+          "shape": [
+            64,
+            216
+          ]
+        },
+        "matrix1_64x576": {
+          "cumulative": {
+            "direction_steps": 3200,
+            "gain_max": 1.0,
+            "gain_min": 0.4524048214475414,
+            "gain_sum": 3084.388666003081,
+            "in_confidence_window_direction_steps": 1536,
+            "n_steps": 200,
+            "noise_direction_steps": 1343,
+            "oscillating_direction_steps": 295,
+            "signal_direction_steps": 1562,
+            "treated_direction_steps": 295,
+            "treated_fraction": 0.0921875
+          },
+          "k": 16,
+          "last": {
+            "gain_max": 1.0,
+            "gain_min": 1.0,
+            "gain_sum": 16.0,
+            "k": 16,
+            "n_in_confidence_window": 0,
+            "n_noise": 16,
+            "n_oscillating": 0,
+            "n_signal": 0,
+            "n_treated": 0,
+            "step": 200,
+            "treated_fraction": 0.0
+          },
+          "n_confidence_resets": 48,
+          "n_innovation_resets": 0,
+          "n_refreshes": 4,
+          "n_rotation_resets": 48,
+          "shape": [
+            64,
+            576
+          ]
+        },
+        "matrix2_256x576": {
+          "cumulative": {
+            "direction_steps": 3200,
+            "gain_max": 1.0,
+            "gain_min": 0.42665467005253627,
+            "gain_sum": 3057.2904496314236,
+            "in_confidence_window_direction_steps": 1536,
+            "n_steps": 200,
+            "noise_direction_steps": 1341,
+            "oscillating_direction_steps": 323,
+            "signal_direction_steps": 1536,
+            "treated_direction_steps": 323,
+            "treated_fraction": 0.1009375
+          },
+          "k": 16,
+          "last": {
+            "gain_max": 1.0,
+            "gain_min": 1.0,
+            "gain_sum": 16.0,
+            "k": 16,
+            "n_in_confidence_window": 0,
+            "n_noise": 16,
+            "n_oscillating": 0,
+            "n_signal": 0,
+            "n_treated": 0,
+            "step": 200,
+            "treated_fraction": 0.0
+          },
+          "n_confidence_resets": 48,
+          "n_innovation_resets": 0,
+          "n_refreshes": 4,
+          "n_rotation_resets": 48,
+          "shape": [
+            256,
+            576
+          ]
+        },
+        "matrix3_256x2304": {
+          "cumulative": {
+            "direction_steps": 3200,
+            "gain_max": 1.0,
+            "gain_min": 0.44693054061835796,
+            "gain_sum": 3089.9583005584977,
+            "in_confidence_window_direction_steps": 1536,
+            "n_steps": 200,
+            "noise_direction_steps": 1393,
+            "oscillating_direction_steps": 269,
+            "signal_direction_steps": 1538,
+            "treated_direction_steps": 269,
+            "treated_fraction": 0.0840625
+          },
+          "k": 16,
+          "last": {
+            "gain_max": 1.0,
+            "gain_min": 1.0,
+            "gain_sum": 16.0,
+            "k": 16,
+            "n_in_confidence_window": 0,
+            "n_noise": 16,
+            "n_oscillating": 0,
+            "n_signal": 0,
+            "n_treated": 0,
+            "step": 200,
+            "treated_fraction": 0.0
+          },
+          "n_confidence_resets": 48,
+          "n_innovation_resets": 0,
+          "n_refreshes": 4,
+          "n_rotation_resets": 48,
+          "shape": [
+            256,
+            2304
+          ]
+        },
+        "matrix4_256x2304": {
+          "cumulative": {
+            "direction_steps": 3200,
+            "gain_max": 1.0,
+            "gain_min": 0.33126671429922283,
+            "gain_sum": 3046.448477575101,
+            "in_confidence_window_direction_steps": 1536,
+            "n_steps": 200,
+            "noise_direction_steps": 1281,
+            "oscillating_direction_steps": 383,
+            "signal_direction_steps": 1536,
+            "treated_direction_steps": 383,
+            "treated_fraction": 0.1196875
+          },
+          "k": 16,
+          "last": {
+            "gain_max": 1.0,
+            "gain_min": 1.0,
+            "gain_sum": 16.0,
+            "k": 16,
+            "n_in_confidence_window": 0,
+            "n_noise": 16,
+            "n_oscillating": 0,
+            "n_signal": 0,
+            "n_treated": 0,
+            "step": 200,
+            "treated_fraction": 0.0
+          },
+          "n_confidence_resets": 48,
+          "n_innovation_resets": 0,
+          "n_refreshes": 4,
+          "n_rotation_resets": 48,
+          "shape": [
+            256,
+            2304
+          ]
+        },
+        "matrix5_256x2304": {
+          "cumulative": {
+            "direction_steps": 3200,
+            "gain_max": 1.0,
+            "gain_min": 0.3717535237982152,
+            "gain_sum": 2869.4958382160144,
+            "in_confidence_window_direction_steps": 1536,
+            "n_steps": 200,
+            "noise_direction_steps": 758,
+            "oscillating_direction_steps": 879,
+            "signal_direction_steps": 1563,
+            "treated_direction_steps": 879,
+            "treated_fraction": 0.2746875
+          },
+          "k": 16,
+          "last": {
+            "gain_max": 1.0,
+            "gain_min": 0.46499410157422383,
+            "gain_sum": 14.549345129026367,
+            "k": 16,
+            "n_in_confidence_window": 0,
+            "n_noise": 13,
+            "n_oscillating": 3,
+            "n_signal": 0,
+            "n_treated": 3,
+            "step": 200,
+            "treated_fraction": 0.1875
+          },
+          "n_confidence_resets": 48,
+          "n_innovation_resets": 0,
+          "n_refreshes": 4,
+          "n_rotation_resets": 48,
+          "shape": [
+            256,
+            2304
+          ]
+        }
+      }
+    },
+    "routing_timeseries": [
+      {
+        "n_in_confidence_window": 96,
+        "n_noise": 0,
+        "n_oscillating": 0,
+        "n_signal": 96,
+        "n_treated": 0,
+        "step": 10,
+        "treated_fraction": 0.0
+      },
+      {
+        "n_in_confidence_window": 96,
+        "n_noise": 0,
+        "n_oscillating": 0,
+        "n_signal": 96,
+        "n_treated": 0,
+        "step": 20,
+        "treated_fraction": 0.0
+      },
+      {
+        "n_in_confidence_window": 0,
+        "n_noise": 91,
+        "n_oscillating": 2,
+        "n_signal": 3,
+        "n_treated": 2,
+        "step": 30,
+        "treated_fraction": 0.020833333333333332
+      },
+      {
+        "n_in_confidence_window": 0,
+        "n_noise": 91,
+        "n_oscillating": 2,
+        "n_signal": 3,
+        "n_treated": 2,
+        "step": 40,
+        "treated_fraction": 0.020833333333333332
+      },
+      {
+        "n_in_confidence_window": 0,
+        "n_noise": 89,
+        "n_oscillating": 4,
+        "n_signal": 3,
+        "n_treated": 4,
+        "step": 50,
+        "treated_fraction": 0.041666666666666664
+      },
+      {
+        "n_in_confidence_window": 96,
+        "n_noise": 0,
+        "n_oscillating": 0,
+        "n_signal": 96,
+        "n_treated": 0,
+        "step": 60,
+        "treated_fraction": 0.0
+      },
+      {
+        "n_in_confidence_window": 96,
+        "n_noise": 0,
+        "n_oscillating": 0,
+        "n_signal": 96,
+        "n_treated": 0,
+        "step": 70,
+        "treated_fraction": 0.0
+      },
+      {
+        "n_in_confidence_window": 0,
+        "n_noise": 36,
+        "n_oscillating": 60,
+        "n_signal": 0,
+        "n_treated": 60,
+        "step": 80,
+        "treated_fraction": 0.625
+      },
+      {
+        "n_in_confidence_window": 0,
+        "n_noise": 38,
+        "n_oscillating": 58,
+        "n_signal": 0,
+        "n_treated": 58,
+        "step": 90,
+        "treated_fraction": 0.6041666666666666
+      },
+      {
+        "n_in_confidence_window": 0,
+        "n_noise": 41,
+        "n_oscillating": 55,
+        "n_signal": 0,
+        "n_treated": 55,
+        "step": 100,
+        "treated_fraction": 0.5729166666666666
+      },
+      {
+        "n_in_confidence_window": 96,
+        "n_noise": 0,
+        "n_oscillating": 0,
+        "n_signal": 96,
+        "n_treated": 0,
+        "step": 110,
+        "treated_fraction": 0.0
+      },
+      {
+        "n_in_confidence_window": 96,
+        "n_noise": 0,
+        "n_oscillating": 0,
+        "n_signal": 96,
+        "n_treated": 0,
+        "step": 120,
+        "treated_fraction": 0.0
+      },
+      {
+        "n_in_confidence_window": 0,
+        "n_noise": 67,
+        "n_oscillating": 29,
+        "n_signal": 0,
+        "n_treated": 29,
+        "step": 130,
+        "treated_fraction": 0.3020833333333333
+      },
+      {
+        "n_in_confidence_window": 0,
+        "n_noise": 69,
+        "n_oscillating": 27,
+        "n_signal": 0,
+        "n_treated": 27,
+        "step": 140,
+        "treated_fraction": 0.28125
+      },
+      {
+        "n_in_confidence_window": 0,
+        "n_noise": 70,
+        "n_oscillating": 26,
+        "n_signal": 0,
+        "n_treated": 26,
+        "step": 150,
+        "treated_fraction": 0.2708333333333333
+      },
+      {
+        "n_in_confidence_window": 96,
+        "n_noise": 0,
+        "n_oscillating": 0,
+        "n_signal": 96,
+        "n_treated": 0,
+        "step": 160,
+        "treated_fraction": 0.0
+      },
+      {
+        "n_in_confidence_window": 96,
+        "n_noise": 0,
+        "n_oscillating": 0,
+        "n_signal": 96,
+        "n_treated": 0,
+        "step": 170,
+        "treated_fraction": 0.0
+      },
+      {
+        "n_in_confidence_window": 0,
+        "n_noise": 89,
+        "n_oscillating": 7,
+        "n_signal": 0,
+        "n_treated": 7,
+        "step": 180,
+        "treated_fraction": 0.07291666666666667
+      },
+      {
+        "n_in_confidence_window": 0,
+        "n_noise": 90,
+        "n_oscillating": 6,
+        "n_signal": 0,
+        "n_treated": 6,
+        "step": 190,
+        "treated_fraction": 0.0625
+      },
+      {
+        "n_in_confidence_window": 0,
+        "n_noise": 93,
+        "n_oscillating": 3,
+        "n_signal": 0,
+        "n_treated": 3,
+        "step": 200,
+        "treated_fraction": 0.03125
+      }
+    ],
+    "steps": 200,
+    "time_seconds": 8.592536376953124,
+    "train_acc_last": 0.9740000367164612,
+    "tta_val_acc": 0.9390999674797058,
+    "val_acc": 0.9325999617576599,
+    "val_accs": [
+      0.5701999664306641,
+      0.6272000074386597,
+      0.777899980545044,
+      0.7989999651908875,
+      0.8781999945640564,
+      0.905299961566925,
+      0.9232999682426453,
+      0.9325999617576599
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1021,
+  "started_at": "2026-07-19T13:29:07.483307+00:00",
+  "wall_time_s": 11.098470947999886
+}

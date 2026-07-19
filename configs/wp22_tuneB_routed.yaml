@@ -16,7 +16,7 @@
 # Routing values are frozen at constructor defaults; TBD-CHECK-GATE1 as in
 # wp22_headtohead_routed.yaml.
 experiment: airbench_smoke
-status: "PLACEHOLDER-TBD-STAGE-A -- not runnable; fill via scripts/plan_wp22.py from the stage-A aggregate"
+status: "filled 2026-07-19 from stage-A argmax (agent, delegated)"
 seed: 2209
 device: cuda
 
@@ -34,11 +34,11 @@ recipe:
 
 optimizer:
   name: routed
-  lr: TBD-STAGE-A            # argmax accuracy over the wp22_tuneA_routed grid
+  lr: 0.24            # argmax accuracy over the wp22_tuneA_routed grid
   momentum: 0.6
   nesterov: true
   ns_steps: 3
-  weight_decay: TBD-STAGE-A  # argmax accuracy over the wp22_tuneA_routed grid
+  weight_decay: 0.008  # argmax accuracy over the wp22_tuneA_routed grid
   # -- routing (frozen at constructor defaults; TBD-CHECK-GATE1)
   k: 16
   t_refresh: 50

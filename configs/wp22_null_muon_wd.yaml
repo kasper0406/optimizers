@@ -10,7 +10,7 @@
 #       --csv <stageA_aggregate.csv> --manifest <stageA_manifest.json> \
 #       --target configs/wp22_null_muon_wd.yaml --fix optimizer.lr=0.24
 experiment: airbench_smoke
-status: "PLACEHOLDER-TBD-STAGE-A -- not runnable; fill weight_decay from the stage-A muon aggregate at lr 0.24"
+status: "filled 2026-07-19 from stage-A argmax (agent, delegated)"
 seed: 2210
 device: cuda
 
@@ -32,7 +32,7 @@ optimizer:
   momentum: 0.6
   nesterov: true
   ns_steps: 3
-  weight_decay: TBD-STAGE-A  # argmax over WD axis at lr 0.24 in stage A
+  weight_decay: 0.004  # argmax over WD axis at lr 0.24 in stage A
 
 sweep:
   seeds: eval          # -> seeds 0-99 at launch time; comparison-table set

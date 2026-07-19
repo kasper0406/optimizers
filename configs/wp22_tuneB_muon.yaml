@@ -10,7 +10,7 @@
 # which replaces the TBD strings and clears the status marker. Attempting to
 # run before filling fails at optimizer construction (lr is a string).
 experiment: airbench_smoke
-status: "PLACEHOLDER-TBD-STAGE-A -- not runnable; fill via scripts/plan_wp22.py from the stage-A aggregate"
+status: "filled 2026-07-19 from stage-A argmax (agent, delegated)"
 seed: 2208
 device: cuda
 
@@ -28,11 +28,11 @@ recipe:
 
 optimizer:
   name: muon
-  lr: TBD-STAGE-A            # argmax accuracy over the wp22_tuneA_muon grid
+  lr: 0.24            # argmax accuracy over the wp22_tuneA_muon grid
   momentum: 0.6
   nesterov: true
   ns_steps: 3
-  weight_decay: TBD-STAGE-A  # argmax accuracy over the wp22_tuneA_muon grid
+  weight_decay: 0.004  # argmax accuracy over the wp22_tuneA_muon grid
 
 sweep:
   seeds: eval          # -> seeds 0-99 at launch time; comparison-table set

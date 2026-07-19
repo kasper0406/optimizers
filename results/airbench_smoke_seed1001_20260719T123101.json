@@ -1,0 +1,65 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_smoke",
+      "optimizer": {
+        "adjust_lr": "spectral_norm",
+        "lr": 0.05,
+        "momentum": 0.6,
+        "name": "dynmuon",
+        "nesterov": true,
+        "p_max": 1.0,
+        "p_min": -0.25,
+        "spectral_impl": "poly",
+        "tau_ratio": 0.02,
+        "total_steps": 200,
+        "weight_decay": 0.0,
+        "width_ratio": 0.08
+      },
+      "recipe": {
+        "compile": true,
+        "normalize_filter_weights": true,
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/lrprobe_dynmuon__lr0.05.yaml",
+    "sha256": "7a0ae85e5e756a2b53c81842ec5e7319abee9ee0325811e8dd750b8fc4fec12d"
+  },
+  "cost_usd": 0.003,
+  "experiment": "airbench_smoke",
+  "finished_at": "2026-07-19T12:31:17.328292+00:00",
+  "git_dirty": false,
+  "git_sha": "411423fd6268a66d040ac049fb3fa388e4241f89",
+  "gpu_type": "NVIDIA RTX A6000",
+  "metrics": {
+    "epochs": 8.0,
+    "optimizer": "dynmuon",
+    "steps": 200,
+    "time_seconds": 13.561391983032227,
+    "train_acc_last": 0.596500039100647,
+    "tta_val_acc": 0.6031000018119812,
+    "val_acc": 0.5950999855995178,
+    "val_accs": [
+      0.29670000076293945,
+      0.4105999767780304,
+      0.4673999845981598,
+      0.4083999991416931,
+      0.4690999984741211,
+      0.539900004863739,
+      0.5807999968528748,
+      0.5950999855995178
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1001,
+  "started_at": "2026-07-19T12:31:01.029167+00:00",
+  "wall_time_s": 16.299088875999587
+}
