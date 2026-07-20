@@ -1,0 +1,57 @@
+# WP0.2 — nanogpt reproduction, 3 dev seeds: OUR OWN seed-variance estimate.
+#
+# Identical in every scientific respect to configs/wp02_nanogpt_repro.yaml
+# (see that file's DEVIATION HEADER — it applies verbatim); the only change is
+# the sweep block. Read that header before touching anything here.
+#
+# Purpose: the record publishes an n=20 distribution (mean 3.2791, std 0.0013)
+# for ITS hardware and ITS 8-GPU code path. Our port runs different reduction
+# order, different accumulation, possibly different precision, so its variance
+# must be measured, not inherited. Three seeds is a variance *estimate* with
+# wide uncertainty (a 3-sample std has ~50% relative CI) — it is the input to
+# the WP3.x power analysis, not a comparison table.
+#
+# Seed policy (CLAUDE.md ground rule 2): dev seeds 1000-1002, resolved by
+# scripts/sweep.py at launch time. This is a measurement, not a comparison, so
+# dev seeds are correct here.
+#
+# Launch (human; ~3 x single-run cost — see docs/nanogpt-port.md):
+#   bash scripts/launch_cloud.sh sweep configs/wp02_nanogpt_repro_3seed.yaml
+#
+# Aggregate:
+#   uv run python scripts/analyze_nanogpt.py --results results/nanogpt_seed10*.json
+
+experiment: nanogpt
+device: auto
+seed: 1000              # base dev seed; sweep.py drops it and passes --seed
+
+nanogpt:
+  device_count: 1
+  precision_mode: fp8
+  attention_impl: flex
+  compile: true
+  warmup_steps: 10
+
+  num_iterations: 1750
+  cooldown_frac: 0.45
+  min_lr_frac: 0.05
+  val_loss_every: 125
+  val_tokens: 10485760
+  train_seq_len: 49152
+  val_seq_len: 262144
+  muon_lr: 0.05
+  muon_momentum: 0.95
+  muon_weight_decay: 0.0
+  adam_lr: 0.008
+  adam_betas: [0.8, 0.95]
+  adam_eps: 1.0e-10
+  adam_weight_decay: 0.0
+  target_val_loss: 3.28
+
+  checkpoint:
+    dir: checkpoints
+    every_steps: 250
+    resume: true
+
+sweep:
+  seeds: {policy: dev, num_seeds: 3}   # -> 1000, 1001, 1002

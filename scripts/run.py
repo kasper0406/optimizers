@@ -161,8 +161,17 @@ def _load_probe_divergence():
     return module.run_probe_divergence
 
 
+def _run_nanogpt(config, device):
+    """WP0.2 nanogpt port (src/nanogpt). Imported lazily: the module pulls in
+    FlexAttention and the FP8 custom ops, which are pointless on a CPU box."""
+    from src.nanogpt.train import run_nanogpt
+
+    return run_nanogpt(config, device)
+
+
 EXPERIMENT_REGISTRY = {
     "smoke": run_smoke,
+    "nanogpt": _run_nanogpt,  # WP0.2 modded-nanogpt record port (2025-07-12_BosAlign)
     "airbench": run_airbench,  # WP0.1 stock baseline (vendored Muon, compile on)
     "airbench_smoke": run_airbench_smoke,  # WP0.4 zoo smoke harness
     "airbench_instrumented": run_airbench_instrumented,  # WP1.2 measurement runs
@@ -243,6 +252,12 @@ def main(argv=None) -> int:
     metrics = EXPERIMENT_REGISTRY[experiment](config, device)
     wall_time_s = time.perf_counter() - t0
     finished_at = results_io.utc_now_iso()
+
+    # Multi-process experiments (torchrun-launched nanogpt) run one process per
+    # GPU; only the primary rank writes the results JSON, the others opt out.
+    if metrics.pop("_no_results_write", False):
+        print(f"non-primary rank: results JSON written by rank 0 ({experiment})")
+        return 0
 
     stamp = started_at.replace(":", "").replace("-", "").split(".")[0]
     out_path = args.out_dir / f"{experiment}_seed{seed}_{stamp}.json"

@@ -107,3 +107,17 @@ Kasper Nielsen. Rationale accepted: in-repo n=20 seed distribution (mean
 `criteria/nanogpt_tolerance.yaml`. WP0.2 port work targets this record;
 `world_size == 8` assertions to be relaxed for the 1–2 GPU grad-accumulation
 port per the candidates analysis above.
+
+## CORRECTION (2026-07-20, WP0.2 port)
+
+The primary-log citation for 2025-07-12_BosAlign in the candidate analysis
+above (`c1fd8a38-…txt`) is **wrong for porting purposes**. The record directory
+holds 21 logs: 20 share a byte-identical script (md5 `5ffba04f…`) whose 20
+final losses are an exact multiset match for the README's `accs` list — those
+are the n=20 distribution (3.27914 ± 0.00134, reproduced exactly by
+`src/nanogpt/record_log.py`) that we power against. `c1fd8a38` is the 07/13
+retiming run "with a refactored version of the code" and differs in ML:
+LR floor `(1-w)*0.1` vs the record's `(1-w)*0.05` (the README lists the
+0.1→0.05 change as one of the three changes constituting the record), plus an
+`assert world_size == 8`. The port follows the n=20 script
+(`0c5449cc-…txt`); a regression test pins this choice.
