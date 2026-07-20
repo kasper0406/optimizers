@@ -1026,15 +1026,17 @@ def test_project_cost_reconciliation_sums_the_results_dir(tmp_path):
 
 
 def test_real_results_dir_cost_totals():
-    """Pins the reconciled spend the WP0.2 report publishes."""
+    """Pins the reconciled spend the project-state report publishes ($13.60,
+    reports/project-state.md §2; superseded the WP0.2-era $12.00 pin when the
+    fp32-embed diagnostic runs landed)."""
     spec = importlib.util.spec_from_file_location(
         "rm_analyze_nanogpt_costs2", REPO_ROOT / "scripts" / "analyze_nanogpt.py"
     )
     analyze = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(analyze)
     costs = analyze.project_costs(REPO_ROOT / "results")
-    assert costs["total_usd"] == pytest.approx(12.00, abs=0.01)
-    assert costs["nanogpt_usd"] == pytest.approx(3.20, abs=0.01)
+    assert costs["total_usd"] == pytest.approx(13.60, abs=0.01)
+    assert costs["nanogpt_usd"] == pytest.approx(4.80, abs=0.01)
 
 
 def test_analysis_script_runs_on_a_synthetic_results_file(tmp_path):
