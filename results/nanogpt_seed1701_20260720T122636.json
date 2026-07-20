@@ -1,0 +1,212 @@
+{
+  "config": {
+    "contents": {
+      "device": "auto",
+      "experiment": "nanogpt",
+      "nanogpt": {
+        "adam_betas": [
+          0.8,
+          0.95
+        ],
+        "adam_eps": 1e-10,
+        "adam_lr": 0.008,
+        "adam_weight_decay": 0.0,
+        "attention_impl": "flex",
+        "checkpoint": {
+          "dir": "checkpoints",
+          "every_steps": 250,
+          "resume": true
+        },
+        "compile": true,
+        "cooldown_frac": 0.45,
+        "device_count": 1,
+        "min_lr_frac": 0.05,
+        "muon_lr": 0.05,
+        "muon_momentum": 0.95,
+        "muon_weight_decay": 0.0,
+        "num_iterations": 1750,
+        "precision_mode": "fp8",
+        "target_val_loss": 3.28,
+        "train_seq_len": 49152,
+        "val_loss_every": 125,
+        "val_seq_len": 262144,
+        "val_tokens": 10485760,
+        "warmup_steps": 10
+      },
+      "seed": 1000
+    },
+    "path": "configs/wp02_nanogpt_repro.yaml",
+    "sha256": "f7121c256105d459b70af2b8bf55685fa9d9dfd352b9f3cb52b52e75fdd68603"
+  },
+  "cost_usd": 1.6,
+  "experiment": "nanogpt",
+  "finished_at": "2026-07-20T13:03:11.528134+00:00",
+  "git_dirty": false,
+  "git_sha": "90e414f0e419e1c1d278a82da08bd2163f3678b0",
+  "gpu_type": "NVIDIA H100 PCIe",
+  "metrics": {
+    "accumulation_factor": 8,
+    "attention_impl": "flex",
+    "compiled": true,
+    "deviations": {
+      "grad_accumulation": "1 device(s) x 8 micro-batches = 8 record chunks per optimizer step; tokens/step 393216 (record 393216)"
+    },
+    "device_count": 1,
+    "final_val_loss": 3.2903497219085693,
+    "nanogpt_config": {
+      "adam_betas": [
+        0.8,
+        0.95
+      ],
+      "adam_eps": 1e-10,
+      "adam_lr": 0.008,
+      "adam_weight_decay": 0.0,
+      "attention_impl": "flex",
+      "checkpoint": {
+        "dir": "checkpoints",
+        "every_steps": 250,
+        "resume": true
+      },
+      "compile": true,
+      "cooldown_frac": 0.45,
+      "device_count": 1,
+      "max_steps": null,
+      "min_lr_frac": 0.05,
+      "model_dim": 768,
+      "momentum_end": 0.95,
+      "momentum_start": 0.85,
+      "momentum_warmup_steps": 300,
+      "muon_lr": 0.05,
+      "muon_momentum": 0.95,
+      "muon_weight_decay": 0.0,
+      "num_heads": 6,
+      "num_iterations": 1750,
+      "num_layers": 12,
+      "precision_mode": "fp8",
+      "record_world_size": 8,
+      "seed": 1000,
+      "target_val_loss": 3.28,
+      "train_align_to_bos": true,
+      "train_files": "data/fineweb10B/fineweb_train_*.bin",
+      "train_seq_len": 49152,
+      "val_align_to_bos": false,
+      "val_files": "data/fineweb10B/fineweb_val_*.bin",
+      "val_loss_every": 125,
+      "val_seq_len": 262144,
+      "val_tokens": 10485760,
+      "vocab_size": 50257,
+      "warmup_steps": 10,
+      "window_warmup_max": 1728
+    },
+    "num_iterations": 1750,
+    "peak_memory_mib": 33472,
+    "precision_mode": "fp8",
+    "record": "2025-07-12_BosAlign",
+    "record_faithful": true,
+    "record_log": "0c5449cc-0b01-4ecc-bec3-f46a09741d60.txt",
+    "record_world_size": 8,
+    "resumed_from_checkpoint": false,
+    "steps_to_target_loss": null,
+    "target_val_loss": 3.28,
+    "tokens_per_step": 393216,
+    "tokens_to_target_loss": null,
+    "train_steps_run": 1750,
+    "train_time_s": 1963.848311675,
+    "val_curve": [
+      {
+        "step": 0,
+        "tokens": 0,
+        "train_time_ms": 0.020291000055294717,
+        "val_loss": 10.825837135314941
+      },
+      {
+        "step": 125,
+        "tokens": 49152000,
+        "train_time_ms": 132054.3652870001,
+        "val_loss": 4.635003089904785
+      },
+      {
+        "step": 250,
+        "tokens": 98304000,
+        "train_time_ms": 267038.69201700017,
+        "val_loss": 4.103822231292725
+      },
+      {
+        "step": 375,
+        "tokens": 147456000,
+        "train_time_ms": 400122.3050190002,
+        "val_loss": 3.902108907699585
+      },
+      {
+        "step": 500,
+        "tokens": 196608000,
+        "train_time_ms": 539350.5850510001,
+        "val_loss": 3.7500627040863037
+      },
+      {
+        "step": 625,
+        "tokens": 245760000,
+        "train_time_ms": 675310.7554600001,
+        "val_loss": 3.6674106121063232
+      },
+      {
+        "step": 750,
+        "tokens": 294912000,
+        "train_time_ms": 816973.2739010002,
+        "val_loss": 3.6009559631347656
+      },
+      {
+        "step": 875,
+        "tokens": 344064000,
+        "train_time_ms": 954608.3670620001,
+        "val_loss": 3.555913209915161
+      },
+      {
+        "step": 1000,
+        "tokens": 393216000,
+        "train_time_ms": 1097478.2903810001,
+        "val_loss": 3.5142719745635986
+      },
+      {
+        "step": 1125,
+        "tokens": 442368000,
+        "train_time_ms": 1237358.6099640003,
+        "val_loss": 3.4630398750305176
+      },
+      {
+        "step": 1250,
+        "tokens": 491520000,
+        "train_time_ms": 1382462.3017810006,
+        "val_loss": 3.4169094562530518
+      },
+      {
+        "step": 1375,
+        "tokens": 540672000,
+        "train_time_ms": 1523481.8559210005,
+        "val_loss": 3.3764827251434326
+      },
+      {
+        "step": 1500,
+        "tokens": 589824000,
+        "train_time_ms": 1670813.3440500002,
+        "val_loss": 3.3405773639678955
+      },
+      {
+        "step": 1625,
+        "tokens": 638976000,
+        "train_time_ms": 1815182.7309970001,
+        "val_loss": 3.3108837604522705
+      },
+      {
+        "step": 1750,
+        "tokens": 688128000,
+        "train_time_ms": 1963848.311675,
+        "val_loss": 3.2903497219085693
+      }
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1701,
+  "started_at": "2026-07-20T12:26:36.397134+00:00",
+  "wall_time_s": 2195.130957554
+}

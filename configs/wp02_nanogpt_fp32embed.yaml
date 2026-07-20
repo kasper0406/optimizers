@@ -1,0 +1,81 @@
+# WP0.2 §6.1 DIAGNOSTIC PROBE — fp32 embedding-gradient accumulation at D=1.
+#
+# ============================ DEVIATION HEADER ==============================
+# This is NOT a reproduction run. It is the one-variable diagnostic that
+# docs/nanogpt-port.md §6.1 pre-registers for the observed cooldown-
+# concentrated deficit of our seed-1701 run (+0.0112 above the record's n=20
+# mean at step 1750).
+#
+# It is `configs/wp02_nanogpt_repro.yaml` with EXACTLY ONE knob changed:
+#
+#   fp32_embed_grad_accum: true
+#
+# Everything else — seed 1701, device_count 1, fp8 head, flex attention,
+# compile, all schedules, all optimizer hyperparameters, the data pipeline —
+# is byte-identical to the repro config, so the two runs differ in one thing.
+#
+# WHAT IT CHANGES. The embeddings are bf16 (RECORD:628-630), so at D=1 the
+# port's eight micro-batch gradients accumulate as eight sequential bf16
+# adds into `p.grad`. The record, on eight ranks, does one backward per rank
+# and an 8-way `ReduceOp.AVG`. docs/nanogpt-port.md §2 flags this as "a
+# genuine precision difference ... the least-controlled numeric deviation in
+# the port". With this flag the eight micro-gradients are summed in an fp32
+# master buffer and cast back to bf16 once, at the end of the step: one
+# rounding instead of eight.
+#
+# PRE-REGISTERED READ (written BEFORE the run; do not revise after seeing it):
+#
+#   final deficit <= +0.006  ->  bf16-accumulation suspect CONFIRMED
+#   final deficit unchanged at ~+0.011  ->  suspect EXCLUDED; the residual is
+#                                           torch-version / kernel / hardware
+#
+# The deficit is our final val loss minus the record ensemble's n=20 mean
+# (3.2791), as reported by scripts/analyze_nanogpt.py. Intermediate outcomes
+# (between +0.006 and +0.011) are partial attribution and are reported as
+# such, not rounded to either verdict.
+#
+# NOT RECORD-FAITHFUL: `metrics.record_faithful` is false here on two counts
+# (device_count != 8, and the probe flag itself), and both appear in
+# `metrics.deviations`. This run must never enter a reproduction table.
+#
+# Launch (human, per the compute boundary — 1 H100-class GPU, ~40 min):
+#   bash scripts/launch_cloud.sh run configs/wp02_nanogpt_fp32embed.yaml
+# ============================================================================
+
+experiment: nanogpt
+device: auto            # CUDA required; this tier does not run on CPU/MPS
+seed: 1701              # dev seed — the SAME seed as the run being diagnosed
+
+nanogpt:
+  # --- the probe ----------------------------------------------------------
+  fp32_embed_grad_accum: true   # THE one variable under test
+
+  # --- port knobs (identical to wp02_nanogpt_repro.yaml) -------------------
+  device_count: 1       # -> accumulation factor 8; tokens/step stays 393,216
+  precision_mode: fp8   # record. Switch to bf16 ONLY on non-H100-class GPUs.
+  attention_impl: flex  # record (FlexAttention block masks)
+  compile: true         # record (torch.compile(model, dynamic=False))
+  warmup_steps: 10      # record kernel warmup; state restored, no ML effect
+
+  # --- record values, restated explicitly so a drift is visible in a diff ---
+  num_iterations: 1750  # RECORD:574
+  cooldown_frac: 0.45   # RECORD:575
+  min_lr_frac: 0.05     # RECORD:674
+  val_loss_every: 125   # RECORD:576
+  val_tokens: 10485760  # RECORD:572 — fixed, never change
+  train_seq_len: 49152  # RECORD:579  (48*1024)
+  val_seq_len: 262144   # RECORD:580  (4*64*1024)
+  muon_lr: 0.05         # RECORD:645
+  muon_momentum: 0.95   # RECORD:645
+  muon_weight_decay: 0.0
+  adam_lr: 0.008        # RECORD:644
+  adam_betas: [0.8, 0.95]
+  adam_eps: 1.0e-10
+  adam_weight_decay: 0.0
+  target_val_loss: 3.28 # vendor/modded-nanogpt/README.md:3
+
+  # Spot-tier resume (docs/hyperstack-runbook.md). VM-local; never synced.
+  checkpoint:
+    dir: checkpoints
+    every_steps: 250
+    resume: true

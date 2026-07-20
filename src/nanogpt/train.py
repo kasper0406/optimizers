@@ -204,6 +204,7 @@ def _build(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
     # RECORD:635-638 — parameter split
     hidden_matrix_params = [p for n, p in model.blocks.named_parameters() if p.ndim >= 2 and "embed" not in n]
     embed_params = [p for n, p in model.named_parameters() if "embed" in n]
+    model._embed_params = embed_params  # for the fp32 grad-accum probe
     scalar_params = [p for p in model.parameters() if p.ndim < 2]
     head_params = [model.lm_head.weight]
 
@@ -237,6 +238,14 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         model = torch.compile(model, dynamic=False)  # RECORD:686
 
     accum = cfg.accum_factor
+
+    # docs/nanogpt-port.md §6.1 probe (default off, flagged as a deviation).
+    # Only meaningful when there is more than one micro-batch to accumulate.
+    fp32_embed_accum = None
+    if cfg.fp32_embed_grad_accum and accum > 1:
+        fp32_embed_accum = {
+            p: torch.zeros_like(p, dtype=torch.float32) for p in raw_model._embed_params
+        }
 
     def train_loader() -> RecordDataGenerator:
         return RecordDataGenerator(
@@ -356,6 +365,22 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         for inputs, targets in loader.next_step():
             # micro-loss scaled by 1/accum: see config.py accumulation math.
             (model(inputs, targets, window_blocks(step)) / accum).backward()
+            # docs/nanogpt-port.md §6.1 probe: drain each micro-batch's bf16
+            # embedding grad into an fp32 master buffer and clear `p.grad`, so
+            # the running sum never touches bf16.
+            if fp32_embed_accum is not None:
+                for p in raw_model._embed_params:
+                    if p.grad is not None:
+                        fp32_embed_accum[p].add_(p.grad.float())
+                        p.grad = None
+        # ...then write the fp32 total back once, in the record's dtype: one
+        # rounding for the whole step instead of one per micro-batch. Done
+        # after the loop (not on a `micro == accum - 1` index) so the buffer is
+        # always drained exactly once per step, whatever the loader yields.
+        if fp32_embed_accum is not None:
+            for p, buf in fp32_embed_accum.items():
+                p.grad = buf.to(p.dtype)
+                buf.zero_()
         for opt in optimizers:  # RECORD:766-768
             for group in opt.param_groups:
                 group["lr"] = group["initial_lr"] * get_lr(step, cfg)
@@ -404,6 +429,7 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         "precision_mode": cfg.precision_mode,
         "attention_impl": cfg.attention_impl,
         "compiled": cfg.compile,
+        "fp32_embed_grad_accum": bool(fp32_embed_accum is not None),
         "record_faithful": cfg.record_faithful,
         "deviations": cfg.deviations(),
         "resumed_from_checkpoint": resumed,

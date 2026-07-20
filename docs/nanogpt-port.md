@@ -117,6 +117,25 @@ Anything that changes numerics is marked **NOT RECORD-FAITHFUL**; every one of
 them flips `metrics.record_faithful` to `false` and is enumerated in
 `metrics.deviations` in the results JSON, so no run can hide one.
 
+> **`device_count != 8` is one of them: D != 8 is NEVER record-faithful.**
+> The token batch is preserved exactly (the 1/G proof below), but the gradient
+> *reduction order* is not — and for the bf16 embedding grads that is a
+> genuine precision difference, not a rounding-order nicety (see "Deviations
+> that exist whether we like them or not"). Numerics-changing means not
+> record-faithful, so only `device_count: 8` can be a reproduction of the
+> record; every smaller D is an accumulation *arm* of it.
+>
+> This was a code defect until 2026-07-20: `NanoGPTConfig.record_faithful` did
+> not inspect `device_count`, so a D=1 run reported `record_faithful: true`
+> while its own `deviations` dict listed `grad_accumulation` — the flag and the
+> deviation list contradicted each other. Fixed in `src/nanogpt/config.py` and
+> pinned in both directions by
+> `tests/test_nanogpt_port.py::test_record_faithful_requires_the_records_device_count`.
+> `results/nanogpt_seed17*.json` predate the fix and carry the old `true`;
+> `results/` is append-only, so the correction is stated in
+> `reports/wp02-nanogpt-repro.md`, which `scripts/analyze_nanogpt.py`
+> regenerates with the recomputed flag.
+
 ### Structural (the point of WP0.2; ML-neutral by the argument above)
 
 | # | Change | Where |
@@ -177,6 +196,7 @@ with the exact message above if O1 is reverted.
 | `attention_impl: sdpa` | Dense-mask SDPA instead of FlexAttention block masks (FlexAttention has no CPU backward) | **NOT RECORD-FAITHFUL** — CPU test path only; refuses sequences > 8192 |
 | `max_steps` | Truncates the run | **NOT RECORD-FAITHFUL** — smoke runs only |
 | `compile: false` | Slower, ML-neutral | reported |
+| `fp32_embed_grad_accum` | Embedding grads accumulate across micro-batches in an fp32 master buffer, cast back to bf16 once per step (one rounding instead of G). The §6.1 diagnostic probe; `configs/wp02_nanogpt_fp32embed.yaml` | **NOT RECORD-FAITHFUL** — diagnostic only, never a reproduction arm |
 
 ### Deviations that exist whether we like them or not
 
@@ -350,6 +370,24 @@ that is a deviation to declare. The record's own n=20 logs interpolate to
    the accumulation proof does not cover. If the overlay is off, test it first
    by running D=8-equivalent chunk counts with fp32 grad accumulation on the
    embeddings as a probe.
+
+   **This risk has now materialised and the probe is built.** The seed-1701
+   D=1 run finished +0.0112 above the record's n=20 ensemble mean and +0.0084
+   above the record's observed *maximum*, with the deficit concentrated in the
+   LR cooldown (10x denser per unit of loss removed than in the stable phase;
+   all 6 cooldown segments underperform). The probe is
+   `configs/wp02_nanogpt_fp32embed.yaml` — `fp32_embed_grad_accum: true`, seed
+   1701, D=1, everything else identical to `configs/wp02_nanogpt_repro.yaml`.
+
+   Pre-registered read (fixed before the run; see
+   `reports/wp02-nanogpt-repro.md`):
+
+   | final deficit vs the record's n=20 mean | conclusion |
+   |---|---|
+   | **<= +0.006** | bf16-accumulation suspect **confirmed** |
+   | **unchanged at ~+0.011** | suspect **excluded**; residual is torch-version / kernel / hardware |
+
+   An outcome between the two is partial attribution and is reported as such.
 2. **Partial GPU verification.** CPU-verified: model forward/backward, the full
    training loop end-to-end (stubbed single-rank collectives), the same loop
    **with `compile: true` and `torch._dynamo.config.suppress_errors` forced

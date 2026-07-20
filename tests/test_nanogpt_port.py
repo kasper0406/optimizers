@@ -39,8 +39,12 @@ from src.nanogpt.config import (
 )
 from src.nanogpt.data import RecordDataGenerator, data_footprint_gb, find_batch_starts
 from src.nanogpt.record_log import (
+    censoring,
     collect_record_runs,
+    cooldown_start,
+    ensemble_deviation,
     parse_record_log,
+    phase_decomposition,
     record_validation_traces,
     steps_to_target,
 )
@@ -125,7 +129,15 @@ def test_defaults_are_the_record():
         0.008, (0.8, 0.95), 1e-10, 0.0,
     )
     assert cfg.target_val_loss == 3.28
-    assert cfg.record_faithful
+    # The ML defaults are the record's, so the config IS record-faithful at the
+    # record's device count...
+    assert NanoGPTConfig(device_count=8).record_faithful
+    # ...but the dataclass default is `device_count: 1` (the port's testbed),
+    # and D != 8 changes the gradient reduction order, so the bare default is
+    # NOT record-faithful. See
+    # test_record_faithful_requires_the_records_device_count.
+    assert not cfg.record_faithful
+    assert set(cfg.deviations()) == {"grad_accumulation"}
 
 
 def test_unknown_config_key_is_rejected_not_ignored():
@@ -151,10 +163,55 @@ def test_deviation_flags_surface():
     assert not cfg.record_faithful
     assert "smoke run" in cfg.deviations()["max_steps"]
 
-    # grad accumulation itself is always reported, but is not a numerics change
     cfg = NanoGPTConfig(device_count=1)
-    assert cfg.record_faithful
     assert "393216" in cfg.deviations()["grad_accumulation"]
+
+    cfg = NanoGPTConfig(device_count=8, fp32_embed_grad_accum=True)
+    assert not cfg.record_faithful
+    assert "NOT RECORD-FAITHFUL" in cfg.deviations()["fp32_embed_grad_accum"]
+
+
+@pytest.mark.parametrize("device_count", [1, 2, 4])
+def test_record_faithful_requires_the_records_device_count(device_count):
+    """REGRESSION (2026-07-20): `record_faithful` ignored `device_count`.
+
+    A D<8 run reported `record_faithful: True` while its own `deviations` dict
+    simultaneously reported `grad_accumulation` — the flag contradicted the
+    deviation list. Accumulation preserves the token batch exactly but NOT the
+    gradient reduction order, and at D<8 the bf16 embedding grads make that a
+    genuine precision difference (docs/nanogpt-port.md §2: "the least-
+    controlled numeric deviation in the port"). Numerics-changing means not
+    record-faithful. Pinned in BOTH directions.
+    """
+    cfg = NanoGPTConfig(device_count=device_count)
+    assert not cfg.record_faithful, (
+        f"D={device_count} != the record's world size 8 must never be "
+        f"record-faithful; deviations={cfg.deviations()}"
+    )
+    # the flag and the deviation list must agree
+    assert "grad_accumulation" in cfg.deviations()
+
+    # ...and the other direction: D == 8 with no other flag IS the record.
+    faithful = NanoGPTConfig(device_count=8)
+    assert faithful.record_faithful, faithful.deviations()
+    assert "grad_accumulation" not in faithful.deviations()
+
+
+def test_record_faithful_never_contradicts_the_deviation_list():
+    """Any active *numerics-changing* deviation must clear the flag."""
+    numerics_changing = [
+        {"device_count": 1},
+        {"precision_mode": "bf16"},
+        {"attention_impl": "sdpa"},
+        {"max_steps": 5},
+        {"min_lr_frac": 0.1},
+        {"num_iterations": 1000},
+        {"fp32_embed_grad_accum": True},
+    ]
+    for kwargs in numerics_changing:
+        cfg = NanoGPTConfig(**kwargs)
+        assert not cfg.record_faithful, f"{kwargs} must not be record-faithful"
+        assert cfg.deviations(), f"{kwargs} must appear in deviations()"
 
 
 def test_invalid_precision_and_attention_modes_refused():
@@ -170,15 +227,54 @@ def test_val_tokens_must_split_over_devices():
 
 
 @pytest.mark.parametrize("path", CONFIGS, ids=lambda p: p.name)
-def test_shipped_configs_parse_and_are_record_faithful(path):
+def test_shipped_configs_are_the_record_modulo_declared_deviations(path):
+    """The repro configs are the record's ML on a smaller device count.
+
+    They are NOT `record_faithful` — they run at D=1, and D != 8 changes the
+    gradient reduction order (see
+    `test_record_faithful_requires_the_records_device_count`). What must hold
+    is that the token batch, the schedules and the numerics knobs are the
+    record's, and that `grad_accumulation` is the ONLY declared deviation.
+    """
     raw = yaml.safe_load(path.read_text())
     assert raw["experiment"] == "nanogpt"
     assert raw["seed"] >= 1000, "configs carry dev seeds only (CLAUDE.md rule 2)"
     cfg = NanoGPTConfig.from_config(raw)
     assert cfg.tokens_per_step == RECORD_TOKENS_PER_STEP
-    assert cfg.record_faithful, cfg.deviations()
     assert cfg.num_iterations == 1750
     assert cfg.precision_mode == "fp8" and cfg.attention_impl == "flex"
+    assert set(cfg.deviations()) == {"grad_accumulation"}, cfg.deviations()
+    # ...and the same config at the record's device count IS record-faithful.
+    at_eight = NanoGPTConfig.from_config(
+        {**raw, "nanogpt": {**raw["nanogpt"], "device_count": 8}}
+    )
+    assert at_eight.record_faithful, at_eight.deviations()
+
+
+def test_fp32_embed_probe_config_is_one_variable_off_the_repro_config():
+    """The §6.1 probe must differ from the repro config in exactly one knob."""
+    repro = yaml.safe_load((REPO_ROOT / "configs" / "wp02_nanogpt_repro.yaml").read_text())
+    probe_path = REPO_ROOT / "configs" / "wp02_nanogpt_fp32embed.yaml"
+    probe = yaml.safe_load(probe_path.read_text())
+
+    assert probe["seed"] == 1701, "the probe re-runs the seed being diagnosed"
+    cfg = NanoGPTConfig.from_config(probe)
+    assert cfg.fp32_embed_grad_accum is True
+    assert cfg.tokens_per_step == RECORD_TOKENS_PER_STEP
+    # a diagnostic, never a reproduction: both flags must be declared
+    assert not cfg.record_faithful
+    assert set(cfg.deviations()) == {"grad_accumulation", "fp32_embed_grad_accum"}
+
+    # exactly one nanogpt knob differs from the repro config (modulo the seed,
+    # which lives at run level and is the point of the probe being paired)
+    a = NanoGPTConfig.from_config({**repro, "seed": 1701}).to_dict()
+    b = cfg.to_dict()
+    assert {k for k in a if a[k] != b[k]} == {"fp32_embed_grad_accum"}
+
+    text = probe_path.read_text()
+    assert "0.006" in text and "PRE-REGISTERED" in text, (
+        "the probe config must carry its pre-registered read"
+    )
 
 
 def test_configs_restate_the_record_optimizer_values():
@@ -544,6 +640,64 @@ def test_training_loop_end_to_end_on_cpu(tmp_path, monkeypatch):
 
 
 @pytest.mark.slow
+def test_fp32_embed_grad_accum_probe_runs_and_changes_only_embedding_grads(tmp_path, monkeypatch):
+    """The §6.1 probe: fp32 accumulation of the bf16 embedding grads.
+
+    Verifies the flag (a) is off by default, (b) is reported in the metrics,
+    (c) produces a finite run, and (d) actually changes the embedding gradient
+    path — a run with the flag on must not be bit-identical to one without,
+    while remaining close (it is one rounding instead of G).
+    """
+    _SingleRankDist.install(monkeypatch)
+    # same scoping rationale as test_training_loop_end_to_end_on_cpu: DistAdam
+    # .step is @torch.compile'd even at `compile: false`, and dynamo's
+    # structured logging calls dist.get_rank() against our stubbed group.
+    monkeypatch.setattr(torch._dynamo.config, "suppress_errors", True)
+    monkeypatch.chdir(tmp_path)
+    for i in (1, 2):
+        _write_shard(tmp_path / f"fineweb_train_{i:06d}.bin", num_tokens=400_000, bos_every=64)
+    _write_shard(tmp_path / "fineweb_val_000000.bin", num_tokens=400_000, bos_every=64)
+
+    from src.nanogpt.train import run_nanogpt
+
+    def config(fp32: bool):
+        return {
+            "experiment": "nanogpt",
+            "seed": 1000,
+            "nanogpt": {
+                "train_files": str(tmp_path / "fineweb_train_*.bin"),
+                "val_files": str(tmp_path / "fineweb_val_*.bin"),
+                "device_count": 1,
+                "num_layers": 12, "num_heads": 1, "model_dim": 128, "vocab_size": 50257,
+                "train_seq_len": 256, "val_seq_len": 256, "val_tokens": 2048,
+                "num_iterations": 2, "val_loss_every": 1, "warmup_steps": 1,
+                "compile": False, "precision_mode": "bf16", "attention_impl": "sdpa",
+                "fp32_embed_grad_accum": fp32,
+                "checkpoint": {"dir": str(tmp_path / f"ckpt{int(fp32)}"),
+                               "every_steps": 0, "resume": False},
+            },
+        }
+
+    off = run_nanogpt(config(False), torch.device("cpu"))
+    on = run_nanogpt(config(True), torch.device("cpu"))
+
+    assert off["fp32_embed_grad_accum"] is False
+    assert on["fp32_embed_grad_accum"] is True
+    assert "fp32_embed_grad_accum" not in off["deviations"]
+    assert "NOT RECORD-FAITHFUL" in on["deviations"]["fp32_embed_grad_accum"]
+    assert all(math.isfinite(p["val_loss"]) for p in on["val_curve"])
+
+    # step 0 is evaluated before any optimizer step -> identical either way
+    assert on["val_curve"][0]["val_loss"] == pytest.approx(
+        off["val_curve"][0]["val_loss"], abs=1e-9
+    )
+    # ...but after stepping, the embedding grads took a different arithmetic
+    # path, so the curves must differ (and only slightly)
+    assert on["final_val_loss"] != off["final_val_loss"]
+    assert on["final_val_loss"] == pytest.approx(off["final_val_loss"], rel=0.05)
+
+
+@pytest.mark.slow
 def test_training_loop_end_to_end_on_cpu_with_compile(tmp_path, monkeypatch):
     """The record path's ``compile: true``, on CPU, with dynamo errors FATAL.
 
@@ -704,6 +858,183 @@ def test_synthetic_metrics_dict_is_schema_valid(tmp_path):
     results_io.validate(result)
     out = results_io.write_result(result, tmp_path / "nanogpt_seed1000.json")
     assert json.loads(out.read_text())["metrics"]["tokens_per_step"] == RECORD_TOKENS_PER_STEP
+
+
+def test_ensemble_deviation_separates_our_offset_from_record_seed_noise():
+    """A run planted at the ensemble mean must read ~0 everywhere.
+
+    Against a SINGLE record log the same run would show a deviation equal to
+    that log's own seed noise — which is what the pre-fix analysis reported as
+    its headline "max |dev|".
+    """
+    traces = record_validation_traces()
+    assert len(traces) == 20
+    steps = traces[0].steps
+    mean_curve = [st.mean([t.loss_at_step(s) for t in traces]) for s in steps]
+
+    rows = ensemble_deviation((steps, mean_curve), traces)
+    assert [r.step for r in rows] == steps
+    for r in rows:
+        assert abs(r.deviation) < 1e-9
+
+    # ...whereas one record log alone is off the ensemble mean by its own noise
+    solo = ensemble_deviation((steps, traces[0].val_losses), traces)
+    late = [r for r in solo if r.step == steps[-1]][0]
+    assert abs(late.deviation) > 0
+
+    # a planted constant offset is recovered in loss units, and its sigma
+    # grows purely because the record's sd shrinks over training
+    offset = 0.01
+    shifted = ensemble_deviation((steps, [m + offset for m in mean_curve]), traces)
+    for r in shifted:
+        assert r.deviation == pytest.approx(offset, abs=1e-9)
+    sized = [r for r in shifted if r.sigma is not None]
+    assert sized[0].record_sd > sized[-1].record_sd  # yardstick shrinks
+    assert sized[0].sigma < sized[-1].sigma  # ...so sigma grows at fixed offset
+
+
+def test_record_ensemble_reproduces_the_reviewed_deviation_trajectory():
+    """Pins the headline numbers for our seed-1701 run against the record."""
+    results = sorted((REPO_ROOT / "results").glob("nanogpt_seed1701_*.json"))
+    if not results:
+        pytest.skip("seed-1701 result not synced")
+    payload = json.loads(results[0].read_text())
+    curve = payload["metrics"]["val_curve"]
+    ours = ([int(p["step"]) for p in curve], [float(p["val_loss"]) for p in curve])
+    rows = {r.step: r for r in ensemble_deviation(ours, record_validation_traces())}
+
+    expected = {  # step: (deviation, sigma) — the adversarial review's table
+        125: (-0.0036, -0.5), 500: (+0.0028, +0.6), 875: (+0.0090, +3.5),
+        1250: (+0.0098, +6.4), 1750: (+0.0112, +8.4),
+    }
+    for step, (dev, sigma) in expected.items():
+        assert rows[step].deviation == pytest.approx(dev, abs=5e-5), step
+        assert rows[step].sigma == pytest.approx(sigma, abs=0.05), step
+
+    final = rows[1750]
+    assert final.n == 20
+    assert final.our_loss > final.record_max  # outside the observed support
+    assert final.our_loss - final.record_max == pytest.approx(0.0084, abs=5e-5)
+
+
+def test_steps_to_target_over_the_record_is_censored_at_3_28():
+    """6 of the record's 20 runs never reach 3.28 — the disclosure's basis."""
+    traces = record_validation_traces()
+    cens = censoring(traces, 3.28)
+    assert cens.n_total == 20
+    assert cens.n_unreached == 6
+    assert cens.n_reached == 14
+    assert cens.is_censored
+    assert min(cens.unreached_finals) == pytest.approx(3.2801, abs=1e-4)
+    assert max(cens.unreached_finals) == pytest.approx(3.2819, abs=1e-4)
+    # the record's own published statistic is over the survivors only
+    assert cens.survivor_mean == pytest.approx(1740.5, abs=0.1)
+    assert cens.survivor_sd == pytest.approx(4.5, abs=0.1)
+    # every unreached run's final sits ABOVE the target: censoring is one-sided
+    assert all(f > 3.28 for f in cens.unreached_finals)
+
+    # a target every run clears is uncensored
+    assert not censoring(traces, 3.30).is_censored
+
+
+def test_cooldown_start_matches_the_records_lr_schedule():
+    assert cooldown_start(1750, 0.45) == pytest.approx(962.5)
+    assert cooldown_start(1750, 0.0) == pytest.approx(1750.0)
+
+
+def test_phase_decomposition_localises_a_planted_cooldown_deficit():
+    """A deficit planted only after cooldown onset must land only there."""
+    traces = record_validation_traces()
+    steps = traces[0].steps
+    mean_curve = [st.mean([t.loss_at_step(s) for t in traces]) for s in steps]
+
+    # A LEVEL SHIFT that appears at the boundary and then stays constant is a
+    # deficit incurred by the boundary and carried, not accrued during
+    # cooldown. The decomposition must attribute it to the stable phase and
+    # leave cooldown clean — it measures loss *removed per phase*, not the
+    # standing offset.
+    planted = [m + (0.01 if s >= 1000 else 0.0) for s, m in zip(steps, mean_curve)]
+    pd = phase_decomposition((steps, planted), traces, 1750, 0.45)
+    assert pd.cooldown_start_exact == pytest.approx(962.5)
+    assert pd.cooldown_start_step == 1000  # nearest validation step
+    assert pd.stable.deficit == pytest.approx(0.01, abs=1e-9)
+    assert pd.cooldown.deficit == pytest.approx(0.0, abs=1e-9)
+    assert pd.n_segments_below_record == 0
+
+    # a run that simply removes less loss during cooldown shows it as a deficit
+    slow = list(mean_curve)
+    for i, s in enumerate(steps):
+        if s >= 1000:
+            slow[i] = mean_curve[i] + 0.002 * (s - 1000) / 750
+    pd2 = phase_decomposition((steps, slow), traces, 1750, 0.45)
+    assert pd2.stable.deficit == pytest.approx(0.0, abs=1e-9)
+    assert pd2.cooldown.deficit == pytest.approx(0.002, abs=1e-6)
+    assert pd2.cooldown.deficit_frac > 0
+    # every cooldown segment underperforms -> unanimous sign test
+    assert pd2.n_segments_below_record == len(pd2.cooldown_segments)
+    assert pd2.sign_test_p == pytest.approx(2 / 2 ** len(pd2.cooldown_segments))
+    assert all(s.ratio < 1 for s in pd2.cooldown_segments)
+
+    # ...and an exactly-on-mean run shows no deficit and a balanced sign test
+    pd3 = phase_decomposition((steps, mean_curve), traces, 1750, 0.45)
+    assert pd3.cooldown.deficit == pytest.approx(0.0, abs=1e-9)
+    assert pd3.n_segments_below_record == 0
+
+
+def test_phase_decomposition_of_our_run_is_cooldown_concentrated():
+    results = sorted((REPO_ROOT / "results").glob("nanogpt_seed1701_*.json"))
+    if not results:
+        pytest.skip("seed-1701 result not synced")
+    curve = json.loads(results[0].read_text())["metrics"]["val_curve"]
+    ours = ([int(p["step"]) for p in curve], [float(p["val_loss"]) for p in curve])
+    pd = phase_decomposition(ours, record_validation_traces(), 1750, 0.45)
+
+    assert pd.stable.deficit == pytest.approx(0.0085, abs=5e-5)
+    assert pd.cooldown.deficit == pytest.approx(0.0027, abs=5e-5)
+    # the point: as a share of the loss each phase removes, cooldown dominates
+    assert pd.stable.deficit_frac == pytest.approx(0.0012, abs=1e-4)
+    assert pd.cooldown.deficit_frac == pytest.approx(0.0120, abs=1e-4)
+    assert pd.cooldown.deficit_frac > 5 * pd.stable.deficit_frac
+    assert pd.n_segments_below_record == 6 == len(pd.cooldown_segments)
+    assert pd.sign_test_p == pytest.approx(0.03125)
+
+
+def test_project_cost_reconciliation_sums_the_results_dir(tmp_path):
+    spec = importlib.util.spec_from_file_location(
+        "rm_analyze_nanogpt_costs", REPO_ROOT / "scripts" / "analyze_nanogpt.py"
+    )
+    analyze = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(analyze)
+
+    def write(name, experiment, cost):
+        payload = {"experiment": experiment, "metrics": {}}
+        if cost is not None:
+            payload["cost_usd"] = cost
+        (tmp_path / name).write_text(json.dumps(payload))
+
+    write("a.json", "nanogpt", 1.6)
+    write("b.json", "nanogpt", 1.6)
+    write("c.json", "airbench", 0.8)
+    write("d.json", "airbench", None)  # uncosted -> excluded, but counted
+    (tmp_path / "not_a_result.json").write_text(json.dumps({"hello": "world"}))
+
+    costs = analyze.project_costs(tmp_path)
+    assert costs["total_usd"] == pytest.approx(4.0)
+    assert costs["nanogpt_usd"] == pytest.approx(3.2)
+    assert costs["n_costed"] == 3
+    assert costs["n_missing"] == 1
+
+
+def test_real_results_dir_cost_totals():
+    """Pins the reconciled spend the WP0.2 report publishes."""
+    spec = importlib.util.spec_from_file_location(
+        "rm_analyze_nanogpt_costs2", REPO_ROOT / "scripts" / "analyze_nanogpt.py"
+    )
+    analyze = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(analyze)
+    costs = analyze.project_costs(REPO_ROOT / "results")
+    assert costs["total_usd"] == pytest.approx(12.00, abs=0.01)
+    assert costs["nanogpt_usd"] == pytest.approx(3.20, abs=0.01)
 
 
 def test_analysis_script_runs_on_a_synthetic_results_file(tmp_path):

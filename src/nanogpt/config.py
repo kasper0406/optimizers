@@ -169,6 +169,12 @@ class NanoGPTConfig:
     precision_mode: str = "fp8"  # "fp8" == record. "bf16" == NOT record-faithful
     attention_impl: str = "flex"  # "flex" == record. "sdpa" == NOT record-faithful
     max_steps: Optional[int] = None  # PORT: early stop for smoke runs (not a run of record)
+    # PORT: docs/nanogpt-port.md §6.1 diagnostic probe. Accumulate embedding
+    # gradients across micro-batches in an fp32 master buffer instead of in the
+    # bf16 `p.grad`, casting back once at the end of the step. Isolates the
+    # bf16-accumulation suspect at D < 8. NOT RECORD-FAITHFUL: the record does
+    # one backward per step, so it never accumulates at all.
+    fp32_embed_grad_accum: bool = False
     checkpoint: CheckpointConfig = field(default_factory=CheckpointConfig)
 
     # ------------------------------------------------------------------ api
@@ -195,9 +201,23 @@ class NanoGPTConfig:
 
     @property
     def record_faithful(self) -> bool:
-        """False if any *numerics-changing* deviation flag is set."""
+        """False if any *numerics-changing* deviation flag is set.
+
+        ``device_count != record_world_size`` is one of them. The token batch
+        is preserved exactly (see the accumulation math above), but the
+        *reduction order* is not: at D < 8 the eight chunk gradients are summed
+        sequentially into ``p.grad`` instead of being tree-reduced across eight
+        ranks, and the embeddings carry bf16 grads (RECORD:628-630). Eight
+        sequential bf16 accumulations are not the same arithmetic as an 8-way
+        ``ReduceOp.AVG`` — docs/nanogpt-port.md §2 calls this "a genuine
+        precision difference ... the least-controlled numeric deviation in the
+        port". Numerics-changing means not record-faithful, so D != 8 is never
+        record-faithful, and this predicate must agree with ``deviations()``.
+        """
         return (
-            self.precision_mode == "fp8"
+            self.device_count == self.record_world_size
+            and not self.fp32_embed_grad_accum
+            and self.precision_mode == "fp8"
             and self.attention_impl == "flex"
             and self.min_lr_frac == 0.05
             and self.num_iterations == RECORD_NUM_ITERATIONS
@@ -227,6 +247,13 @@ class NanoGPTConfig:
                 "FlexAttention block masks. NOT RECORD-FAITHFUL: the sliding "
                 "window is applied at block granularity by a dense mask. "
                 "CPU-test path only."
+            )
+        if self.fp32_embed_grad_accum:
+            out["fp32_embed_grad_accum"] = (
+                "embedding gradients accumulate across micro-batches in an fp32 "
+                "master buffer, cast back to bf16 once per step (record: bf16 "
+                "throughout, one backward per step). NOT RECORD-FAITHFUL: "
+                "diagnostic probe for docs/nanogpt-port.md §6.1."
             )
         if self.num_iterations != RECORD_NUM_ITERATIONS:
             out["num_iterations"] = f"{self.num_iterations} (record {RECORD_NUM_ITERATIONS})"
