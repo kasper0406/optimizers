@@ -157,6 +157,7 @@ def test_plan_defaults():
     assert opt.g_osc_min == 0.1
     assert opt.enable_noise_channel and opt.enable_oscillation_channel
     assert not opt.rho_ignored and not opt.random_gating
+    assert opt.state_damping is False  # output-side by default
     assert opt.defaults["momentum"] == 0.95  # Muon-side defaults intact
     assert opt.defaults["nesterov"] is True
 
@@ -519,6 +520,153 @@ def test_constant_mode_end_to_end_on_planted_oscillation():
     assert tier.last_gains[i_osc] == 0.5  # exactly the constant
     assert tier.last_gains[i_noise] == ROUTE_KW["g_noise"]
     assert tier.last_gains[i_sig] == 1.0
+
+
+# --------------------------------- state-side damping (compounding hypothesis)
+
+
+def test_state_damping_compounds_geometrically_in_the_buffer():
+    """Brainstorm program #1 (compounding). A persistently-oscillating
+    direction is classified, then the forcing goes silent. In state-damping
+    mode the buffer component along that direction relaxes at rate
+    g * momentum (undamped control: momentum), so the ratio damped/control
+    multiplies by exactly g each treated step -- geometric compounding of a
+    single per-step edit. An OUTPUT-mode twin leaves the buffer bit-for-bit
+    identical to stock Muon (the edit is re-derived away and cannot compound):
+    that asymmetry is the whole hypothesis.
+    """
+    m, n, r = 8, 6, 1.05
+    U, V = orthonormal_pairs(m, n, 1, SEED + 20)
+    u0, v0 = U[:, 0], V[:, 0]
+    stop = 40  # oscillate to classify through here, then go silent
+
+    def s(t):
+        return 0.4 * (-r) ** t if t <= stop else 0.0
+
+    # bg ~ 0 so the free relaxation after `stop` is not swamped by noise.
+    stream = PlantedStream(m, n, U, V, [s], bg=1e-9, seed=SEED + 21)
+    kw = {
+        **BASE_KW,
+        **ROUTE_KW,
+        "k": 2,
+        "t_refresh": 1000,  # lock subspace at step 1
+        "n_min": 20,
+        "g_osc_const": 0.5,  # fixed gain -> clean geometric factor
+        "enable_noise_channel": False,  # osc-only, as in the probe configs
+    }
+    gen = torch.Generator().manual_seed(SEED)
+    w0 = 0.1 * torch.randn(m, n, generator=gen)
+    p_state = torch.nn.Parameter(w0.clone())
+    p_out = torch.nn.Parameter(w0.clone())
+    p_ctrl = torch.nn.Parameter(w0.clone())
+    state_opt = RoutedMuon([p_state], **{**kw, "state_damping": True})
+    out_opt = RoutedMuon([p_out], **{**kw, "state_damping": False})
+    ctrl = Muon([p_ctrl], **BASE_KW)
+
+    def comp(opt, p):
+        buf = opt.state[p]["momentum_buffer"]
+        return float(u0 @ buf @ v0)
+
+    activated = False
+    # (step, ratio, gain) records inside the SILENT relaxation window, where
+    # the buffer is driven only by momentum decay + the per-step edit.
+    silent = []
+    for t in range(1, stop + 10):
+        G = stream.grad(t)
+        for p, o in ((p_state, state_opt), (p_out, out_opt), (p_ctrl, ctrl)):
+            p.grad = G.clone()
+            o.step()
+        # OUTPUT mode never touches the buffer: identical to stock every step.
+        assert torch.equal(
+            out_opt.state[p_out]["momentum_buffer"],
+            ctrl.state[p_ctrl]["momentum_buffer"],
+        ), f"output-mode buffer diverged from stock at step {t}"
+        g = float(state_opt.state[p_state]["routing"].last_gains[0])
+        if g < 1.0:
+            activated = True
+        cc = comp(ctrl, p_ctrl)
+        cd = comp(state_opt, p_state)
+        if t >= stop and abs(cc) > 1e-12:
+            silent.append((t, abs(cd) / abs(cc), g))
+
+    assert activated, "oscillating direction was never treated"
+    # STATE mode DID move the buffer (unlike output mode).
+    assert not torch.equal(
+        state_opt.state[p_state]["momentum_buffer"],
+        ctrl.state[p_ctrl]["momentum_buffer"],
+    )
+    # In the silent window the forcing is gone: control relaxes at `momentum`,
+    # the state-damped buffer at g * momentum, so the ratio multiplies by
+    # exactly g each consecutive step (holding flat on any one-step classifier
+    # flicker back to g = 1) -- a geometric law, the signature of compounding.
+    for (tp, prev, _), (tc, cur, g) in zip(silent, silent[1:]):
+        assert tc == tp + 1
+        assert cur == pytest.approx(prev * g, abs=2e-3), (tp, prev, cur, g)
+    # Net effect: the damped component is suppressed by orders of magnitude
+    # relative to the undamped control across the window.
+    assert silent[-1][1] < 0.05 * silent[0][1]
+
+
+def test_state_damping_channels_off_is_bit_for_bit_stock_muon():
+    """state_damping only ever edits the buffer for TREATED directions; with
+    both channels disabled nothing is treated, so params AND the momentum
+    buffer stay bit-for-bit identical to stock Muon (default-false regression
+    guarantee: turning the flag on changes nothing until a direction is
+    actually gated)."""
+    gen = torch.Generator().manual_seed(1302)
+    w0 = 0.1 * torch.randn(10, 8, generator=gen)
+    p_routed = torch.nn.Parameter(w0.clone())
+    p_muon = torch.nn.Parameter(w0.clone())
+    kw = {
+        **BASE_KW,
+        **ROUTE_KW,
+        "k": 4,
+        "t_refresh": 25,
+        "n_min": 5,
+        "state_damping": True,
+        "enable_noise_channel": False,
+        "enable_oscillation_channel": False,
+    }
+    routed = RoutedMuon([p_routed], **kw)
+    muon = Muon([p_muon], **BASE_KW)
+    for _ in range(70):
+        G = torch.randn(10, 8, generator=gen)
+        p_routed.grad = G.clone()
+        p_muon.grad = G.clone()
+        routed.step()
+        muon.step()
+        assert torch.equal(p_routed.detach(), p_muon.detach())
+        assert torch.equal(
+            routed.state[p_routed]["momentum_buffer"],
+            muon.state[p_muon]["momentum_buffer"],
+        )
+    tier = routed.state[p_routed]["routing"]
+    assert tier.last_gains is not None and np.all(tier.last_gains == 1.0)
+
+
+def test_state_damping_records_applied_gains_in_telemetry():
+    """Telemetry must record the applied state gains identically to output
+    mode: same classifier, same gain vector, only the application point
+    differs."""
+    stream = three_regime_stream(r_osc=PLANTED_R)
+    param = torch.nn.Parameter(
+        0.1 * torch.randn(14, 12, generator=torch.Generator().manual_seed(SEED))
+    )
+    opt = RoutedMuon(
+        [param], **{**BASE_KW, **ROUTE_KW, "g_osc_const": 0.5, "state_damping": True}
+    )
+    drive(opt, param, stream, PLANTED_STEPS + 1)
+    tier = opt.state[param]["routing"]
+    i_sig, i_noise, i_osc = _planted_indices(stream, tier)
+    # The oscillating direction is treated with exactly the constant gain...
+    assert tier.last_regimes[i_osc] is Regime.OSCILLATING
+    assert tier.last_gains[i_osc] == 0.5
+    # ... and the telemetry snapshot reflects the applied gain vector.
+    snap = opt.routing_stats()["per_matrix"]["matrix0_14x12"]["last"]
+    g = tier.last_gains
+    assert snap["n_treated"] == int(np.sum(g != 1.0))
+    assert snap["gain_min"] == pytest.approx(g.min())
+    assert snap["gain_sum"] == pytest.approx(g.sum())
 
 
 # ------------------------------------- routing telemetry (Gate-1 A5)

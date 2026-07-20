@@ -48,6 +48,37 @@ the pair rotated) resets that direction's statistics and confidence through
 ``BatchRegimeClassifier.reset_directions`` -> back to SIGNAL, n_min clock
 restarts.
 
+State-side damping mode (brainstorm program #1 -- compounding hypothesis):
+    state_damping -- when True the per-direction attenuation is written into
+        the MOMENTUM BUFFER itself (state-side), and the output-side O_t
+        correction becomes a no-op. For every treated direction i (gain
+        g(i) < 1; in the oscillation-only configs this is exactly the
+        oscillation-classified set):
+
+            buf <- buf + (g(i) - 1) * (u_i^T buf v_i) * u_i v_i^T
+
+        applied ONCE per step at the SAME decision point as the output-side
+        correction, using the current tracked pairs (u_i, v_i) (singular
+        pairs of the nesterov-composed M_t) and the persistent buffer's OWN
+        projection u_i^T buf v_i.
+
+        Where the edit lands (and why): ``pre_step`` has already run the
+        buffer update ``buf = momentum*buf + G`` and derived this step's NS
+        input M_t = G + momentum*buf (nesterov) BEFORE ``shape_spectrum`` is
+        reached, so the edit here lands on the persistent
+        ``state["momentum_buffer"]`` AFTER M_t was formed. Consequences:
+        (1) THIS step's output is stock NS(M_t) -- the output-side correction
+        is skipped, so the intervention does not touch the current update at
+        all; (2) M_t is never stored (it is re-derived from buf every step by
+        ``pre_step``), so the single edit to buf automatically propagates into
+        every FUTURE M_t through the nesterov recomposition. That is the
+        compounding the hypothesis predicts: unlike the output-side edit
+        (re-derived away from an unmodified buffer each step), the state-side
+        edit persists in state and accumulates across steps. Both channels off
+        (or no treated directions) => no edit => bit-for-bit stock Muon,
+        exactly as in output mode. Telemetry records the same applied gain
+        vector in both modes.
+
 Ablation / scoping switches:
     enable_noise_channel / enable_oscillation_channel -- Gate-1 scoping
         (e.g. oscillation-only branch) as a config change; with BOTH off the
@@ -339,6 +370,10 @@ class RoutedMuon(Muon):
         rho_ignored          ablation 4c: magnitude-only gate.
         random_gating        ablation 4d: placebo (random assignment of the
                              same gain multiset), dedicated RNG from seed.
+        state_damping        compounding-hypothesis mode (default False): the
+                             attenuation is written into the momentum buffer
+                             and the output-side correction is a no-op (see
+                             the "State-side damping mode" section above).
         seed                 base seed for per-matrix subspace/gating RNGs.
         classifier_extra     optional dict of extra BatchRegimeClassifier
                              kwargs (innovation detectors z_reset/z_quiet
@@ -377,6 +412,7 @@ class RoutedMuon(Muon):
         enable_oscillation_channel: bool = True,
         rho_ignored: bool = False,
         random_gating: bool = False,
+        state_damping: bool = False,
         seed: int = 1000,
         classifier_extra: Optional[Dict[str, Any]] = None,
     ) -> None:
@@ -431,6 +467,7 @@ class RoutedMuon(Muon):
         self.enable_oscillation_channel = bool(enable_oscillation_channel)
         self.rho_ignored = bool(rho_ignored)
         self.random_gating = bool(random_gating)
+        self.state_damping = bool(state_damping)
         self.seed = int(seed)
         self.classifier_extra = dict(classifier_extra or {})
         self._n_tiers = 0  # deterministic per-matrix seed offsets
@@ -484,7 +521,18 @@ class RoutedMuon(Muon):
         if np.all(gains == 1.0):
             # No deviation from stock Muon (also guarantees the bit-for-bit
             # equivalence when both channels are disabled: the correction is
-            # skipped, not added-as-zero).
+            # skipped, not added-as-zero). Holds identically in state-damping
+            # mode: no treated direction => the buffer is never edited.
+            return stock
+
+        if self.state_damping:
+            # STATE-SIDE damping (compounding hypothesis): attenuate the
+            # treated components inside the PERSISTENT momentum buffer; the
+            # output-side correction is a no-op, so this step's update is
+            # stock NS(M_t). The edit lands on state["momentum_buffer"] AFTER
+            # pre_step derived M_t, so it only affects FUTURE M_t (re-derived
+            # from buf each step) -- that is how it compounds across steps.
+            self._apply_state_damping(state, tier, gains)
             return stock
 
         # O_t <- O_t + sum_i (g_i - 1) * (u_i^T O_t v_i) * u_i v_i^T
@@ -498,6 +546,34 @@ class RoutedMuon(Muon):
         )
         corrected = O32 + (tier.U * coeff.unsqueeze(0)) @ tier.V.T
         return corrected.to(stock.dtype).reshape(O.shape)
+
+    def _apply_state_damping(
+        self, state: Dict[str, Any], tier: _TrackedTier, gains: np.ndarray
+    ) -> None:
+        """Write the per-direction attenuation into the momentum buffer.
+
+        buf <- buf + sum_i (g_i - 1) * (u_i^T buf v_i) * u_i v_i^T, in place,
+        using the buffer's OWN projection onto the tracked pairs (u_i, v_i)
+        of M_t. The (g_i - 1) factor is zero for untreated directions, so this
+        touches exactly the same rank-<=(#treated) subspace as the output-side
+        correction -- only the operand (persistent buf vs transient O_t) and
+        thus the persistence differ. Handles conv (>2D) buffers by flattening
+        to the same (m, -1) 2-D view the tracked tier uses; the correction is
+        reshaped back with matching row-major semantics regardless of the
+        buffer's memory format.
+        """
+        buf = state.get("momentum_buffer")
+        if buf is None:  # defensive: pre_step always creates it before here
+            return
+        buf2 = buf.reshape(len(buf), -1) if buf.ndim > 2 else buf
+        buf32 = buf2.to(tier.dtype)
+        proj = ((tier.U.T @ buf32) * tier.V.T).sum(dim=1)  # (k,) u_i^T buf v_i
+        coeff = (
+            torch.as_tensor(gains - 1.0, dtype=tier.dtype, device=buf32.device)
+            * proj
+        )
+        correction = (tier.U * coeff.unsqueeze(0)) @ tier.V.T  # (m, n)
+        buf.add_(correction.to(buf.dtype).reshape(buf.shape))
 
     # -------------------------------------------------------------- internals
 

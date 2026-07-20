@@ -147,11 +147,26 @@ from src.optim.airbench_zoo import (  # noqa: E402
     run_airbench_smoke,
 )
 
+
+def _load_probe_divergence():
+    """Load scripts/probe_divergence.py (not a package) for its experiment
+    function, so the twin-trajectory probe runs through the standard runner /
+    container entrypoint. Import-time only; no side effects."""
+    import importlib.util
+
+    path = REPO_ROOT / "scripts" / "probe_divergence.py"
+    spec = importlib.util.spec_from_file_location("routed_muon_probe_divergence", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.run_probe_divergence
+
+
 EXPERIMENT_REGISTRY = {
     "smoke": run_smoke,
     "airbench": run_airbench,  # WP0.1 stock baseline (vendored Muon, compile on)
     "airbench_smoke": run_airbench_smoke,  # WP0.4 zoo smoke harness
     "airbench_instrumented": run_airbench_instrumented,  # WP1.2 measurement runs
+    "probe_divergence": _load_probe_divergence(),  # twin-trajectory probe
     # Later WPs register nanogpt experiments here.
 }
 
