@@ -458,7 +458,14 @@ class _SingleRankDist:
         return _Work()
 
     @classmethod
-    def install(cls, monkeypatch):
+    def install(cls, monkeypatch, stub_is_initialized: bool = True):
+        """Patch the AVG collectives.
+
+        ``stub_is_initialized=False`` leaves ``dist.is_initialized`` alone so
+        ``run_nanogpt`` really builds its own single-rank process group — that
+        is the code path a 1-GPU cloud run takes, and the only way to test that
+        it needs no ``RANK``/``WORLD_SIZE``/``MASTER_ADDR`` in the environment.
+        """
         import torch.distributed as dist
 
         def reduce_scatter(output, input_list, op=None, async_op=False):
@@ -480,7 +487,8 @@ class _SingleRankDist:
         def all_reduce(tensor, op=None, async_op=False):
             return cls._done()
 
-        monkeypatch.setattr(dist, "is_initialized", lambda: True)
+        if stub_is_initialized:
+            monkeypatch.setattr(dist, "is_initialized", lambda: True)
         monkeypatch.setattr(dist, "reduce_scatter", reduce_scatter)
         monkeypatch.setattr(dist, "reduce_scatter_tensor", reduce_scatter_tensor)
         monkeypatch.setattr(dist, "all_gather", all_gather)
@@ -493,7 +501,10 @@ def test_training_loop_end_to_end_on_cpu(tmp_path, monkeypatch):
     validation, checkpoint, metrics. Tiny + NOT record-faithful by construction
     (sdpa/bf16/no-compile); this checks wiring, not numerics."""
     _SingleRankDist.install(monkeypatch)
-    torch._dynamo.config.suppress_errors = True
+    # scoped, not global: leaking suppress_errors=True into the rest of the
+    # session would silence exactly the dynamo failures
+    # test_training_loop_end_to_end_on_cpu_with_compile exists to catch.
+    monkeypatch.setattr(torch._dynamo.config, "suppress_errors", True)
 
     for i in (1, 2):
         _write_shard(tmp_path / f"fineweb_train_{i:06d}.bin", num_tokens=400_000, bos_every=64)
@@ -530,6 +541,124 @@ def test_training_loop_end_to_end_on_cpu(tmp_path, monkeypatch):
     config["nanogpt"]["checkpoint"]["resume"] = True
     resumed = run_nanogpt(config, torch.device("cpu"))
     assert resumed["resumed_from_checkpoint"] is True
+
+
+@pytest.mark.slow
+def test_training_loop_end_to_end_on_cpu_with_compile(tmp_path, monkeypatch):
+    """The record path's ``compile: true``, on CPU, with dynamo errors FATAL.
+
+    WHY THIS TEST EXISTS. ``test_training_loop_end_to_end_on_cpu`` runs with
+    ``compile: False`` and therefore missed a bug that killed *every*
+    record-faithful GPU run at the first ``opt.step()``:
+
+        torch._dynamo.exc.InternalTorchDynamoError: RuntimeError: A view was
+        created in no_grad mode and its base or another view of its base has
+        been modified inplace with grad mode enabled.
+
+    Root cause and fix: ``src/nanogpt/optim.py``, PORT CHANGE O1. The trigger is
+    purely an autograd/dynamo aliasing property of ``DistAdam.step`` — it needs
+    ``torch.compile``, not CUDA — so CPU reproduces it exactly. Revert O1 and
+    this test fails with the message above; that is how it was verified.
+
+    Two more things it pins:
+      * ``torch._dynamo.config.suppress_errors`` is forced False, so a dynamo
+        failure is an error and not a silent fallback to eager;
+      * the run builds its own single-rank process group with **no**
+        RANK/WORLD_SIZE/LOCAL_RANK/MASTER_ADDR/MASTER_PORT in the environment
+        (PORT CHANGE T8), which is how 1-GPU cloud runs are launched.
+
+    STILL NOT COVERED HERE (GPU-only): FlexAttention block masks
+    (``attention_impl: flex`` has no CPU backward), the FP8 head
+    (``torch._scaled_mm`` / ``float8_e4m3fn``, H100-class only), inductor's CUDA
+    codegen, and NCCL. See docs/nanogpt-port.md §6.
+    """
+    # Real process group, stubbed AVG collectives only.
+    _SingleRankDist.install(monkeypatch, stub_is_initialized=False)
+    for var in ("RANK", "WORLD_SIZE", "LOCAL_RANK", "MASTER_ADDR", "MASTER_PORT"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(torch._dynamo.config, "suppress_errors", False)
+    torch._dynamo.reset()
+
+    _write_shard(tmp_path / "fineweb_train_000001.bin", num_tokens=20_000, bos_every=64)
+    _write_shard(tmp_path / "fineweb_val_000000.bin", num_tokens=20_000, bos_every=64)
+
+    from src.nanogpt.train import run_nanogpt
+
+    config = {
+        "experiment": "nanogpt",
+        "seed": 1000,
+        "nanogpt": {
+            "train_files": str(tmp_path / "fineweb_train_*.bin"),
+            "val_files": str(tmp_path / "fineweb_val_*.bin"),
+            # record_world_size 1 -> accumulation factor 1: the accumulation
+            # arithmetic is covered by the tests above; this one is about
+            # compile, and 8 micro-batches would only make it 8x slower.
+            "device_count": 1, "record_world_size": 1,
+            "num_layers": 12, "num_heads": 1, "model_dim": 128, "vocab_size": 50257,
+            "train_seq_len": 256, "val_seq_len": 256, "val_tokens": 256,
+            "num_iterations": 1, "val_loss_every": 0, "warmup_steps": 1,
+            "compile": True, "precision_mode": "bf16", "attention_impl": "sdpa",
+            "checkpoint": {"dir": str(tmp_path / "ckpt"), "every_steps": 0, "resume": False},
+        },
+    }
+    metrics = run_nanogpt(config, torch.device("cpu"))
+
+    assert metrics["compiled"] is True
+    assert [p["step"] for p in metrics["val_curve"]] == [1]
+    assert math.isfinite(metrics["final_val_loss"])
+    # the process group was created and torn down by run_nanogpt itself
+    import torch.distributed as dist
+
+    assert not dist.is_initialized()
+
+
+def test_dist_adam_param_slice_is_not_a_no_grad_view(monkeypatch):
+    """PORT CHANGE O1, isolated: the fast unit-level guard on the same bug.
+
+    ``DistAdam.step`` must write into the parameter through a handle that is
+    NOT an autograd differentiable view of a ``requires_grad`` leaf. If it is,
+    the in-place writes rebase the view's history and any later read of
+    ``.grad_fn``/``.is_leaf`` (which is what dynamo does when the collective
+    graph-breaks) raises the no_grad-view RuntimeError.
+    """
+    from src.nanogpt.optim import DistAdam
+
+    captured = {}
+
+    def all_gather_into_tensor(output, input_tensor, async_op=False):
+        captured["out"] = output
+        captured["in"] = input_tensor
+        output.copy_(input_tensor)
+        return _SingleRankDist._done()
+
+    import torch.distributed as dist
+
+    _SingleRankDist.install(monkeypatch, stub_is_initialized=False)
+    monkeypatch.setattr(dist, "all_gather_into_tensor", all_gather_into_tensor)
+    # DistAdam.step is @torch.compile'd (RECORD:223) and dynamo's structured
+    # logging calls dist.get_rank(), so a real single-rank group must exist.
+    created_pg = not dist.is_initialized()
+    if created_pg:
+        dist.init_process_group(backend="gloo", rank=0, world_size=1, store=dist.HashStore())
+
+    try:
+        p = torch.nn.Parameter(torch.ones(8, 4))
+        p.grad = torch.full((8, 4), 0.5)
+        opt = DistAdam([p], lr=0.1, betas=(0.8, 0.95), eps=1e-10, weight_decay=0.0)
+        opt.step()
+    finally:
+        if created_pg:
+            dist.destroy_process_group()
+
+    for name in ("out", "in"):
+        t = captured[name]
+        assert t._base is None or not t._base.requires_grad, (
+            f"DistAdam handed the collective a differentiable view ({name}); "
+            "this is the no_grad-view bug (src/nanogpt/optim.py PORT CHANGE O1)"
+        )
+        t.is_leaf  # must not raise the view-rebase RuntimeError
+    # and the parameter really was updated in place
+    assert not torch.allclose(p.detach(), torch.ones(8, 4))
 
 
 # ------------------------------------------------------------ results schema

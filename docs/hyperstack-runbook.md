@@ -60,6 +60,13 @@ Sweep (the normal shape for WP0.1's 100-seed eval sweep):
 bash scripts/launch_cloud.sh sweep configs/wp01_airbench_eval.yaml
 ```
 
+**nanogpt at `device_count: 1` needs no distributed environment.** Do *not*
+export `RANK` / `LOCAL_RANK` / `WORLD_SIZE` / `MASTER_ADDR` / `MASTER_PORT`, and
+do not wrap the run in `torchrun`: the runner defaults the triple to (0, 1, 0)
+and rendezvouses through an in-process store (`docs/nanogpt-port.md`, PORT
+CHANGE T8). Multi-GPU is unchanged — launch it under
+`torchrun --nproc_per_node=D` with `device_count: D`.
+
 Seed policy resolution happens **inside `scripts/sweep.py` at launch time**:
 `seeds: eval` expands to seeds 0–99 passed via `run.py --seed N`; `seeds: dev`
 expands to the documented dev range (1000, 1001, …). Literal eval seeds never
@@ -131,6 +138,10 @@ is the pinned image + config + seed; everything worth keeping is in
   the image built from the CUDA base (`docker run --rm --gpus all routed-muon
   configs/smoke.yaml --seed 1000` is the smoke test; it runs on GPU-less
   machines too, on CPU).
+- nanogpt dies in the first minute with `Default process group has not been
+  initialized` or `A view was created in no_grad mode ...`: you are on a build
+  from before PORT CHANGES T8/O1 (`docs/nanogpt-port.md` §2). Re-`push` and
+  re-`build`; do not work around it by exporting `RANK`/`WORLD_SIZE`/etc.
 - `ingest` refuses a file: the error names the schema problem or the missing
   cost. Fix on the staged copy — never in `results/`.
 - `aggregate.py` refuses mixed GPU types: the sweep ran on more than one

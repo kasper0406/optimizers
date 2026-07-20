@@ -30,6 +30,14 @@ T6. **The profiler block** of the validation script (its lines 700-712, a
     (RECORD:714-717), so this is wall-time-only.
 T7. **``torch.empty(1, device="cuda").backward()``** (RECORD:15) runs here
     instead of at import.
+T8. **Process-group bootstrap.** The record (RECORD:592-598) requires
+    ``torchrun`` — it reads ``os.environ["RANK"]`` etc. and lets
+    ``init_process_group`` rendezvous through the env store. The port defaults
+    the triple to ``(0, 1, 0)`` and, at ``world_size == 1`` with no
+    ``MASTER_ADDR`` in the environment, rendezvouses through an in-process
+    ``dist.HashStore``. A single-device run therefore needs **no** distributed
+    environment variables. Under ``torchrun`` (any ``world_size``) the env is
+    present and the behaviour is exactly the record's.
 
 Everything else — architecture, optimizer instantiation, LR/momentum/window
 schedules, data pipeline, validation protocol — is the record.
@@ -133,12 +141,30 @@ def run_nanogpt(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]:
 
     owns_pg = not dist.is_initialized()
     if owns_pg:
-        os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
-        os.environ.setdefault("MASTER_PORT", "29500")
+        # PORT CHANGE T8 (RECORD:592-598). The record reads RANK/WORLD_SIZE/
+        # LOCAL_RANK from ``os.environ[...]`` (KeyError if absent) and calls
+        # ``dist.init_process_group(backend="nccl", device_id=device)``, which
+        # then resolves rank/world_size/MASTER_* from the env again — i.e. the
+        # record's script only runs under ``torchrun``. That is correct for the
+        # record (it is always 8 ranks) but it made a *single-device* run of the
+        # port fail unless the caller exported RANK/LOCAL_RANK/WORLD_SIZE/
+        # MASTER_ADDR/MASTER_PORT by hand.
+        #
+        # ``_rank_world()`` already defaults to (0, 1, 0) when the env is empty,
+        # so the only missing piece is a rendezvous. We build the store
+        # explicitly for the single-rank case (no MASTER_ADDR/MASTER_PORT, no
+        # free-port race) and pass rank/world_size explicitly in every case.
+        # Under torchrun the env is present, ``rank``/``world_size`` are exactly
+        # what the env-store would have produced, and behaviour is unchanged.
+        pg_kwargs: Dict[str, Any] = dict(backend=backend, rank=rank, world_size=world_size)
         if backend == "nccl":
-            dist.init_process_group(backend=backend, device_id=device)
+            pg_kwargs["device_id"] = device
+        if world_size == 1 and "MASTER_ADDR" not in os.environ:
+            pg_kwargs["store"] = dist.HashStore()
         else:
-            dist.init_process_group(backend=backend, rank=rank, world_size=world_size)
+            os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
+            os.environ.setdefault("MASTER_PORT", "29500")
+        dist.init_process_group(**pg_kwargs)
         dist.barrier()
 
     try:

@@ -25,6 +25,9 @@ packages = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: minutes-scale tests (torch.compile end-to-end). Run by default; skip with `-m 'not slow'`.",
+]
 
 [tool.uv]
 # uv.lock is the pin. On this dev Mac torch resolves to CPU/MPS wheels;

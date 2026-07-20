@@ -3,8 +3,16 @@
 Record source (see src/nanogpt/__init__.py): the 2025-07-12_BosAlign
 validation script, ``0c5449cc-....txt`` lines 108-286.
 
-**Nothing in this file may be changed.** The record's optimizer *behaviour* is
-the object of study; the only permitted edits are the module-level imports.
+**The record's optimizer *behaviour* is the object of study and may not be
+changed.** Exactly one edit has been made to the code below, PORT CHANGE O1 in
+``DistAdam.step``: the parameter is written through ``p.detach()`` instead of
+through the ``Parameter`` object. Same storage, same writes, same values — it
+only removes an autograd *view* relationship that made every ``compile: true``
+run abort at the first ``opt.step()``. Full rationale is inline at the change
+and in ``docs/nanogpt-port.md`` §2 (O1); regression tests are
+``tests/test_nanogpt_port.py::test_dist_adam_param_slice_is_not_a_no_grad_view``
+and ``::test_training_loop_end_to_end_on_cpu_with_compile``.
+
 The instantiation values used by the record (RECORD:644-645) are
 
     DistAdam(scalar_params + head_params + embed_params,
@@ -184,7 +192,44 @@ class DistAdam(torch.optim.Optimizer):
                 reduce_scatter_futures[idx].wait()
                 p = params[base]
                 rank_size = p.shape[0] // self.world_size
-                p_slice = p[self.rank * rank_size:(self.rank + 1) * rank_size]
+                # ---- PORT CHANGE O1 -----------------------------------------
+                # RECORD:249  `p_slice = p[rank * rank_size:(rank + 1) * rank_size]`
+                # RECORD:262  `... dist.all_gather_into_tensor(p, p_slice, ...)`
+                # The port writes both through `p_view = p.detach()` instead of
+                # through the Parameter object. Nothing else on either line moves.
+                #
+                # WHY. RECORD:249 slices a *Parameter* (requires_grad=True) inside
+                # `@torch.no_grad()`, so `p_slice` is an autograd *differentiable
+                # view* carrying creation_meta NO_GRAD_MODE, while `p` itself is a
+                # leaf with `._base is None`. The lines below mutate the view in
+                # place (`p_slice.mul_`, `p_slice.add_`), bumping the base's version
+                # counter, and RECORD:262 then hands *both* the base and the mutated
+                # view to a collective. Because `step` is `@torch.compile`d
+                # (RECORD:223) that collective is a dynamo graph break, and resuming
+                # the trace re-wraps `p_slice` as a graph input, which reads
+                # `.is_leaf` -> the `grad_fn` getter -> the view-rebase check ->
+                #   "A view was created in no_grad mode and its base ... has been
+                #    modified inplace with grad mode enabled."
+                # That aborted every `compile: true` run at the first `opt.step()`,
+                # on GPU and (see tests) on CPU alike. Handing the collective a
+                # base/view pair with mixed `._base` states also trips AOTAutograd's
+                # `merge_view_inputs` ("mixed autograd ._base states").
+                #
+                # WHY IT IS BEHAVIOUR-PRESERVING. `p.detach()` shares `p`'s storage,
+                # sizes, strides *and* version counter; the slice of it covers the
+                # same elements at the same addresses. Every in-place write below,
+                # and the collective's write, therefore lands in exactly the same
+                # memory with exactly the same arithmetic, and `p` (the Parameter)
+                # observes exactly the same values. Only the autograd *metadata* of
+                # the two handles changes: `p.detach()`'s base does not require grad,
+                # so neither handle is a differentiable view and no rebase check
+                # applies. Nothing here is differentiated anyway — the whole method
+                # is `@torch.no_grad()` and `p` is a leaf whose `.grad` is read, not
+                # written. This is the record's own idiom for writing into a
+                # parameter's storage: RECORD:632 `dist.broadcast(param.detach(), 0)`,
+                # RECORD:346 / 372 / 417 `...weight.detach().zero_()`.
+                p_view = p.detach()
+                p_slice = p_view[self.rank * rank_size:(self.rank + 1) * rank_size]
                 lr = group['lr'] * getattr(p, "lr_mul", 1.0)
                 state = self.state[p]
                 g_slice = grad_slices[idx]
@@ -220,5 +265,7 @@ class DistAdam(torch.optim.Optimizer):
                 p_slice.add_(other=update, alpha=-1.0)
 
                 idx += 1
-                all_reduce_futures.append(dist.all_gather_into_tensor(p, p_slice, async_op=True).get_future())
+                # PORT CHANGE O1 (RECORD:262): `p` -> `p_view` (== `p.detach()`),
+                # same storage, same write. See the block above.
+                all_reduce_futures.append(dist.all_gather_into_tensor(p_view, p_slice, async_op=True).get_future())
         torch.futures.collect_all(all_reduce_futures).wait()

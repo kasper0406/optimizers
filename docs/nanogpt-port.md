@@ -129,7 +129,45 @@ them flips `metrics.record_faithful` to `false` and is enumerated in
 | P5/T7 | The record's `torch.empty(1, device="cuda").backward()` import-time hack moved into startup so the package imports on a CPU box | `train.py` |
 | T6 | The validation script's second, profiler-wrapped 10-step warmup is dropped; one kernel warmup remains, state restored exactly as the record does | `train.py` |
 | T5 | Metrics JSON + optional VM-local checkpoint/resume (spot tier) | `train.py` |
+| T8 | Process-group bootstrap: rank/world/local-rank default to (0, 1, 0) and a 1-rank run rendezvouses through an in-process `dist.HashStore` — **no `RANK`/`WORLD_SIZE`/`LOCAL_RANK`/`MASTER_ADDR`/`MASTER_PORT` needed for a single-device run.** Under `torchrun` the env is present and behaviour is the record's | `train.py` |
+| O1 | `DistAdam.step` writes the parameter through `p.detach()` instead of through the `Parameter` (same storage, same writes) | `optim.py` |
 | — | `pin_memory` only requested when CUDA is present | `data.py` |
+
+**O1 in detail — the bug that killed the first record-faithful GPU run.**
+RECORD:249 slices a `Parameter` inside `@torch.no_grad()`:
+
+```python
+p_slice = p[rank * rank_size:(rank + 1) * rank_size]   # RECORD:249
+...
+p_slice.mul_(...); p_slice.add_(...)                    # RECORD:246-259
+dist.all_gather_into_tensor(p, p_slice, async_op=True)  # RECORD:262
+```
+
+`p_slice` is an autograd *differentiable view* with creation-meta
+`NO_GRAD_MODE`, and the in-place writes bump the base's version counter.
+`DistAdam.step` is `@torch.compile`d (RECORD:223), so the collective at
+RECORD:262 is a dynamo graph break; resuming the trace re-wraps `p_slice` as a
+graph input, reads `.is_leaf`, hits the view-rebase check and raises
+
+```
+torch._dynamo.exc.InternalTorchDynamoError: RuntimeError: A view was created in
+no_grad mode and its base or another view of its base has been modified inplace
+with grad mode enabled.
+```
+
+before step 1 completes. (Handing the collective a base/view pair with mixed
+`._base` states additionally trips AOTAutograd's `merge_view_inputs`.) The port
+takes `p_view = p.detach()` once and uses it for both the slice and the
+collective's output. `p.detach()` shares `p`'s storage, sizes, strides and
+version counter, so every write lands in the same memory with the same
+arithmetic and `p` observes the same values — **the ML is unchanged**; only the
+autograd metadata of two temporary handles changes, and nothing here is
+differentiated (`@torch.no_grad()`, `p` is a leaf). It is the record's own idiom
+for writing into a parameter's storage (RECORD:632 `dist.broadcast(param.detach(), 0)`,
+RECORD:346/372/417 `weight.detach().zero_()`). Regression-tested by
+`tests/test_nanogpt_port.py::test_dist_adam_param_slice_is_not_a_no_grad_view`
+and `::test_training_loop_end_to_end_on_cpu_with_compile`, both of which fail
+with the exact message above if O1 is reverted.
 
 ### Behaviour-changing, opt-in, all OFF in the shipped configs
 
@@ -201,6 +239,11 @@ bash scripts/launch_cloud.sh run configs/wp02_nanogpt_repro.yaml
 
 # 2b. the 3-dev-seed variance set
 bash scripts/launch_cloud.sh sweep configs/wp02_nanogpt_repro_3seed.yaml
+
+# 2b'. NOTE: a 1-GPU run needs NO distributed environment variables (PORT
+#      CHANGE T8). Do not export RANK/LOCAL_RANK/WORLD_SIZE/MASTER_ADDR/
+#      MASTER_PORT and do not wrap it in torchrun — `device_count: 1` builds
+#      its own single-rank group through an in-process store.
 
 # 2c. two GPUs: set device_count: 2 in the config, then on the VM
 docker run --rm --gpus all -v $PWD/results_out:/workspace/results \
@@ -307,11 +350,31 @@ that is a deviation to declare. The record's own n=20 logs interpolate to
    the accumulation proof does not cover. If the overlay is off, test it first
    by running D=8-equivalent chunk counts with fp32 grad accumulation on the
    embeddings as a probe.
-2. **No GPU verification yet.** Everything here is CPU-verified: model
-   forward/backward, the full training loop end-to-end (stubbed single-rank
-   collectives), accumulation arithmetic, data chunking, config parsing, the
-   record-trace parser. The FP8 path, FlexAttention, `torch.compile`, and NCCL
-   have never been executed for this port.
+2. **Partial GPU verification.** CPU-verified: model forward/backward, the full
+   training loop end-to-end (stubbed single-rank collectives), the same loop
+   **with `compile: true` and `torch._dynamo.config.suppress_errors` forced
+   False** (`test_training_loop_end_to_end_on_cpu_with_compile` — this is what
+   catches dynamo/autograd-aliasing bugs of the O1 class), single-rank
+   process-group bootstrap with an empty environment, accumulation arithmetic,
+   data chunking, config parsing, the record-trace parser.
+   **Still GPU-only-untested, in the order they would bite:**
+   - the FP8 head — `torch.ops.routed_muon_nanogpt.mm` / `mm_backward`,
+     `torch._scaled_mm`, `float8_e4m3fn` / `e5m2` quantization, and the custom
+     op's `register_autograd`/`setup_context` wiring (CPU runs `precision_mode:
+     bf16`, which takes the `F.linear` branch and never enters the custom op);
+   - FlexAttention — `BlockMask.from_kv_blocks`, the `document_causal` mask_mod,
+     and the long/short SWA masks (CPU runs the `sdpa` dense-mask fallback,
+     which is the port's own code, not the record's kernel);
+   - inductor's **CUDA** codegen for the compiled model and for
+     `DistAdam.step` / `zeropower_via_newtonschulz5` (CPU exercises dynamo +
+     AOTAutograd, i.e. the tracing/aliasing layer where O1 lived, but a
+     different inductor backend);
+   - NCCL — every collective is stubbed on CPU, so `reduce_scatter` /
+     `reduce_scatter_tensor` / `all_gather` / `all_gather_into_tensor` with
+     `ReduceOp.AVG`, and in particular the **input/output aliasing** at
+     `world_size == 1` (`all_gather_into_tensor(p_view, p_slice)` where the two
+     are the same memory), are unverified against a real backend;
+   - `torch.cuda.max_memory_allocated`, and the peak-memory claim in §3.
 3. **Torch-version drift** vs the record's 2025 nightly (§2).
 4. **A100-only availability** would force `precision_mode: bf16`, i.e. no
    record-faithful reproduction at all — that is a WP0.2 finding to report to

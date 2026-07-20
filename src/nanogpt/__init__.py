@@ -43,7 +43,9 @@ Modules:
 
 - ``config``   YAML -> :class:`NanoGPTConfig`; the accumulation arithmetic.
 - ``model``    architecture, verbatim from the record except where marked.
-- ``optim``    ``Muon`` and ``DistAdam``, verbatim from the record.
+- ``optim``    ``Muon`` and ``DistAdam``, verbatim from the record except
+  PORT CHANGE O1 (``DistAdam`` writes the parameter through ``p.detach()``;
+  same storage, same values — see the module docstring there).
 - ``data``     FineWeb loader; emulates the record's 8-rank BOS-aligned batching.
 - ``train``    training loop with gradient accumulation + the results metrics.
 - ``record_log``  parser for the loss-vs-tokens trace inside a record log.
