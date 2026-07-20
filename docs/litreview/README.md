@@ -32,3 +32,12 @@ Each direction has a full report in this directory. Verdicts:
 
 Four directly adjacent papers appeared Jan–Jun 2026 (OrScale, NAMO, SpecMuon,
 Aurora). The B slot and the D measurement are both time-sensitive.
+
+## Round 2 (2026-07-20) — brainstorm-direction reviews
+
+| Direction | Verdict | File |
+|---|---|---|
+| Occupancy-derived schedules / schedules as implicit statistic control | Partially reported; the composite (occupancy state function + inverse schedule derivation + Muon) unreported. Must-run discriminators: occupancy vs sharpness ηλ/2, occupancy vs temperature ηN/B | [f-schedules-as-control.md](f-schedules-as-control.md) |
+| State-side momentum damping / compounding asymmetry | Mechanism exists in the compression lineage (DeMo, Dion, EF21-Muon) but never as deliberate damping; the output-vs-state compounding principle unreported — our null is error feedback's contrapositive | [h-momentum-state-filtering.md](h-momentum-state-filtering.md) |
+| Frozen-probe long-integration signal detection | Unreported with partial anticipation; theory warrant published (drift ~T vs noise ~√T) | [g-persistent-probes.md](g-persistent-probes.md) |
+| Benchmark headroom for optimizer claims | Our powered equivalence on a record config is novel evidence; ranked testbeds: modded-nanogpt 124M steps-to-target > EPFL 124M harness > CIFAR time-to-94% | [i-benchmark-headroom.md](i-benchmark-headroom.md) |
