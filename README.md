@@ -96,7 +96,7 @@ vendor/       airbench, modded-nanogpt, DynMuon submodules @ pinned SHAs
 scripts/      run.py, sweep.py, aggregate.py, launch_*, analysis scripts
 results/      2,600+ result JSONs (append-only; full provenance: git SHA,
               seed, gpu_type, wall time, cost)
-reports/      gate records, measurement reports, paper draft, figures
+reports/      gate records, measurement reports, paper draft, project-state.md, figures
 ```
 
 ## Seed discipline
