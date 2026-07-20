@@ -1,0 +1,2708 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "probe_divergence",
+      "harness": "airbench",
+      "recipe": {
+        "normalize_filter_weights": true,
+        "tta_level": 2
+      },
+      "seed": 1603,
+      "steps": 200,
+      "train": {
+        "batch_size": 2000
+      },
+      "twin_a": {
+        "lr": 0.24,
+        "momentum": 0.6,
+        "name": "muon",
+        "nesterov": true,
+        "ns_steps": 3
+      },
+      "twin_b": {
+        "align_min": 0.3,
+        "beta": 0.99,
+        "enable_noise_channel": false,
+        "enable_oscillation_channel": true,
+        "g_noise": 0.25,
+        "g_osc_const": 0.5,
+        "k": 16,
+        "lr": 0.24,
+        "momentum": 0.6,
+        "n_min": 25,
+        "name": "routed",
+        "nesterov": true,
+        "ns_steps": 3,
+        "rho_osc": 0.5,
+        "seed": 2600,
+        "state_damping": true,
+        "t_refresh": 50,
+        "tau_noise": 2.0,
+        "tau_sig": 4.0,
+        "weight_decay": 0.0
+      }
+    },
+    "path": "configs/dev/probe_divergence_goscconst050_state.yaml",
+    "sha256": "0018f68e9f259fd6faaee23c949efdba92a9600691d2fac7ce7e9a00ea59e052"
+  },
+  "cost_usd": 0.02,
+  "experiment": "probe_divergence",
+  "finished_at": "2026-07-20T08:14:27.010857+00:00",
+  "git_dirty": false,
+  "git_sha": "7aa433b644d2f8bfcdbf1ba39db85941e2637705",
+  "gpu_type": "NVIDIA RTX A6000",
+  "metrics": {
+    "divergence": [
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 1,
+        "update_cosine": 1.0
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 2,
+        "update_cosine": 0.9999999403953552
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 3,
+        "update_cosine": 1.0
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 4,
+        "update_cosine": 0.9999999403953552
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 5,
+        "update_cosine": 1.0
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 6,
+        "update_cosine": 0.9999999403953552
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 7,
+        "update_cosine": 1.0000001192092896
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 8,
+        "update_cosine": 1.0000001192092896
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 9,
+        "update_cosine": 1.0000001192092896
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 10,
+        "update_cosine": 1.0
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 11,
+        "update_cosine": 1.0
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 12,
+        "update_cosine": 0.9999997019767761
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 13,
+        "update_cosine": 1.0
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 14,
+        "update_cosine": 1.0
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 15,
+        "update_cosine": 0.9999999403953552
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 16,
+        "update_cosine": 1.0000001192092896
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 17,
+        "update_cosine": 1.0000001192092896
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 18,
+        "update_cosine": 1.0000001192092896
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 19,
+        "update_cosine": 1.0000001192092896
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 20,
+        "update_cosine": 1.0000001192092896
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 21,
+        "update_cosine": 1.0000001192092896
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 22,
+        "update_cosine": 1.0
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 23,
+        "update_cosine": 1.0
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 24,
+        "update_cosine": 0.9999998211860657
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.0,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0,
+        "step": 25,
+        "update_cosine": 1.0
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0,
+          "layers.1.conv2.weight": 0.004116439405046103,
+          "layers.2.conv1.weight": 0.0,
+          "layers.2.conv2.weight": 0.0,
+          "layers.3.conv1.weight": 0.0,
+          "layers.3.conv2.weight": 0.0
+        },
+        "rel_dist": 0.0009830071727224983,
+        "step": 26,
+        "update_cosine": 0.9999791383743286
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.003665358641071667,
+          "layers.1.conv2.weight": 0.007588152580119388,
+          "layers.2.conv1.weight": 0.004287531937370584,
+          "layers.2.conv2.weight": 0.003027701017190965,
+          "layers.3.conv1.weight": 0.004685311644389276,
+          "layers.3.conv2.weight": 0.004480277775912138
+        },
+        "rel_dist": 0.004414128886483163,
+        "step": 27,
+        "update_cosine": 0.9996424913406372
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.008218545034672673,
+          "layers.1.conv2.weight": 0.012626406946913388,
+          "layers.2.conv1.weight": 0.009417145967407637,
+          "layers.2.conv2.weight": 0.006424172324629035,
+          "layers.3.conv1.weight": 0.010753424686206482,
+          "layers.3.conv2.weight": 0.013055120758129318
+        },
+        "rel_dist": 0.010261900693849869,
+        "step": 28,
+        "update_cosine": 0.998383641242981
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.014040308809533702,
+          "layers.1.conv2.weight": 0.019471058434763686,
+          "layers.2.conv1.weight": 0.01602542748055254,
+          "layers.2.conv2.weight": 0.011540776132162466,
+          "layers.3.conv1.weight": 0.01986125617810474,
+          "layers.3.conv2.weight": 0.024938198874267122
+        },
+        "rel_dist": 0.01858738531731661,
+        "step": 29,
+        "update_cosine": 0.9957018494606018
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.01930124409316153,
+          "layers.1.conv2.weight": 0.025250103664310658,
+          "layers.2.conv1.weight": 0.023327081339830056,
+          "layers.2.conv2.weight": 0.017524458098680935,
+          "layers.3.conv1.weight": 0.030461629509557164,
+          "layers.3.conv2.weight": 0.03995410938798396
+        },
+        "rel_dist": 0.02842693635229885,
+        "step": 30,
+        "update_cosine": 0.9916362166404724
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.02904119148502708,
+          "layers.1.conv2.weight": 0.03491235553150457,
+          "layers.2.conv1.weight": 0.0343536126623967,
+          "layers.2.conv2.weight": 0.026635549093130588,
+          "layers.3.conv1.weight": 0.04490670236256837,
+          "layers.3.conv2.weight": 0.05877489770584516
+        },
+        "rel_dist": 0.04185688121739945,
+        "step": 31,
+        "update_cosine": 0.9854171872138977
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.03914725926127394,
+          "layers.1.conv2.weight": 0.04228599706020975,
+          "layers.2.conv1.weight": 0.04358896383104193,
+          "layers.2.conv2.weight": 0.03469145418288589,
+          "layers.3.conv1.weight": 0.05828019567388412,
+          "layers.3.conv2.weight": 0.07844917517569137
+        },
+        "rel_dist": 0.05480665627570123,
+        "step": 32,
+        "update_cosine": 0.978908121585846
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.04658032725238744,
+          "layers.1.conv2.weight": 0.050555874003100104,
+          "layers.2.conv1.weight": 0.05235069095913864,
+          "layers.2.conv2.weight": 0.0441718950199789,
+          "layers.3.conv1.weight": 0.07422462690989083,
+          "layers.3.conv2.weight": 0.09866475045099636
+        },
+        "rel_dist": 0.0685962267914038,
+        "step": 33,
+        "update_cosine": 0.9709838032722473
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.05429875722304111,
+          "layers.1.conv2.weight": 0.05784633081932403,
+          "layers.2.conv1.weight": 0.06239031047858508,
+          "layers.2.conv2.weight": 0.0535265120400349,
+          "layers.3.conv1.weight": 0.0900531437398677,
+          "layers.3.conv2.weight": 0.11916730050980229
+        },
+        "rel_dist": 0.08264153166662895,
+        "step": 34,
+        "update_cosine": 0.963840901851654
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.061712522255089594,
+          "layers.1.conv2.weight": 0.06734896417592358,
+          "layers.2.conv1.weight": 0.07205839362968412,
+          "layers.2.conv2.weight": 0.06359387085251493,
+          "layers.3.conv1.weight": 0.10584832554979505,
+          "layers.3.conv2.weight": 0.1396954459728282
+        },
+        "rel_dist": 0.09676172812398048,
+        "step": 35,
+        "update_cosine": 0.9576540589332581
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.074578605064307,
+          "layers.1.conv2.weight": 0.07974889091214363,
+          "layers.2.conv1.weight": 0.0860480455151762,
+          "layers.2.conv2.weight": 0.0768629500201716,
+          "layers.3.conv1.weight": 0.1261173994179075,
+          "layers.3.conv2.weight": 0.16679864617049645
+        },
+        "rel_dist": 0.1157072310104303,
+        "step": 36,
+        "update_cosine": 0.9393665194511414
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.08637813925925376,
+          "layers.1.conv2.weight": 0.0905488200486656,
+          "layers.2.conv1.weight": 0.10000274791711083,
+          "layers.2.conv2.weight": 0.08985515257514923,
+          "layers.3.conv1.weight": 0.1455348739043537,
+          "layers.3.conv2.weight": 0.1931043674071989
+        },
+        "rel_dist": 0.13382494141064313,
+        "step": 37,
+        "update_cosine": 0.9289860725402832
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.0929466274262565,
+          "layers.1.conv2.weight": 0.10072492556922896,
+          "layers.2.conv1.weight": 0.11058819753921818,
+          "layers.2.conv2.weight": 0.10055017380382655,
+          "layers.3.conv1.weight": 0.16054888947470575,
+          "layers.3.conv2.weight": 0.21200603863697082
+        },
+        "rel_dist": 0.14755368257760956,
+        "step": 38,
+        "update_cosine": 0.9279854893684387
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.10573588953118072,
+          "layers.1.conv2.weight": 0.11121250218150565,
+          "layers.2.conv1.weight": 0.12377221214263992,
+          "layers.2.conv2.weight": 0.11444511733794693,
+          "layers.3.conv1.weight": 0.17877907581443714,
+          "layers.3.conv2.weight": 0.23330535848212722
+        },
+        "rel_dist": 0.16383424811340394,
+        "step": 39,
+        "update_cosine": 0.9107927680015564
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.11872505597519711,
+          "layers.1.conv2.weight": 0.12576128905298317,
+          "layers.2.conv1.weight": 0.1380222743974589,
+          "layers.2.conv2.weight": 0.1280924502627344,
+          "layers.3.conv1.weight": 0.19709652281787712,
+          "layers.3.conv2.weight": 0.2565597630488932
+        },
+        "rel_dist": 0.18122463685823978,
+        "step": 40,
+        "update_cosine": 0.8974268436431885
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.1383483055185747,
+          "layers.1.conv2.weight": 0.1408380073001447,
+          "layers.2.conv1.weight": 0.15461307593398113,
+          "layers.2.conv2.weight": 0.14442152830678298,
+          "layers.3.conv1.weight": 0.21778470897814578,
+          "layers.3.conv2.weight": 0.28030426409986625
+        },
+        "rel_dist": 0.20040160599357731,
+        "step": 41,
+        "update_cosine": 0.881726086139679
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.1533111183748367,
+          "layers.1.conv2.weight": 0.15452753465040747,
+          "layers.2.conv1.weight": 0.17036738307612287,
+          "layers.2.conv2.weight": 0.1620627743556768,
+          "layers.3.conv1.weight": 0.23978642546371354,
+          "layers.3.conv2.weight": 0.30475935431794604
+        },
+        "rel_dist": 0.22001492881733162,
+        "step": 42,
+        "update_cosine": 0.8602667450904846
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.16267017182193602,
+          "layers.1.conv2.weight": 0.16797780368684367,
+          "layers.2.conv1.weight": 0.1851262925788183,
+          "layers.2.conv2.weight": 0.1782780254814454,
+          "layers.3.conv1.weight": 0.2596508656491269,
+          "layers.3.conv2.weight": 0.32475197243541554
+        },
+        "rel_dist": 0.23698674028422642,
+        "step": 43,
+        "update_cosine": 0.8548465967178345
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.1763767171230418,
+          "layers.1.conv2.weight": 0.18096636954169254,
+          "layers.2.conv1.weight": 0.1991144096682925,
+          "layers.2.conv2.weight": 0.19471527967310154,
+          "layers.3.conv1.weight": 0.27888684282363174,
+          "layers.3.conv2.weight": 0.34493713437923035
+        },
+        "rel_dist": 0.2540830264750026,
+        "step": 44,
+        "update_cosine": 0.8422330617904663
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.19052883115409705,
+          "layers.1.conv2.weight": 0.1953911446271224,
+          "layers.2.conv1.weight": 0.214404704955809,
+          "layers.2.conv2.weight": 0.21325088821002003,
+          "layers.3.conv1.weight": 0.3003286015800205,
+          "layers.3.conv2.weight": 0.3699211091750175
+        },
+        "rel_dist": 0.2739827076908452,
+        "step": 45,
+        "update_cosine": 0.8107575178146362
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.20589878861455638,
+          "layers.1.conv2.weight": 0.2138699403638186,
+          "layers.2.conv1.weight": 0.23258828362324013,
+          "layers.2.conv2.weight": 0.23198097659922523,
+          "layers.3.conv1.weight": 0.3222541582262029,
+          "layers.3.conv2.weight": 0.3930376475326374
+        },
+        "rel_dist": 0.29382044983958283,
+        "step": 46,
+        "update_cosine": 0.7937415242195129
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.220799150883028,
+          "layers.1.conv2.weight": 0.23134553434396857,
+          "layers.2.conv1.weight": 0.249282527937861,
+          "layers.2.conv2.weight": 0.2497919738533989,
+          "layers.3.conv1.weight": 0.3425100529885017,
+          "layers.3.conv2.weight": 0.4115868435190724
+        },
+        "rel_dist": 0.31168114618213616,
+        "step": 47,
+        "update_cosine": 0.7821844816207886
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.23794874570743235,
+          "layers.1.conv2.weight": 0.25254680882719416,
+          "layers.2.conv1.weight": 0.2691365838435042,
+          "layers.2.conv2.weight": 0.2702881877245373,
+          "layers.3.conv1.weight": 0.3636017114964304,
+          "layers.3.conv2.weight": 0.43098846240616245
+        },
+        "rel_dist": 0.33123030318806,
+        "step": 48,
+        "update_cosine": 0.7524982690811157
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.2532513590080349,
+          "layers.1.conv2.weight": 0.27194776954993855,
+          "layers.2.conv1.weight": 0.2883523858780371,
+          "layers.2.conv2.weight": 0.29256073184489817,
+          "layers.3.conv1.weight": 0.38572558748345576,
+          "layers.3.conv2.weight": 0.4497994268374013
+        },
+        "rel_dist": 0.35105174296577246,
+        "step": 49,
+        "update_cosine": 0.719857394695282
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.26132516284467977,
+          "layers.1.conv2.weight": 0.2906684546623867,
+          "layers.2.conv1.weight": 0.3069053775678199,
+          "layers.2.conv2.weight": 0.312330912114518,
+          "layers.3.conv1.weight": 0.4064509655394017,
+          "layers.3.conv2.weight": 0.4699554458896282
+        },
+        "rel_dist": 0.3701209568000674,
+        "step": 50,
+        "update_cosine": 0.7073111534118652
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.2678834130356273,
+          "layers.1.conv2.weight": 0.30376477287340714,
+          "layers.2.conv1.weight": 0.3220936870516392,
+          "layers.2.conv2.weight": 0.3289809949832035,
+          "layers.3.conv1.weight": 0.4244962561264969,
+          "layers.3.conv2.weight": 0.4845127225899166
+        },
+        "rel_dist": 0.3853809898983003,
+        "step": 51,
+        "update_cosine": 0.69477778673172
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.2823446718596892,
+          "layers.1.conv2.weight": 0.3206415871709166,
+          "layers.2.conv1.weight": 0.34037849954805105,
+          "layers.2.conv2.weight": 0.34918711047373896,
+          "layers.3.conv1.weight": 0.44491919167338767,
+          "layers.3.conv2.weight": 0.5018288615361646
+        },
+        "rel_dist": 0.403670744486775,
+        "step": 52,
+        "update_cosine": 0.6786633729934692
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.29992175924324155,
+          "layers.1.conv2.weight": 0.3386655630957463,
+          "layers.2.conv1.weight": 0.35777585890554675,
+          "layers.2.conv2.weight": 0.36937090069541834,
+          "layers.3.conv1.weight": 0.4669903845196278,
+          "layers.3.conv2.weight": 0.5222293098670607
+        },
+        "rel_dist": 0.4234462097674623,
+        "step": 53,
+        "update_cosine": 0.6385769844055176
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.31522151436962037,
+          "layers.1.conv2.weight": 0.3551588728933847,
+          "layers.2.conv1.weight": 0.3751745543972432,
+          "layers.2.conv2.weight": 0.38885766848734105,
+          "layers.3.conv1.weight": 0.48819930800377703,
+          "layers.3.conv2.weight": 0.5384531638716061
+        },
+        "rel_dist": 0.4413237622109844,
+        "step": 54,
+        "update_cosine": 0.607261598110199
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.3371104541502832,
+          "layers.1.conv2.weight": 0.37237477950957565,
+          "layers.2.conv1.weight": 0.3918594748572538,
+          "layers.2.conv2.weight": 0.40849706843358774,
+          "layers.3.conv1.weight": 0.5090501955640439,
+          "layers.3.conv2.weight": 0.5566904249197849
+        },
+        "rel_dist": 0.4604448134486964,
+        "step": 55,
+        "update_cosine": 0.5690656304359436
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.3419505643024513,
+          "layers.1.conv2.weight": 0.3859623284298105,
+          "layers.2.conv1.weight": 0.40753671422142723,
+          "layers.2.conv2.weight": 0.42784965828515026,
+          "layers.3.conv1.weight": 0.5288992703612191,
+          "layers.3.conv2.weight": 0.5718041679787355
+        },
+        "rel_dist": 0.4767040373456424,
+        "step": 56,
+        "update_cosine": 0.557133138179779
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.35306293122568416,
+          "layers.1.conv2.weight": 0.402434264356364,
+          "layers.2.conv1.weight": 0.4251475688080528,
+          "layers.2.conv2.weight": 0.4485124728818784,
+          "layers.3.conv1.weight": 0.5504204259854044,
+          "layers.3.conv2.weight": 0.5901008548276351
+        },
+        "rel_dist": 0.4955739707345661,
+        "step": 57,
+        "update_cosine": 0.5451051592826843
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.36971269272172635,
+          "layers.1.conv2.weight": 0.41568446124213565,
+          "layers.2.conv1.weight": 0.44076299236689753,
+          "layers.2.conv2.weight": 0.4678439439235838,
+          "layers.3.conv1.weight": 0.5704914418862851,
+          "layers.3.conv2.weight": 0.6077427006064874
+        },
+        "rel_dist": 0.5133426298310194,
+        "step": 58,
+        "update_cosine": 0.5169186592102051
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.38266234871110333,
+          "layers.1.conv2.weight": 0.43580224882944507,
+          "layers.2.conv1.weight": 0.4596521117204548,
+          "layers.2.conv2.weight": 0.4872405544855237,
+          "layers.3.conv1.weight": 0.5895080700490559,
+          "layers.3.conv2.weight": 0.6219386380938388
+        },
+        "rel_dist": 0.5306774557706297,
+        "step": 59,
+        "update_cosine": 0.5070123076438904
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.3934778126678583,
+          "layers.1.conv2.weight": 0.44964866985453444,
+          "layers.2.conv1.weight": 0.47536913240435213,
+          "layers.2.conv2.weight": 0.5069088232456894,
+          "layers.3.conv1.weight": 0.6082936938627971,
+          "layers.3.conv2.weight": 0.6373701397149721
+        },
+        "rel_dist": 0.5475957152206383,
+        "step": 60,
+        "update_cosine": 0.47991421818733215
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.4071307841526745,
+          "layers.1.conv2.weight": 0.46352500088671655,
+          "layers.2.conv1.weight": 0.4931966009176901,
+          "layers.2.conv2.weight": 0.5264018452314453,
+          "layers.3.conv1.weight": 0.6277214243980835,
+          "layers.3.conv2.weight": 0.6512522055067684
+        },
+        "rel_dist": 0.5645537093916879,
+        "step": 61,
+        "update_cosine": 0.46120351552963257
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.41648001168338494,
+          "layers.1.conv2.weight": 0.48021361642276345,
+          "layers.2.conv1.weight": 0.5102058035620117,
+          "layers.2.conv2.weight": 0.5450653298591442,
+          "layers.3.conv1.weight": 0.646440628519802,
+          "layers.3.conv2.weight": 0.6668554979446936
+        },
+        "rel_dist": 0.5815041206320396,
+        "step": 62,
+        "update_cosine": 0.44803759455680847
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.42812752143128946,
+          "layers.1.conv2.weight": 0.4933868144429891,
+          "layers.2.conv1.weight": 0.5264222639087422,
+          "layers.2.conv2.weight": 0.5626136517149061,
+          "layers.3.conv1.weight": 0.6627209775294711,
+          "layers.3.conv2.weight": 0.6791896996786814
+        },
+        "rel_dist": 0.5965461275420452,
+        "step": 63,
+        "update_cosine": 0.4318286180496216
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.439437842846301,
+          "layers.1.conv2.weight": 0.5075230710384856,
+          "layers.2.conv1.weight": 0.5420119517460336,
+          "layers.2.conv2.weight": 0.579737563265375,
+          "layers.3.conv1.weight": 0.6794059090704305,
+          "layers.3.conv2.weight": 0.6931082054687262
+        },
+        "rel_dist": 0.6121081457747117,
+        "step": 64,
+        "update_cosine": 0.4071301519870758
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.44467773917292347,
+          "layers.1.conv2.weight": 0.5191978019519892,
+          "layers.2.conv1.weight": 0.5559592405528299,
+          "layers.2.conv2.weight": 0.5955706390310015,
+          "layers.3.conv1.weight": 0.6937481923805942,
+          "layers.3.conv2.weight": 0.7031129992697662
+        },
+        "rel_dist": 0.6248363679238739,
+        "step": 65,
+        "update_cosine": 0.4167707562446594
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.45236074273024396,
+          "layers.1.conv2.weight": 0.5337071522630018,
+          "layers.2.conv1.weight": 0.5719306926984047,
+          "layers.2.conv2.weight": 0.612204179174074,
+          "layers.3.conv1.weight": 0.7096120434677443,
+          "layers.3.conv2.weight": 0.7153643747921837
+        },
+        "rel_dist": 0.6393595712988672,
+        "step": 66,
+        "update_cosine": 0.40098363161087036
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.4645257996731263,
+          "layers.1.conv2.weight": 0.5447586755980914,
+          "layers.2.conv1.weight": 0.5868013972990358,
+          "layers.2.conv2.weight": 0.6282220577343205,
+          "layers.3.conv1.weight": 0.724644441868358,
+          "layers.3.conv2.weight": 0.7258637477033983
+        },
+        "rel_dist": 0.6531402128433949,
+        "step": 67,
+        "update_cosine": 0.39637982845306396
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.46995203303566263,
+          "layers.1.conv2.weight": 0.558581743981172,
+          "layers.2.conv1.weight": 0.6012952951536567,
+          "layers.2.conv2.weight": 0.6436467719709883,
+          "layers.3.conv1.weight": 0.7389976140820853,
+          "layers.3.conv2.weight": 0.7398971495605228
+        },
+        "rel_dist": 0.6672432271711476,
+        "step": 68,
+        "update_cosine": 0.3927256762981415
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.4721805492331278,
+          "layers.1.conv2.weight": 0.5677163887294225,
+          "layers.2.conv1.weight": 0.613038893607174,
+          "layers.2.conv2.weight": 0.6575602531634925,
+          "layers.3.conv1.weight": 0.7516289592391434,
+          "layers.3.conv2.weight": 0.7474160985570286
+        },
+        "rel_dist": 0.6781040685290607,
+        "step": 69,
+        "update_cosine": 0.40250903367996216
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.4781458294579835,
+          "layers.1.conv2.weight": 0.5763384630089071,
+          "layers.2.conv1.weight": 0.6254556096382615,
+          "layers.2.conv2.weight": 0.6701323510556246,
+          "layers.3.conv1.weight": 0.7639066460780359,
+          "layers.3.conv2.weight": 0.7580142038377026
+        },
+        "rel_dist": 0.689473679203171,
+        "step": 70,
+        "update_cosine": 0.38666972517967224
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.4893029232289402,
+          "layers.1.conv2.weight": 0.5860239922028663,
+          "layers.2.conv1.weight": 0.6371845387471645,
+          "layers.2.conv2.weight": 0.6834646347348877,
+          "layers.3.conv1.weight": 0.7758617937771736,
+          "layers.3.conv2.weight": 0.7670066772485211
+        },
+        "rel_dist": 0.7007331055338547,
+        "step": 71,
+        "update_cosine": 0.3696259558200836
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.49766246779440393,
+          "layers.1.conv2.weight": 0.5930448921864078,
+          "layers.2.conv1.weight": 0.6479446576082598,
+          "layers.2.conv2.weight": 0.6959652923400882,
+          "layers.3.conv1.weight": 0.7870267652750638,
+          "layers.3.conv2.weight": 0.7739140354543438
+        },
+        "rel_dist": 0.7107638715731639,
+        "step": 72,
+        "update_cosine": 0.3723788857460022
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.49883449160895954,
+          "layers.1.conv2.weight": 0.5986552571663574,
+          "layers.2.conv1.weight": 0.6563618547523952,
+          "layers.2.conv2.weight": 0.7064591338656563,
+          "layers.3.conv1.weight": 0.7965551784023379,
+          "layers.3.conv2.weight": 0.7814557316423443
+        },
+        "rel_dist": 0.7191899932983385,
+        "step": 73,
+        "update_cosine": 0.3843667507171631
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5050574604115857,
+          "layers.1.conv2.weight": 0.6052810727058661,
+          "layers.2.conv1.weight": 0.6667143719524827,
+          "layers.2.conv2.weight": 0.7193639545214077,
+          "layers.3.conv1.weight": 0.8074302228731463,
+          "layers.3.conv2.weight": 0.7883758247243303
+        },
+        "rel_dist": 0.7290763655803767,
+        "step": 74,
+        "update_cosine": 0.35477539896965027
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5110582842707228,
+          "layers.1.conv2.weight": 0.6164043733192444,
+          "layers.2.conv1.weight": 0.6779329870235828,
+          "layers.2.conv2.weight": 0.7316354360137024,
+          "layers.3.conv1.weight": 0.8177746848471296,
+          "layers.3.conv2.weight": 0.7971269113058557
+        },
+        "rel_dist": 0.7393323213895078,
+        "step": 75,
+        "update_cosine": 0.33281421661376953
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5165023748876553,
+          "layers.1.conv2.weight": 0.6228616650454855,
+          "layers.2.conv1.weight": 0.6869669554788753,
+          "layers.2.conv2.weight": 0.743403422227705,
+          "layers.3.conv1.weight": 0.8275452693806437,
+          "layers.3.conv2.weight": 0.8038509315749414
+        },
+        "rel_dist": 0.7483121860061388,
+        "step": 76,
+        "update_cosine": 0.31271257996559143
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5209770420266726,
+          "layers.1.conv2.weight": 0.63186320506013,
+          "layers.2.conv1.weight": 0.6968307149750027,
+          "layers.2.conv2.weight": 0.7544671309993963,
+          "layers.3.conv1.weight": 0.8378359992141972,
+          "layers.3.conv2.weight": 0.8118032795323263
+        },
+        "rel_dist": 0.7578190959815883,
+        "step": 77,
+        "update_cosine": 0.29303568601608276
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5231697853013999,
+          "layers.1.conv2.weight": 0.638429718545974,
+          "layers.2.conv1.weight": 0.7046703228994168,
+          "layers.2.conv2.weight": 0.7640888218296994,
+          "layers.3.conv1.weight": 0.8458206752247394,
+          "layers.3.conv2.weight": 0.8177155700019296
+        },
+        "rel_dist": 0.7652286745231307,
+        "step": 78,
+        "update_cosine": 0.29897406697273254
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5302770083199783,
+          "layers.1.conv2.weight": 0.6461265306623474,
+          "layers.2.conv1.weight": 0.7141312392005424,
+          "layers.2.conv2.weight": 0.7737096255640182,
+          "layers.3.conv1.weight": 0.8543540058870415,
+          "layers.3.conv2.weight": 0.823481995238575
+        },
+        "rel_dist": 0.7734962518157035,
+        "step": 79,
+        "update_cosine": 0.27474480867385864
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5372511347633325,
+          "layers.1.conv2.weight": 0.6495186865153821,
+          "layers.2.conv1.weight": 0.7221575269955537,
+          "layers.2.conv2.weight": 0.7824443956117545,
+          "layers.3.conv1.weight": 0.862530960311212,
+          "layers.3.conv2.weight": 0.8284601956938159
+        },
+        "rel_dist": 0.7806652181630201,
+        "step": 80,
+        "update_cosine": 0.29160940647125244
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5416022652287273,
+          "layers.1.conv2.weight": 0.6566366782136465,
+          "layers.2.conv1.weight": 0.7300276601856034,
+          "layers.2.conv2.weight": 0.7923899530855152,
+          "layers.3.conv1.weight": 0.871614351518626,
+          "layers.3.conv2.weight": 0.8345752087015877
+        },
+        "rel_dist": 0.7887492115960347,
+        "step": 81,
+        "update_cosine": 0.2903244197368622
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5480429811148391,
+          "layers.1.conv2.weight": 0.6624677491104504,
+          "layers.2.conv1.weight": 0.7375089408035057,
+          "layers.2.conv2.weight": 0.8014396281154645,
+          "layers.3.conv1.weight": 0.8800353499857603,
+          "layers.3.conv2.weight": 0.8398292659418116
+        },
+        "rel_dist": 0.7961725258248277,
+        "step": 82,
+        "update_cosine": 0.30529218912124634
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5494088959860811,
+          "layers.1.conv2.weight": 0.6696652284577822,
+          "layers.2.conv1.weight": 0.744563064575473,
+          "layers.2.conv2.weight": 0.8096077940789249,
+          "layers.3.conv1.weight": 0.8869390590185118,
+          "layers.3.conv2.weight": 0.8451933953800655
+        },
+        "rel_dist": 0.802633077305014,
+        "step": 83,
+        "update_cosine": 0.2917710840702057
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5589465547244094,
+          "layers.1.conv2.weight": 0.6750826459466697,
+          "layers.2.conv1.weight": 0.7517256659652399,
+          "layers.2.conv2.weight": 0.8187854504665387,
+          "layers.3.conv1.weight": 0.8950006248707919,
+          "layers.3.conv2.weight": 0.8498528794300377
+        },
+        "rel_dist": 0.8099642286964941,
+        "step": 84,
+        "update_cosine": 0.2505359351634979
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.562199995488919,
+          "layers.1.conv2.weight": 0.679531066400935,
+          "layers.2.conv1.weight": 0.7578404624228532,
+          "layers.2.conv2.weight": 0.8260578981943599,
+          "layers.3.conv1.weight": 0.901680415252919,
+          "layers.3.conv2.weight": 0.854420193285752
+        },
+        "rel_dist": 0.8158395903189082,
+        "step": 85,
+        "update_cosine": 0.2553150951862335
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5670680585372634,
+          "layers.1.conv2.weight": 0.6852823451213086,
+          "layers.2.conv1.weight": 0.7646550548054758,
+          "layers.2.conv2.weight": 0.8336665800588487,
+          "layers.3.conv1.weight": 0.9086309821991215,
+          "layers.3.conv2.weight": 0.8570705588761817
+        },
+        "rel_dist": 0.8217301617327217,
+        "step": 86,
+        "update_cosine": 0.2799297273159027
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5704139426332785,
+          "layers.1.conv2.weight": 0.6911073563380313,
+          "layers.2.conv1.weight": 0.770825004006909,
+          "layers.2.conv2.weight": 0.8404719336072529,
+          "layers.3.conv1.weight": 0.9139105998427797,
+          "layers.3.conv2.weight": 0.8604732977737628
+        },
+        "rel_dist": 0.827081601566178,
+        "step": 87,
+        "update_cosine": 0.291920006275177
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5673661749071142,
+          "layers.1.conv2.weight": 0.6934502061804901,
+          "layers.2.conv1.weight": 0.7761820457502346,
+          "layers.2.conv2.weight": 0.8472814250465307,
+          "layers.3.conv1.weight": 0.9196623175935519,
+          "layers.3.conv2.weight": 0.8648073938531714
+        },
+        "rel_dist": 0.8320713506492129,
+        "step": 88,
+        "update_cosine": 0.27698612213134766
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5735591492610228,
+          "layers.1.conv2.weight": 0.700234060817754,
+          "layers.2.conv1.weight": 0.7826642636526417,
+          "layers.2.conv2.weight": 0.8542744804260397,
+          "layers.3.conv1.weight": 0.9250864262143919,
+          "layers.3.conv2.weight": 0.8692887638350079
+        },
+        "rel_dist": 0.8379860434442578,
+        "step": 89,
+        "update_cosine": 0.2646486759185791
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5764928266154205,
+          "layers.1.conv2.weight": 0.7011707436134497,
+          "layers.2.conv1.weight": 0.7880672889416172,
+          "layers.2.conv2.weight": 0.8610946471221403,
+          "layers.3.conv1.weight": 0.9301090278508063,
+          "layers.3.conv2.weight": 0.8717888475410209
+        },
+        "rel_dist": 0.8425984522119073,
+        "step": 90,
+        "update_cosine": 0.27155861258506775
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5789587470891328,
+          "layers.1.conv2.weight": 0.7065782145009047,
+          "layers.2.conv1.weight": 0.794007956723217,
+          "layers.2.conv2.weight": 0.8672086879746546,
+          "layers.3.conv1.weight": 0.9358868203388623,
+          "layers.3.conv2.weight": 0.8776765079483837
+        },
+        "rel_dist": 0.8483339030188097,
+        "step": 91,
+        "update_cosine": 0.26178619265556335
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.582993639251356,
+          "layers.1.conv2.weight": 0.7099484024456807,
+          "layers.2.conv1.weight": 0.8002780892180837,
+          "layers.2.conv2.weight": 0.8740398863218369,
+          "layers.3.conv1.weight": 0.9416510202854683,
+          "layers.3.conv2.weight": 0.8799095235343214
+        },
+        "rel_dist": 0.8534202879109323,
+        "step": 92,
+        "update_cosine": 0.25066760182380676
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5885125716818813,
+          "layers.1.conv2.weight": 0.7136174682549802,
+          "layers.2.conv1.weight": 0.8059222676902488,
+          "layers.2.conv2.weight": 0.88066561164719,
+          "layers.3.conv1.weight": 0.9466500070365572,
+          "layers.3.conv2.weight": 0.885091130909179
+        },
+        "rel_dist": 0.8589599939972958,
+        "step": 93,
+        "update_cosine": 0.24534007906913757
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5877866876544926,
+          "layers.1.conv2.weight": 0.7157459765879479,
+          "layers.2.conv1.weight": 0.8115966709870073,
+          "layers.2.conv2.weight": 0.885888850357096,
+          "layers.3.conv1.weight": 0.9519006761714536,
+          "layers.3.conv2.weight": 0.8860429260393747
+        },
+        "rel_dist": 0.8628883210618801,
+        "step": 94,
+        "update_cosine": 0.26085737347602844
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5942036323698381,
+          "layers.1.conv2.weight": 0.7187539249811572,
+          "layers.2.conv1.weight": 0.8159404324625941,
+          "layers.2.conv2.weight": 0.8921219942604522,
+          "layers.3.conv1.weight": 0.9568322243833732,
+          "layers.3.conv2.weight": 0.8912469260942328
+        },
+        "rel_dist": 0.8679505514652935,
+        "step": 95,
+        "update_cosine": 0.27388519048690796
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5973439566908126,
+          "layers.1.conv2.weight": 0.7221024171380468,
+          "layers.2.conv1.weight": 0.8198033625758564,
+          "layers.2.conv2.weight": 0.8961739695884814,
+          "layers.3.conv1.weight": 0.9607742814673803,
+          "layers.3.conv2.weight": 0.8914577770333945
+        },
+        "rel_dist": 0.8709666996848066,
+        "step": 96,
+        "update_cosine": 0.2741084098815918
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5983919964284935,
+          "layers.1.conv2.weight": 0.7247807759833311,
+          "layers.2.conv1.weight": 0.8245417938609998,
+          "layers.2.conv2.weight": 0.9005562992180124,
+          "layers.3.conv1.weight": 0.9648292771063545,
+          "layers.3.conv2.weight": 0.8936431269220083
+        },
+        "rel_dist": 0.8746163611419585,
+        "step": 97,
+        "update_cosine": 0.2644144892692566
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5965077800605435,
+          "layers.1.conv2.weight": 0.7261853044416745,
+          "layers.2.conv1.weight": 0.8284992745731713,
+          "layers.2.conv2.weight": 0.9049315376229953,
+          "layers.3.conv1.weight": 0.9689267185362989,
+          "layers.3.conv2.weight": 0.8976280761205518
+        },
+        "rel_dist": 0.8782965057552291,
+        "step": 98,
+        "update_cosine": 0.25571709871292114
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.600749443684904,
+          "layers.1.conv2.weight": 0.7284329365927312,
+          "layers.2.conv1.weight": 0.8329311957047931,
+          "layers.2.conv2.weight": 0.908553677557064,
+          "layers.3.conv1.weight": 0.9719449654903167,
+          "layers.3.conv2.weight": 0.8976500836681519
+        },
+        "rel_dist": 0.8810483863357432,
+        "step": 99,
+        "update_cosine": 0.2564866840839386
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.5977063130335021,
+          "layers.1.conv2.weight": 0.7310019473334549,
+          "layers.2.conv1.weight": 0.8378202285668092,
+          "layers.2.conv2.weight": 0.9137702485249629,
+          "layers.3.conv1.weight": 0.9763268849964067,
+          "layers.3.conv2.weight": 0.9006270000807645
+        },
+        "rel_dist": 0.8850709923527763,
+        "step": 100,
+        "update_cosine": 0.24822784960269928
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6004793326707883,
+          "layers.1.conv2.weight": 0.732932186803806,
+          "layers.2.conv1.weight": 0.8409020954575983,
+          "layers.2.conv2.weight": 0.9181949773177573,
+          "layers.3.conv1.weight": 0.979891905751611,
+          "layers.3.conv2.weight": 0.9016649270210194
+        },
+        "rel_dist": 0.8880314366126384,
+        "step": 101,
+        "update_cosine": 0.25060418248176575
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6007997622909704,
+          "layers.1.conv2.weight": 0.7374229287135909,
+          "layers.2.conv1.weight": 0.8438621961576893,
+          "layers.2.conv2.weight": 0.9216836306809374,
+          "layers.3.conv1.weight": 0.9834055491520055,
+          "layers.3.conv2.weight": 0.9023651702213265
+        },
+        "rel_dist": 0.8907608608835024,
+        "step": 102,
+        "update_cosine": 0.240570068359375
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6036126826190178,
+          "layers.1.conv2.weight": 0.7406548499924804,
+          "layers.2.conv1.weight": 0.846346989536955,
+          "layers.2.conv2.weight": 0.9249380080346576,
+          "layers.3.conv1.weight": 0.9854941342622441,
+          "layers.3.conv2.weight": 0.9037643481564152
+        },
+        "rel_dist": 0.8931205298340468,
+        "step": 103,
+        "update_cosine": 0.23697121441364288
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6053581503471462,
+          "layers.1.conv2.weight": 0.7423605840088864,
+          "layers.2.conv1.weight": 0.8492568478763156,
+          "layers.2.conv2.weight": 0.9283895302306833,
+          "layers.3.conv1.weight": 0.9892844666508244,
+          "layers.3.conv2.weight": 0.904902873947434
+        },
+        "rel_dist": 0.8957897090736007,
+        "step": 104,
+        "update_cosine": 0.2157299667596817
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6080289788140623,
+          "layers.1.conv2.weight": 0.7446623470606728,
+          "layers.2.conv1.weight": 0.8529279581163693,
+          "layers.2.conv2.weight": 0.9326649789526361,
+          "layers.3.conv1.weight": 0.9918571719067492,
+          "layers.3.conv2.weight": 0.9073860956903755
+        },
+        "rel_dist": 0.8988641398237239,
+        "step": 105,
+        "update_cosine": 0.2234383076429367
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.612046776609998,
+          "layers.1.conv2.weight": 0.7470502926210881,
+          "layers.2.conv1.weight": 0.8561497466320487,
+          "layers.2.conv2.weight": 0.9360878789677157,
+          "layers.3.conv1.weight": 0.995164296214402,
+          "layers.3.conv2.weight": 0.9061486677255113
+        },
+        "rel_dist": 0.9011557620638829,
+        "step": 106,
+        "update_cosine": 0.20920488238334656
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6111887734502969,
+          "layers.1.conv2.weight": 0.7475940002210897,
+          "layers.2.conv1.weight": 0.8585854799532192,
+          "layers.2.conv2.weight": 0.9392147613703647,
+          "layers.3.conv1.weight": 0.9975315041299903,
+          "layers.3.conv2.weight": 0.9098773862388962
+        },
+        "rel_dist": 0.9038868997240423,
+        "step": 107,
+        "update_cosine": 0.21616819500923157
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6168567479494013,
+          "layers.1.conv2.weight": 0.7495935988146057,
+          "layers.2.conv1.weight": 0.86158949933344,
+          "layers.2.conv2.weight": 0.9427725383690029,
+          "layers.3.conv1.weight": 1.0002998667311278,
+          "layers.3.conv2.weight": 0.9095886996398262
+        },
+        "rel_dist": 0.9062351433739999,
+        "step": 108,
+        "update_cosine": 0.22664377093315125
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6180267639367002,
+          "layers.1.conv2.weight": 0.7515776234335285,
+          "layers.2.conv1.weight": 0.8649725197959434,
+          "layers.2.conv2.weight": 0.9464571563033064,
+          "layers.3.conv1.weight": 1.0033473431684636,
+          "layers.3.conv2.weight": 0.9124031544248836
+        },
+        "rel_dist": 0.9092844719841215,
+        "step": 109,
+        "update_cosine": 0.23040807247161865
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6174009130072279,
+          "layers.1.conv2.weight": 0.7514164980534668,
+          "layers.2.conv1.weight": 0.8669476216303781,
+          "layers.2.conv2.weight": 0.9495125327702387,
+          "layers.3.conv1.weight": 1.0054267946529387,
+          "layers.3.conv2.weight": 0.9127974631369782
+        },
+        "rel_dist": 0.9109877254984202,
+        "step": 110,
+        "update_cosine": 0.2187940925359726
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6177970971697069,
+          "layers.1.conv2.weight": 0.753928928636479,
+          "layers.2.conv1.weight": 0.870500200119741,
+          "layers.2.conv2.weight": 0.9529410725360312,
+          "layers.3.conv1.weight": 1.0085241183418574,
+          "layers.3.conv2.weight": 0.9150253596329818
+        },
+        "rel_dist": 0.9139479192222161,
+        "step": 111,
+        "update_cosine": 0.21763908863067627
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6198724734936302,
+          "layers.1.conv2.weight": 0.7551570957212591,
+          "layers.2.conv1.weight": 0.8730969994789708,
+          "layers.2.conv2.weight": 0.9560033603829149,
+          "layers.3.conv1.weight": 1.0114745334988986,
+          "layers.3.conv2.weight": 0.9159719272700247
+        },
+        "rel_dist": 0.916235582043788,
+        "step": 112,
+        "update_cosine": 0.22119532525539398
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6176781484475838,
+          "layers.1.conv2.weight": 0.7565144398743974,
+          "layers.2.conv1.weight": 0.8750484334749004,
+          "layers.2.conv2.weight": 0.959118475315313,
+          "layers.3.conv1.weight": 1.0133203702721654,
+          "layers.3.conv2.weight": 0.9173762261693056
+        },
+        "rel_dist": 0.9181679136942537,
+        "step": 113,
+        "update_cosine": 0.23232139647006989
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6175960032427877,
+          "layers.1.conv2.weight": 0.7568351863712431,
+          "layers.2.conv1.weight": 0.8763116957769875,
+          "layers.2.conv2.weight": 0.9609170133893359,
+          "layers.3.conv1.weight": 1.01533534898208,
+          "layers.3.conv2.weight": 0.9161381978127178
+        },
+        "rel_dist": 0.9190969749021211,
+        "step": 114,
+        "update_cosine": 0.2387675940990448
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6189354324320395,
+          "layers.1.conv2.weight": 0.757618706039577,
+          "layers.2.conv1.weight": 0.8790523440229625,
+          "layers.2.conv2.weight": 0.9636161239613955,
+          "layers.3.conv1.weight": 1.0177613040166695,
+          "layers.3.conv2.weight": 0.9175072456446159
+        },
+        "rel_dist": 0.9212758847197963,
+        "step": 115,
+        "update_cosine": 0.23343126475811005
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6209606866887182,
+          "layers.1.conv2.weight": 0.7598584733772332,
+          "layers.2.conv1.weight": 0.8818052455093219,
+          "layers.2.conv2.weight": 0.9661020265285003,
+          "layers.3.conv1.weight": 1.020505270279802,
+          "layers.3.conv2.weight": 0.9193744315097655
+        },
+        "rel_dist": 0.9236474804574321,
+        "step": 116,
+        "update_cosine": 0.2211179882287979
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6216460482513966,
+          "layers.1.conv2.weight": 0.7611036743971927,
+          "layers.2.conv1.weight": 0.8829278944659265,
+          "layers.2.conv2.weight": 0.9684291544151752,
+          "layers.3.conv1.weight": 1.0227255167916822,
+          "layers.3.conv2.weight": 0.9188413385508379
+        },
+        "rel_dist": 0.9249537186643488,
+        "step": 117,
+        "update_cosine": 0.23350711166858673
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6212880387312048,
+          "layers.1.conv2.weight": 0.763525226166876,
+          "layers.2.conv1.weight": 0.884910623298064,
+          "layers.2.conv2.weight": 0.9700543418357316,
+          "layers.3.conv1.weight": 1.0241035351568308,
+          "layers.3.conv2.weight": 0.9206996916436896
+        },
+        "rel_dist": 0.9266246997038629,
+        "step": 118,
+        "update_cosine": 0.22475098073482513
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6201313371529958,
+          "layers.1.conv2.weight": 0.7633203658628299,
+          "layers.2.conv1.weight": 0.8863869441921655,
+          "layers.2.conv2.weight": 0.9719668759240576,
+          "layers.3.conv1.weight": 1.0254578216359866,
+          "layers.3.conv2.weight": 0.9213877426944025
+        },
+        "rel_dist": 0.9278140297678322,
+        "step": 119,
+        "update_cosine": 0.23177708685398102
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6225479601419316,
+          "layers.1.conv2.weight": 0.7635244011941155,
+          "layers.2.conv1.weight": 0.8874961174956738,
+          "layers.2.conv2.weight": 0.9734632306576894,
+          "layers.3.conv1.weight": 1.027660698485554,
+          "layers.3.conv2.weight": 0.9234074988581918
+        },
+        "rel_dist": 0.9295156614464329,
+        "step": 120,
+        "update_cosine": 0.2433585673570633
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6236293442227572,
+          "layers.1.conv2.weight": 0.763855674418434,
+          "layers.2.conv1.weight": 0.8891752088686281,
+          "layers.2.conv2.weight": 0.9749821161966808,
+          "layers.3.conv1.weight": 1.0289228951523497,
+          "layers.3.conv2.weight": 0.9222232340760037
+        },
+        "rel_dist": 0.9302869916872775,
+        "step": 121,
+        "update_cosine": 0.24726438522338867
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.623323863622928,
+          "layers.1.conv2.weight": 0.7643232757963898,
+          "layers.2.conv1.weight": 0.889465067892216,
+          "layers.2.conv2.weight": 0.9768970791205965,
+          "layers.3.conv1.weight": 1.0301088363698216,
+          "layers.3.conv2.weight": 0.9230115391168353
+        },
+        "rel_dist": 0.9312328750730793,
+        "step": 122,
+        "update_cosine": 0.22675220668315887
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6250322696256061,
+          "layers.1.conv2.weight": 0.7650431165639097,
+          "layers.2.conv1.weight": 0.8912621850030858,
+          "layers.2.conv2.weight": 0.9788906011429414,
+          "layers.3.conv1.weight": 1.0313489618752834,
+          "layers.3.conv2.weight": 0.9223059587007522
+        },
+        "rel_dist": 0.9323512122301331,
+        "step": 123,
+        "update_cosine": 0.2282225638628006
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6244195652068443,
+          "layers.1.conv2.weight": 0.7660103404631637,
+          "layers.2.conv1.weight": 0.8927262040801643,
+          "layers.2.conv2.weight": 0.980313954493557,
+          "layers.3.conv1.weight": 1.0327261816183813,
+          "layers.3.conv2.weight": 0.9218567341891881
+        },
+        "rel_dist": 0.9332672124975688,
+        "step": 124,
+        "update_cosine": 0.21776948869228363
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6244335724085512,
+          "layers.1.conv2.weight": 0.7678503854963372,
+          "layers.2.conv1.weight": 0.8949829460862628,
+          "layers.2.conv2.weight": 0.982204367688818,
+          "layers.3.conv1.weight": 1.0347640672020197,
+          "layers.3.conv2.weight": 0.9234198156685299
+        },
+        "rel_dist": 0.9350800156789492,
+        "step": 125,
+        "update_cosine": 0.21848724782466888
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6249235107223174,
+          "layers.1.conv2.weight": 0.7686628527482372,
+          "layers.2.conv1.weight": 0.8958180238409568,
+          "layers.2.conv2.weight": 0.9835616807332634,
+          "layers.3.conv1.weight": 1.0365060634834413,
+          "layers.3.conv2.weight": 0.9232476547072102
+        },
+        "rel_dist": 0.9359930886800838,
+        "step": 126,
+        "update_cosine": 0.21632055938243866
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6250961509988214,
+          "layers.1.conv2.weight": 0.7701401982757948,
+          "layers.2.conv1.weight": 0.8974689792749967,
+          "layers.2.conv2.weight": 0.9847214097041253,
+          "layers.3.conv1.weight": 1.0372847937973704,
+          "layers.3.conv2.weight": 0.9232076505858755
+        },
+        "rel_dist": 0.9369105098331422,
+        "step": 127,
+        "update_cosine": 0.22982029616832733
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6257539311893293,
+          "layers.1.conv2.weight": 0.7710683021903398,
+          "layers.2.conv1.weight": 0.8990366995407079,
+          "layers.2.conv2.weight": 0.9860234157972582,
+          "layers.3.conv1.weight": 1.0390129997976731,
+          "layers.3.conv2.weight": 0.9224930876691421
+        },
+        "rel_dist": 0.9378909744470615,
+        "step": 128,
+        "update_cosine": 0.23099754750728607
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6264952984471711,
+          "layers.1.conv2.weight": 0.7723295984977779,
+          "layers.2.conv1.weight": 0.9004260518284205,
+          "layers.2.conv2.weight": 0.9871265514882945,
+          "layers.3.conv1.weight": 1.0395121028073309,
+          "layers.3.conv2.weight": 0.9241305612046632
+        },
+        "rel_dist": 0.9390859722797741,
+        "step": 129,
+        "update_cosine": 0.22543001174926758
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6254588391722475,
+          "layers.1.conv2.weight": 0.7729122913988389,
+          "layers.2.conv1.weight": 0.9012361375855515,
+          "layers.2.conv2.weight": 0.9884794253323043,
+          "layers.3.conv1.weight": 1.0406041962516237,
+          "layers.3.conv2.weight": 0.9232397544023735
+        },
+        "rel_dist": 0.9395247227034285,
+        "step": 130,
+        "update_cosine": 0.2206992208957672
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.627154669841637,
+          "layers.1.conv2.weight": 0.7737125859494965,
+          "layers.2.conv1.weight": 0.9027557768416888,
+          "layers.2.conv2.weight": 0.9894441444477152,
+          "layers.3.conv1.weight": 1.041384148625046,
+          "layers.3.conv2.weight": 0.92378261713842
+        },
+        "rel_dist": 0.9405152391431699,
+        "step": 131,
+        "update_cosine": 0.23524810373783112
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6262752726702373,
+          "layers.1.conv2.weight": 0.7734795233711519,
+          "layers.2.conv1.weight": 0.9032810947012281,
+          "layers.2.conv2.weight": 0.990933326642964,
+          "layers.3.conv1.weight": 1.0419029063274847,
+          "layers.3.conv2.weight": 0.9235081105213552
+        },
+        "rel_dist": 0.9409978164560063,
+        "step": 132,
+        "update_cosine": 0.22942990064620972
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6283761581273444,
+          "layers.1.conv2.weight": 0.7738501669627403,
+          "layers.2.conv1.weight": 0.9043815902371881,
+          "layers.2.conv2.weight": 0.9917127758178316,
+          "layers.3.conv1.weight": 1.0435653229526005,
+          "layers.3.conv2.weight": 0.9238574135436466
+        },
+        "rel_dist": 0.9420194365197186,
+        "step": 133,
+        "update_cosine": 0.2202591896057129
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6283474938569261,
+          "layers.1.conv2.weight": 0.7739989446210319,
+          "layers.2.conv1.weight": 0.9047831956937212,
+          "layers.2.conv2.weight": 0.9933557754159131,
+          "layers.3.conv1.weight": 1.0441649838794447,
+          "layers.3.conv2.weight": 0.923087955348088
+        },
+        "rel_dist": 0.9424490681717231,
+        "step": 134,
+        "update_cosine": 0.21955083310604095
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6303263338786386,
+          "layers.1.conv2.weight": 0.7734107999699504,
+          "layers.2.conv1.weight": 0.9052737811323547,
+          "layers.2.conv2.weight": 0.9938182655826879,
+          "layers.3.conv1.weight": 1.044918261624584,
+          "layers.3.conv2.weight": 0.9242344725697001
+        },
+        "rel_dist": 0.9432063901212482,
+        "step": 135,
+        "update_cosine": 0.2255977839231491
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6296364347827427,
+          "layers.1.conv2.weight": 0.7729442322140799,
+          "layers.2.conv1.weight": 0.9061127969467141,
+          "layers.2.conv2.weight": 0.9949108769578437,
+          "layers.3.conv1.weight": 1.0455053086961108,
+          "layers.3.conv2.weight": 0.9225854679794181
+        },
+        "rel_dist": 0.9433159011858105,
+        "step": 136,
+        "update_cosine": 0.22400705516338348
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6292908334798023,
+          "layers.1.conv2.weight": 0.772058781715304,
+          "layers.2.conv1.weight": 0.9075304271095281,
+          "layers.2.conv2.weight": 0.9950887266520029,
+          "layers.3.conv1.weight": 1.046502620937263,
+          "layers.3.conv2.weight": 0.9239250018569536
+        },
+        "rel_dist": 0.9441588699913604,
+        "step": 137,
+        "update_cosine": 0.21301671862602234
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6294439988595237,
+          "layers.1.conv2.weight": 0.7735017339365777,
+          "layers.2.conv1.weight": 0.9090593739265428,
+          "layers.2.conv2.weight": 0.9960252505136761,
+          "layers.3.conv1.weight": 1.0472207153872306,
+          "layers.3.conv2.weight": 0.9230412944864519
+        },
+        "rel_dist": 0.9447427944434655,
+        "step": 138,
+        "update_cosine": 0.20309782028198242
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.629714134761225,
+          "layers.1.conv2.weight": 0.7745576022579642,
+          "layers.2.conv1.weight": 0.9098398595729984,
+          "layers.2.conv2.weight": 0.9975913536770182,
+          "layers.3.conv1.weight": 1.0479287717476595,
+          "layers.3.conv2.weight": 0.9239242044151716
+        },
+        "rel_dist": 0.9457100640992337,
+        "step": 139,
+        "update_cosine": 0.2223304957151413
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6290624439523413,
+          "layers.1.conv2.weight": 0.7739199157069864,
+          "layers.2.conv1.weight": 0.9105403553394675,
+          "layers.2.conv2.weight": 0.9985707523813679,
+          "layers.3.conv1.weight": 1.0483819924806683,
+          "layers.3.conv2.weight": 0.9233147542871184
+        },
+        "rel_dist": 0.9459683045783017,
+        "step": 140,
+        "update_cosine": 0.20779867470264435
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6304630053388927,
+          "layers.1.conv2.weight": 0.7739781662438135,
+          "layers.2.conv1.weight": 0.9114218523216783,
+          "layers.2.conv2.weight": 0.9993951866821531,
+          "layers.3.conv1.weight": 1.048892517960466,
+          "layers.3.conv2.weight": 0.9241838127283687
+        },
+        "rel_dist": 0.9467235677443085,
+        "step": 141,
+        "update_cosine": 0.21715928614139557
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6309168437930455,
+          "layers.1.conv2.weight": 0.7738012073499904,
+          "layers.2.conv1.weight": 0.9117802412448387,
+          "layers.2.conv2.weight": 0.9993589997408495,
+          "layers.3.conv1.weight": 1.0490079798918257,
+          "layers.3.conv2.weight": 0.9238411123533364
+        },
+        "rel_dist": 0.9467567610078791,
+        "step": 142,
+        "update_cosine": 0.21448341012001038
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6294883239218985,
+          "layers.1.conv2.weight": 0.7740697364439043,
+          "layers.2.conv1.weight": 0.91238730786516,
+          "layers.2.conv2.weight": 1.0006742508521536,
+          "layers.3.conv1.weight": 1.0492852157278392,
+          "layers.3.conv2.weight": 0.9242946840726602
+        },
+        "rel_dist": 0.9473274561954516,
+        "step": 143,
+        "update_cosine": 0.21264974772930145
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.629379188316321,
+          "layers.1.conv2.weight": 0.7729866463675473,
+          "layers.2.conv1.weight": 0.9136886221771088,
+          "layers.2.conv2.weight": 1.0007620357963558,
+          "layers.3.conv1.weight": 1.0498435372230128,
+          "layers.3.conv2.weight": 0.923417539720698
+        },
+        "rel_dist": 0.9475335802550608,
+        "step": 144,
+        "update_cosine": 0.20834383368492126
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6308753995702329,
+          "layers.1.conv2.weight": 0.7738484575730106,
+          "layers.2.conv1.weight": 0.9136147464137403,
+          "layers.2.conv2.weight": 1.0017040490093896,
+          "layers.3.conv1.weight": 1.0502004016696718,
+          "layers.3.conv2.weight": 0.9233030078412503
+        },
+        "rel_dist": 0.9478398187507638,
+        "step": 145,
+        "update_cosine": 0.21463434398174286
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6313522685765277,
+          "layers.1.conv2.weight": 0.7731404676022766,
+          "layers.2.conv1.weight": 0.9140604274852001,
+          "layers.2.conv2.weight": 1.0023791970331661,
+          "layers.3.conv1.weight": 1.05076435190977,
+          "layers.3.conv2.weight": 0.9230297914978798
+        },
+        "rel_dist": 0.948148289497536,
+        "step": 146,
+        "update_cosine": 0.20377005636692047
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6298735581199544,
+          "layers.1.conv2.weight": 0.7738533920934207,
+          "layers.2.conv1.weight": 0.9148127337953117,
+          "layers.2.conv2.weight": 1.002802189427863,
+          "layers.3.conv1.weight": 1.0503971427920824,
+          "layers.3.conv2.weight": 0.9222402308551594
+        },
+        "rel_dist": 0.9482546903909269,
+        "step": 147,
+        "update_cosine": 0.20654627680778503
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.629292956158428,
+          "layers.1.conv2.weight": 0.7735063312994928,
+          "layers.2.conv1.weight": 0.915179845024216,
+          "layers.2.conv2.weight": 1.0030650633784122,
+          "layers.3.conv1.weight": 1.0512735794271215,
+          "layers.3.conv2.weight": 0.921340679828014
+        },
+        "rel_dist": 0.9483304523615091,
+        "step": 148,
+        "update_cosine": 0.20508845150470734
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6289489800071457,
+          "layers.1.conv2.weight": 0.7738800265639981,
+          "layers.2.conv1.weight": 0.9163039922253405,
+          "layers.2.conv2.weight": 1.0038650771246647,
+          "layers.3.conv1.weight": 1.0518197026620248,
+          "layers.3.conv2.weight": 0.9205475478202114
+        },
+        "rel_dist": 0.9486812865334281,
+        "step": 149,
+        "update_cosine": 0.19503715634346008
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6284414349775571,
+          "layers.1.conv2.weight": 0.773618077684146,
+          "layers.2.conv1.weight": 0.9158215617339591,
+          "layers.2.conv2.weight": 1.003727647556128,
+          "layers.3.conv1.weight": 1.051571018874446,
+          "layers.3.conv2.weight": 0.9210041295494719
+        },
+        "rel_dist": 0.9486077577720903,
+        "step": 150,
+        "update_cosine": 0.21069541573524475
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6278888920551016,
+          "layers.1.conv2.weight": 0.7735417667296861,
+          "layers.2.conv1.weight": 0.9169350545181458,
+          "layers.2.conv2.weight": 1.0044660332646977,
+          "layers.3.conv1.weight": 1.0518328388159777,
+          "layers.3.conv2.weight": 0.9197303069095488
+        },
+        "rel_dist": 0.9487663901700671,
+        "step": 151,
+        "update_cosine": 0.19769816100597382
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6294775692259083,
+          "layers.1.conv2.weight": 0.7729599884454141,
+          "layers.2.conv1.weight": 0.9177204774849264,
+          "layers.2.conv2.weight": 1.0053647976965343,
+          "layers.3.conv1.weight": 1.0530816299070358,
+          "layers.3.conv2.weight": 0.9202864663838938
+        },
+        "rel_dist": 0.949611886100423,
+        "step": 152,
+        "update_cosine": 0.19757859408855438
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6290170483948684,
+          "layers.1.conv2.weight": 0.7729817771162377,
+          "layers.2.conv1.weight": 0.9178993218169091,
+          "layers.2.conv2.weight": 1.0055802147412385,
+          "layers.3.conv1.weight": 1.053511851475022,
+          "layers.3.conv2.weight": 0.9191457602823433
+        },
+        "rel_dist": 0.9495467103233126,
+        "step": 153,
+        "update_cosine": 0.20731984078884125
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6301703728575281,
+          "layers.1.conv2.weight": 0.7729054370842782,
+          "layers.2.conv1.weight": 0.9183909382947747,
+          "layers.2.conv2.weight": 1.0061843890391384,
+          "layers.3.conv1.weight": 1.053842318457805,
+          "layers.3.conv2.weight": 0.9195794911996974
+        },
+        "rel_dist": 0.9499954774464208,
+        "step": 154,
+        "update_cosine": 0.19987578690052032
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.630763492907618,
+          "layers.1.conv2.weight": 0.7725158904651503,
+          "layers.2.conv1.weight": 0.9187185708408702,
+          "layers.2.conv2.weight": 1.006784653200203,
+          "layers.3.conv1.weight": 1.0540799068169797,
+          "layers.3.conv2.weight": 0.9181859927643526
+        },
+        "rel_dist": 0.9499547449147091,
+        "step": 155,
+        "update_cosine": 0.1996607482433319
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6304303154654186,
+          "layers.1.conv2.weight": 0.7722190883564725,
+          "layers.2.conv1.weight": 0.9192749146174924,
+          "layers.2.conv2.weight": 1.007056163703283,
+          "layers.3.conv1.weight": 1.054384850039009,
+          "layers.3.conv2.weight": 0.9186586188253905
+        },
+        "rel_dist": 0.9503066552848499,
+        "step": 156,
+        "update_cosine": 0.1976369470357895
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6320325531601639,
+          "layers.1.conv2.weight": 0.7716868629382773,
+          "layers.2.conv1.weight": 0.9192839659473323,
+          "layers.2.conv2.weight": 1.0074996900218387,
+          "layers.3.conv1.weight": 1.054669742061357,
+          "layers.3.conv2.weight": 0.91699061973833
+        },
+        "rel_dist": 0.9501532673714578,
+        "step": 157,
+        "update_cosine": 0.20398519933223724
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6318994775981895,
+          "layers.1.conv2.weight": 0.7720898636518027,
+          "layers.2.conv1.weight": 0.9198071169222939,
+          "layers.2.conv2.weight": 1.0079482841533276,
+          "layers.3.conv1.weight": 1.0550052845119164,
+          "layers.3.conv2.weight": 0.916711094141045
+        },
+        "rel_dist": 0.9503656784452947,
+        "step": 158,
+        "update_cosine": 0.2029361128807068
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.632935417867761,
+          "layers.1.conv2.weight": 0.7711690986728799,
+          "layers.2.conv1.weight": 0.9199301087230674,
+          "layers.2.conv2.weight": 1.008152771655963,
+          "layers.3.conv1.weight": 1.0552577602945825,
+          "layers.3.conv2.weight": 0.9158454204630553
+        },
+        "rel_dist": 0.9503500860191203,
+        "step": 159,
+        "update_cosine": 0.19484376907348633
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6325905380908818,
+          "layers.1.conv2.weight": 0.7716020655076993,
+          "layers.2.conv1.weight": 0.9200437169109256,
+          "layers.2.conv2.weight": 1.0083509095773109,
+          "layers.3.conv1.weight": 1.0552948672387925,
+          "layers.3.conv2.weight": 0.9149900456296013
+        },
+        "rel_dist": 0.9502549320973378,
+        "step": 160,
+        "update_cosine": 0.20124538242816925
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6310754009188875,
+          "layers.1.conv2.weight": 0.7707148701914261,
+          "layers.2.conv1.weight": 0.9203268630533749,
+          "layers.2.conv2.weight": 1.0085687467793367,
+          "layers.3.conv1.weight": 1.0554448587266494,
+          "layers.3.conv2.weight": 0.914300237469781
+        },
+        "rel_dist": 0.950150592925741,
+        "step": 161,
+        "update_cosine": 0.20204633474349976
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6311307218317704,
+          "layers.1.conv2.weight": 0.7702472450987624,
+          "layers.2.conv1.weight": 0.9203262173668129,
+          "layers.2.conv2.weight": 1.008890376747309,
+          "layers.3.conv1.weight": 1.055284300203592,
+          "layers.3.conv2.weight": 0.9138274864561339
+        },
+        "rel_dist": 0.950065352837405,
+        "step": 162,
+        "update_cosine": 0.18017862737178802
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6312679982946229,
+          "layers.1.conv2.weight": 0.7705178055319116,
+          "layers.2.conv1.weight": 0.9207043612419871,
+          "layers.2.conv2.weight": 1.0091308412960136,
+          "layers.3.conv1.weight": 1.0558618545439666,
+          "layers.3.conv2.weight": 0.9130431624236465
+        },
+        "rel_dist": 0.9501879674601625,
+        "step": 163,
+        "update_cosine": 0.19602280855178833
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6313983056594856,
+          "layers.1.conv2.weight": 0.7707541444652364,
+          "layers.2.conv1.weight": 0.921215360832336,
+          "layers.2.conv2.weight": 1.0088436137539747,
+          "layers.3.conv1.weight": 1.0556363628148575,
+          "layers.3.conv2.weight": 0.912842342245316
+        },
+        "rel_dist": 0.9501716494982406,
+        "step": 164,
+        "update_cosine": 0.19377411901950836
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6312919718039637,
+          "layers.1.conv2.weight": 0.7696294625822959,
+          "layers.2.conv1.weight": 0.9213763954566442,
+          "layers.2.conv2.weight": 1.0095215609498487,
+          "layers.3.conv1.weight": 1.0563079468169405,
+          "layers.3.conv2.weight": 0.9127548726927736
+        },
+        "rel_dist": 0.9504166620448248,
+        "step": 165,
+        "update_cosine": 0.1978984922170639
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.63097250040178,
+          "layers.1.conv2.weight": 0.7690552378142784,
+          "layers.2.conv1.weight": 0.9215671695368514,
+          "layers.2.conv2.weight": 1.0097496403192516,
+          "layers.3.conv1.weight": 1.0564177341233274,
+          "layers.3.conv2.weight": 0.9125382013505949
+        },
+        "rel_dist": 0.9504659670104513,
+        "step": 166,
+        "update_cosine": 0.19913356006145477
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6306292698962119,
+          "layers.1.conv2.weight": 0.7689646369054431,
+          "layers.2.conv1.weight": 0.9211219879070164,
+          "layers.2.conv2.weight": 1.009967122990294,
+          "layers.3.conv1.weight": 1.0564950299100224,
+          "layers.3.conv2.weight": 0.911413046132195
+        },
+        "rel_dist": 0.9501458373332342,
+        "step": 167,
+        "update_cosine": 0.1946755200624466
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6309851733417343,
+          "layers.1.conv2.weight": 0.7686256413159998,
+          "layers.2.conv1.weight": 0.9212849076181235,
+          "layers.2.conv2.weight": 1.0100091855998168,
+          "layers.3.conv1.weight": 1.0565373400693556,
+          "layers.3.conv2.weight": 0.9111827237262327
+        },
+        "rel_dist": 0.9501559757233807,
+        "step": 168,
+        "update_cosine": 0.19944694638252258
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6305981493296565,
+          "layers.1.conv2.weight": 0.7689889442849932,
+          "layers.2.conv1.weight": 0.9215885509344848,
+          "layers.2.conv2.weight": 1.0101306372262233,
+          "layers.3.conv1.weight": 1.0564966512646823,
+          "layers.3.conv2.weight": 0.9106881915713659
+        },
+        "rel_dist": 0.950130308944834,
+        "step": 169,
+        "update_cosine": 0.18905450403690338
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6300184383751344,
+          "layers.1.conv2.weight": 0.7690422001191002,
+          "layers.2.conv1.weight": 0.9211986044872224,
+          "layers.2.conv2.weight": 1.0106480650776208,
+          "layers.3.conv1.weight": 1.0566070157380043,
+          "layers.3.conv2.weight": 0.9107360276513015
+        },
+        "rel_dist": 0.9501634434871222,
+        "step": 170,
+        "update_cosine": 0.19189487397670746
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6302791339490391,
+          "layers.1.conv2.weight": 0.7693189341110155,
+          "layers.2.conv1.weight": 0.9217878325778142,
+          "layers.2.conv2.weight": 1.010266913577074,
+          "layers.3.conv1.weight": 1.0561527729960583,
+          "layers.3.conv2.weight": 0.9102326748338953
+        },
+        "rel_dist": 0.9501024895928762,
+        "step": 171,
+        "update_cosine": 0.19250881671905518
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6302311361280516,
+          "layers.1.conv2.weight": 0.7688302261445381,
+          "layers.2.conv1.weight": 0.9219097353848263,
+          "layers.2.conv2.weight": 1.0102935654828953,
+          "layers.3.conv1.weight": 1.0567374940654333,
+          "layers.3.conv2.weight": 0.9091024677491779
+        },
+        "rel_dist": 0.9499612009909101,
+        "step": 172,
+        "update_cosine": 0.1936095803976059
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6304763986841462,
+          "layers.1.conv2.weight": 0.7686177396335918,
+          "layers.2.conv1.weight": 0.9215217911171913,
+          "layers.2.conv2.weight": 1.010315810817661,
+          "layers.3.conv1.weight": 1.0562137228293218,
+          "layers.3.conv2.weight": 0.908554062394315
+        },
+        "rel_dist": 0.9496586310883725,
+        "step": 173,
+        "update_cosine": 0.18995946645736694
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6306212224016065,
+          "layers.1.conv2.weight": 0.768419544891331,
+          "layers.2.conv1.weight": 0.9219220219262992,
+          "layers.2.conv2.weight": 1.0103081502649283,
+          "layers.3.conv1.weight": 1.0562010438892395,
+          "layers.3.conv2.weight": 0.9081851518097455
+        },
+        "rel_dist": 0.9496671558968331,
+        "step": 174,
+        "update_cosine": 0.19022634625434875
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6301366169108384,
+          "layers.1.conv2.weight": 0.768688084374869,
+          "layers.2.conv1.weight": 0.9218790004890687,
+          "layers.2.conv2.weight": 1.0102515964405805,
+          "layers.3.conv1.weight": 1.0566792008191352,
+          "layers.3.conv2.weight": 0.9074880664276775
+        },
+        "rel_dist": 0.9495792120107138,
+        "step": 175,
+        "update_cosine": 0.18859724700450897
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6296076823030723,
+          "layers.1.conv2.weight": 0.7687399996021579,
+          "layers.2.conv1.weight": 0.9220072531223427,
+          "layers.2.conv2.weight": 1.0102820834674737,
+          "layers.3.conv1.weight": 1.0561882263724751,
+          "layers.3.conv2.weight": 0.9074783255163846
+        },
+        "rel_dist": 0.9494643488307665,
+        "step": 176,
+        "update_cosine": 0.18271401524543762
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6298101420586033,
+          "layers.1.conv2.weight": 0.7682541178073714,
+          "layers.2.conv1.weight": 0.9220698613802888,
+          "layers.2.conv2.weight": 1.0103666913291374,
+          "layers.3.conv1.weight": 1.0562807129512652,
+          "layers.3.conv2.weight": 0.906261910177056
+        },
+        "rel_dist": 0.9492930767481169,
+        "step": 177,
+        "update_cosine": 0.19857290387153625
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6292119490983826,
+          "layers.1.conv2.weight": 0.7678952917968308,
+          "layers.2.conv1.weight": 0.922077402270357,
+          "layers.2.conv2.weight": 1.010455853499486,
+          "layers.3.conv1.weight": 1.056402592391111,
+          "layers.3.conv2.weight": 0.9062604366987455
+        },
+        "rel_dist": 0.9492939769122251,
+        "step": 178,
+        "update_cosine": 0.18430235981941223
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6295400130470267,
+          "layers.1.conv2.weight": 0.7675251632449546,
+          "layers.2.conv1.weight": 0.9220441536034468,
+          "layers.2.conv2.weight": 1.0101221950423753,
+          "layers.3.conv1.weight": 1.0563975412359048,
+          "layers.3.conv2.weight": 0.9052342808208605
+        },
+        "rel_dist": 0.949028881335166,
+        "step": 179,
+        "update_cosine": 0.1899941861629486
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6290395690078073,
+          "layers.1.conv2.weight": 0.7677274881974042,
+          "layers.2.conv1.weight": 0.9215543961611298,
+          "layers.2.conv2.weight": 1.0107132266645127,
+          "layers.3.conv1.weight": 1.056511669780323,
+          "layers.3.conv2.weight": 0.905152761168669
+        },
+        "rel_dist": 0.9490085939289977,
+        "step": 180,
+        "update_cosine": 0.18824608623981476
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6289144625993719,
+          "layers.1.conv2.weight": 0.766974586247325,
+          "layers.2.conv1.weight": 0.9215611266599179,
+          "layers.2.conv2.weight": 1.0108389534652364,
+          "layers.3.conv1.weight": 1.0565424861885824,
+          "layers.3.conv2.weight": 0.9042300733281652
+        },
+        "rel_dist": 0.9487929229519103,
+        "step": 181,
+        "update_cosine": 0.18366660177707672
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6280287684335877,
+          "layers.1.conv2.weight": 0.7668191314296359,
+          "layers.2.conv1.weight": 0.92212671145846,
+          "layers.2.conv2.weight": 1.0108483342317904,
+          "layers.3.conv1.weight": 1.0564807945282417,
+          "layers.3.conv2.weight": 0.9040554776380085
+        },
+        "rel_dist": 0.9488115148725617,
+        "step": 182,
+        "update_cosine": 0.17748068273067474
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6281418378147615,
+          "layers.1.conv2.weight": 0.7670872811869514,
+          "layers.2.conv1.weight": 0.9222702512634691,
+          "layers.2.conv2.weight": 1.0104420942630818,
+          "layers.3.conv1.weight": 1.0569485356605053,
+          "layers.3.conv2.weight": 0.9031250551134037
+        },
+        "rel_dist": 0.9486943877666115,
+        "step": 183,
+        "update_cosine": 0.1820949763059616
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6276994462570451,
+          "layers.1.conv2.weight": 0.7666046315652079,
+          "layers.2.conv1.weight": 0.922230584661597,
+          "layers.2.conv2.weight": 1.0109655559166046,
+          "layers.3.conv1.weight": 1.0564456432110627,
+          "layers.3.conv2.weight": 0.902646884234805
+        },
+        "rel_dist": 0.948565300549675,
+        "step": 184,
+        "update_cosine": 0.17505471408367157
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6272664816018912,
+          "layers.1.conv2.weight": 0.7665427329038779,
+          "layers.2.conv1.weight": 0.9222671150251754,
+          "layers.2.conv2.weight": 1.0110015371599481,
+          "layers.3.conv1.weight": 1.056888173695657,
+          "layers.3.conv2.weight": 0.9021536716468568
+        },
+        "rel_dist": 0.9485358231456114,
+        "step": 185,
+        "update_cosine": 0.17971456050872803
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.627387891791565,
+          "layers.1.conv2.weight": 0.7664931131942879,
+          "layers.2.conv1.weight": 0.9222590261162932,
+          "layers.2.conv2.weight": 1.0105066210388018,
+          "layers.3.conv1.weight": 1.056312695344051,
+          "layers.3.conv2.weight": 0.901768728009774
+        },
+        "rel_dist": 0.9482450577021488,
+        "step": 186,
+        "update_cosine": 0.18636515736579895
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.626534102298618,
+          "layers.1.conv2.weight": 0.7662726335670919,
+          "layers.2.conv1.weight": 0.9217394256390953,
+          "layers.2.conv2.weight": 1.0110118296790296,
+          "layers.3.conv1.weight": 1.0567279439503985,
+          "layers.3.conv2.weight": 0.9012021439300069
+        },
+        "rel_dist": 0.9481271311303248,
+        "step": 187,
+        "update_cosine": 0.17977862060070038
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6266129581100195,
+          "layers.1.conv2.weight": 0.7657900837666372,
+          "layers.2.conv1.weight": 0.9221636611943049,
+          "layers.2.conv2.weight": 1.010539578333482,
+          "layers.3.conv1.weight": 1.0561948895646454,
+          "layers.3.conv2.weight": 0.9006790455126882
+        },
+        "rel_dist": 0.9478977930676927,
+        "step": 188,
+        "update_cosine": 0.1902385652065277
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.626404351101898,
+          "layers.1.conv2.weight": 0.7659693376462122,
+          "layers.2.conv1.weight": 0.9217067670265964,
+          "layers.2.conv2.weight": 1.0110070357259362,
+          "layers.3.conv1.weight": 1.0562147722515716,
+          "layers.3.conv2.weight": 0.9003482705732285
+        },
+        "rel_dist": 0.9478504194165444,
+        "step": 189,
+        "update_cosine": 0.18557626008987427
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6256458915507401,
+          "layers.1.conv2.weight": 0.7657039951723198,
+          "layers.2.conv1.weight": 0.9216722902623561,
+          "layers.2.conv2.weight": 1.010976853715784,
+          "layers.3.conv1.weight": 1.0566523594405488,
+          "layers.3.conv2.weight": 0.9005005423913301
+        },
+        "rel_dist": 0.9478900943476141,
+        "step": 190,
+        "update_cosine": 0.1861923784017563
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6255966946700899,
+          "layers.1.conv2.weight": 0.7655073173207931,
+          "layers.2.conv1.weight": 0.9220599902128321,
+          "layers.2.conv2.weight": 1.0109290835859146,
+          "layers.3.conv1.weight": 1.0560631591067264,
+          "layers.3.conv2.weight": 0.8997735019985749
+        },
+        "rel_dist": 0.947668986016289,
+        "step": 191,
+        "update_cosine": 0.18255510926246643
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6253628046763677,
+          "layers.1.conv2.weight": 0.7649868988162591,
+          "layers.2.conv1.weight": 0.9220139719980782,
+          "layers.2.conv2.weight": 1.010911608153892,
+          "layers.3.conv1.weight": 1.055983790562474,
+          "layers.3.conv2.weight": 0.8999177358365512
+        },
+        "rel_dist": 0.9476349044426197,
+        "step": 192,
+        "update_cosine": 0.17766207456588745
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6246393762462042,
+          "layers.1.conv2.weight": 0.7652858678923494,
+          "layers.2.conv1.weight": 0.9215113954608825,
+          "layers.2.conv2.weight": 1.010868372070683,
+          "layers.3.conv1.weight": 1.0559343789717575,
+          "layers.3.conv2.weight": 0.8991471329114056
+        },
+        "rel_dist": 0.9473548616511115,
+        "step": 193,
+        "update_cosine": 0.1837294101715088
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6248210412050578,
+          "layers.1.conv2.weight": 0.7651628655292143,
+          "layers.2.conv1.weight": 0.9214139940509865,
+          "layers.2.conv2.weight": 1.0108417887026795,
+          "layers.3.conv1.weight": 1.0558842947221327,
+          "layers.3.conv2.weight": 0.8992862103290532
+        },
+        "rel_dist": 0.9473446902824103,
+        "step": 194,
+        "update_cosine": 0.18286141753196716
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6244060881482604,
+          "layers.1.conv2.weight": 0.7650355300083628,
+          "layers.2.conv1.weight": 0.9214023102986518,
+          "layers.2.conv2.weight": 1.0103414534871114,
+          "layers.3.conv1.weight": 1.0563446574456423,
+          "layers.3.conv2.weight": 0.8986744690698529
+        },
+        "rel_dist": 0.9471217005690356,
+        "step": 195,
+        "update_cosine": 0.18325531482696533
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6249067675281668,
+          "layers.1.conv2.weight": 0.764953559316135,
+          "layers.2.conv1.weight": 0.9217921266405317,
+          "layers.2.conv2.weight": 1.0103263144927022,
+          "layers.3.conv1.weight": 1.0558224289701943,
+          "layers.3.conv2.weight": 0.8988721904486374
+        },
+        "rel_dist": 0.9472401488398974,
+        "step": 196,
+        "update_cosine": 0.191924586892128
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6241082468558788,
+          "layers.1.conv2.weight": 0.7648669313458951,
+          "layers.2.conv1.weight": 0.9217638626025619,
+          "layers.2.conv2.weight": 1.0107622585801566,
+          "layers.3.conv1.weight": 1.055770716215517,
+          "layers.3.conv2.weight": 0.8982304280302336
+        },
+        "rel_dist": 0.9470363147471932,
+        "step": 197,
+        "update_cosine": 0.17932790517807007
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6243461269736623,
+          "layers.1.conv2.weight": 0.7647699941121925,
+          "layers.2.conv1.weight": 0.9217339792986897,
+          "layers.2.conv2.weight": 1.0102776994507339,
+          "layers.3.conv1.weight": 1.0557535875976602,
+          "layers.3.conv2.weight": 0.898101133088103
+        },
+        "rel_dist": 0.9469924257004162,
+        "step": 198,
+        "update_cosine": 0.1797962337732315
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6240219147325735,
+          "layers.1.conv2.weight": 0.7647328816006079,
+          "layers.2.conv1.weight": 0.921718878204448,
+          "layers.2.conv2.weight": 1.0107395091910276,
+          "layers.3.conv1.weight": 1.0557244452117875,
+          "layers.3.conv2.weight": 0.8980074062987382
+        },
+        "rel_dist": 0.946955684502266,
+        "step": 199,
+        "update_cosine": 0.17943838238716125
+      },
+      {
+        "per_matrix_rel_dist": {
+          "layers.1.conv1.weight": 0.6242834482049809,
+          "layers.1.conv2.weight": 0.7647212854809863,
+          "layers.2.conv1.weight": 0.9217046571320214,
+          "layers.2.conv2.weight": 1.0107312025696842,
+          "layers.3.conv1.weight": 1.0562112424631147,
+          "layers.3.conv2.weight": 0.8979595338794454
+        },
+        "rel_dist": 0.9470984286329239,
+        "step": 200,
+        "update_cosine": 0.1790643185377121
+      }
+    ],
+    "final": {
+      "max_rel_dist": 0.9504659670104513,
+      "rel_dist": 0.9470984286329239,
+      "twin_a": {
+        "tta_val_acc": 0.9371999502182007
+      },
+      "twin_b": {
+        "tta_val_acc": 0.9364999532699585
+      }
+    },
+    "harness": "airbench",
+    "prediction": "Output-mode relative divergence stays small (same order as the goscconst-output arm's known behavioral equivalence, i.e. well below 1e-2 by the end of the 200-step run) while state-mode divergence grows with step count and ends at least 10x the output-mode divergence at matched gain. If instead both are small or both are large, the compounding explanation of the Gate-2 null is wrong and must be reported as refuted.",
+    "steps": 200,
+    "twin_a": {
+      "lr": 0.24,
+      "momentum": 0.6,
+      "name": "muon",
+      "nesterov": true,
+      "ns_steps": 3
+    },
+    "twin_b": {
+      "align_min": 0.3,
+      "beta": 0.99,
+      "enable_noise_channel": false,
+      "enable_oscillation_channel": true,
+      "g_noise": 0.25,
+      "g_osc_const": 0.5,
+      "k": 16,
+      "lr": 0.24,
+      "momentum": 0.6,
+      "n_min": 25,
+      "name": "routed",
+      "nesterov": true,
+      "ns_steps": 3,
+      "rho_osc": 0.5,
+      "seed": 2600,
+      "state_damping": true,
+      "t_refresh": 50,
+      "tau_noise": 2.0,
+      "tau_sig": 4.0,
+      "weight_decay": 0.0
+    }
+  },
+  "schema_version": 1,
+  "seed": 1603,
+  "started_at": "2026-07-20T08:14:05.636451+00:00",
+  "wall_time_s": 21.374351152999964
+}
