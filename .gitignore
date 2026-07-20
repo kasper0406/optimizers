@@ -11,6 +11,9 @@ __pycache__/
 # macOS
 .DS_Store
 
-# NOTE: results/ and uv.lock are intentionally NOT ignored.
+# NOTE: results/ summary JSONs and uv.lock are intentionally NOT ignored.
 # results/ is append-only synced data; uv.lock is the dependency pin.
+# Large per-direction instrumentation logs (6-8 MB each) are kept on disk
+# and synced from cloud, but are NOT versioned in git (too big for history).
+results/*.instrumentation.json
 sweeps/
