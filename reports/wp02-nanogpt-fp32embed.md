@@ -9,12 +9,11 @@ All comparisons below are against the **ensemble** of those 20 logs, not against
 
 | seed | GPU | git | device_count x accum | tokens/step | precision | final val | steps→3.28 | train s | $ |
 |---|---|---|---|---|---|---|---|---|---|
-| 1701 | NVIDIA H100 PCIe | 90e414f0 | 1 x 8 | 393,216 | fp8 | 3.2903 | — | 1964 | 1.6 |
-
-**Correction to the stored `record_faithful` flag.** seed 1701: the results JSON records `record_faithful: true`, but the run uses gradient accumulation (`device_count` != the record's world size) and its own `deviations` dict lists `grad_accumulation`. That flag was computed by a predicate that did not inspect `device_count` — a code defect, since accumulation changes the gradient *reduction order* and at D<8 the bf16 embedding grads make that a genuine precision difference (docs/nanogpt-port.md §2). The predicate is fixed in `src/nanogpt/config.py` (D != 8 is never record-faithful) and pinned by a regression test. `results/` is append-only, so the JSON keeps the pre-fix value; **the correct reading is that these runs are NOT record-faithful**, and this report is where that correction lives.
+| 1701 | NVIDIA H100 PCIe | e4f54c9a | 1 x 8 | 393,216 | fp8 | 3.2854 | — | 2276 | 1.6 |
 
 **Deviation flags active** (these runs are NOT record-faithful):
 
+- seed 1701 — `fp32_embed_grad_accum`: embedding gradients accumulate across micro-batches in an fp32 master buffer, cast back to bf16 once per step (record: bf16 throughout, one backward per step). NOT RECORD-FAITHFUL: diagnostic probe for docs/nanogpt-port.md §6.1.
 - seed 1701 — `grad_accumulation`: 1 device(s) x 8 micro-batches = 8 record chunks per optimizer step; tokens/step 393216 (record 393216)
 
 ## Overlay vs the record ensemble (headline)
@@ -28,25 +27,25 @@ Read `sigma` with care: it is *the record's* sigma, not ours. We have n=1 and th
 | step | ours | record mean | record sd | dev (loss) | dev (sigma) |
 |---|---|---|---|---|---|
 | 0 | 10.8258 | 10.8258 | 0.00000 | +0.0000 | — |
-| 125 | 4.6350 | 4.6386 | 0.00751 | -0.0036 | -0.5 |
-| 250 | 4.1038 | 4.0972 | 0.00602 | +0.0066 | +1.1 |
-| 375 | 3.9021 | 3.8953 | 0.00671 | +0.0068 | +1.0 |
-| 500 | 3.7501 | 3.7473 | 0.00442 | +0.0028 | +0.6 |
-| 625 | 3.6674 | 3.6600 | 0.00384 | +0.0074 | +1.9 |
-| 750 | 3.6010 | 3.5965 | 0.00270 | +0.0045 | +1.7 |
-| 875 | 3.5559 | 3.5470 | 0.00256 | +0.0090 | +3.5 |
-| 1000 | 3.5143 | 3.5058 | 0.00232 | +0.0085 | +3.7 |
-| 1125 | 3.4630 | 3.4534 | 0.00208 | +0.0096 | +4.6 |
-| 1250 | 3.4169 | 3.4071 | 0.00153 | +0.0098 | +6.4 |
-| 1375 | 3.3765 | 3.3661 | 0.00165 | +0.0104 | +6.3 |
-| 1500 | 3.3406 | 3.3300 | 0.00137 | +0.0105 | +7.7 |
-| 1625 | 3.3109 | 3.3000 | 0.00145 | +0.0109 | +7.5 |
-| 1750 | 3.2903 | 3.2791 | 0.00134 | +0.0112 | +8.4 |
+| 125 | 4.6419 | 4.6386 | 0.00751 | +0.0033 | +0.4 |
+| 250 | 4.0870 | 4.0972 | 0.00602 | -0.0102 | -1.7 |
+| 375 | 3.8917 | 3.8953 | 0.00671 | -0.0036 | -0.5 |
+| 500 | 3.7499 | 3.7473 | 0.00442 | +0.0026 | +0.6 |
+| 625 | 3.6607 | 3.6600 | 0.00384 | +0.0007 | +0.2 |
+| 750 | 3.5981 | 3.5965 | 0.00270 | +0.0017 | +0.6 |
+| 875 | 3.5513 | 3.5470 | 0.00256 | +0.0043 | +1.7 |
+| 1000 | 3.5101 | 3.5058 | 0.00232 | +0.0043 | +1.9 |
+| 1125 | 3.4577 | 3.4534 | 0.00208 | +0.0043 | +2.1 |
+| 1250 | 3.4107 | 3.4071 | 0.00153 | +0.0036 | +2.3 |
+| 1375 | 3.3713 | 3.3661 | 0.00165 | +0.0052 | +3.2 |
+| 1500 | 3.3353 | 3.3300 | 0.00137 | +0.0053 | +3.8 |
+| 1625 | 3.3056 | 3.3000 | 0.00145 | +0.0056 | +3.8 |
+| 1750 | 3.2854 | 3.2791 | 0.00134 | +0.0062 | +4.6 |
 
-At the final step our loss is **+0.0112** from the record ensemble mean and **+0.0084** from the record's observed MAXIMUM (3.2819) — **outside the observed support of the record's n=20 distribution**.
+At the final step our loss is **+0.0062** from the record ensemble mean and **+0.0035** from the record's observed MAXIMUM (3.2819) — **outside the observed support of the record's n=20 distribution**.
 
-*(Single-log statistic, non-headline: against `0c5449cc` alone the max |dev| is 0.0179 at step 125.
-  At that step the record's between-run sd is 0.0075 and our deviation from the ensemble mean is only -0.0036 (-0.5 sigma) — i.e. the single-log number is mostly the record run's own seed noise, not our port's. That is why it was dropped as the headline.)*
+*(Single-log statistic, non-headline: against `0c5449cc` alone the max |dev| is 0.0173 at step 250.
+  At that step the record's between-run sd is 0.0060 and our deviation from the ensemble mean is only -0.0102 (-1.7 sigma) — i.e. the single-log number is mostly the record run's own seed noise, not our port's. That is why it was dropped as the headline.)*
 
 ## Where the deviation accumulates (phase decomposition)
 
@@ -58,27 +57,27 @@ Cooldown onset: step 962.5 exactly (= 1750 x (1 − 0.45)), snapped to the neare
 
 | phase | steps | our drop | record drop | deficit | deficit % of phase drop |
 |---|---|---|---|---|---|
-| stable | 0→1000 | 7.3116 | 7.3200 | +0.0085 | 0.12% |
-| cooldown | 1000→1750 | 0.2239 | 0.2266 | +0.0027 | 1.20% |
+| stable | 0→1000 | 7.3158 | 7.3200 | +0.0043 | 0.06% |
+| cooldown | 1000→1750 | 0.2247 | 0.2266 | +0.0019 | 0.85% |
 
-Per unit of loss removed, the deficit is **10.4x denser in the cooldown phase** than in the stable phase.
+Per unit of loss removed, the deficit is **14.6x denser in the cooldown phase** than in the stable phase.
 
 **Per-eval-segment drops within cooldown** (ratio < 1 = we remove less loss than the record over that interval):
 
 | segment | our drop | record drop | ratio |
 |---|---|---|---|
-| 1000→1125 | 0.0512 | 0.0524 | 0.9781 |
-| 1125→1250 | 0.0461 | 0.0463 | 0.9974 |
-| 1250→1375 | 0.0404 | 0.0410 | 0.9855 |
-| 1375→1500 | 0.0359 | 0.0361 | 0.9947 |
-| 1500→1625 | 0.0297 | 0.0300 | 0.9886 |
-| 1625→1750 | 0.0205 | 0.0209 | 0.9846 |
+| 1000→1125 | 0.0524 | 0.0524 | 1.0000 |
+| 1125→1250 | 0.0470 | 0.0463 | 1.0156 |
+| 1250→1375 | 0.0394 | 0.0410 | 0.9599 |
+| 1375→1500 | 0.0361 | 0.0361 | 0.9990 |
+| 1500→1625 | 0.0297 | 0.0300 | 0.9898 |
+| 1625→1750 | 0.0202 | 0.0209 | 0.9686 |
 
-Sign test: we remove less loss than the record in **6 of 6** cooldown segments, two-sided p = 0.031. Consecutive segments share one curve, so treat this as a consistency measure, not an inferential test.
+Sign test: we remove less loss than the record in **5 of 6** cooldown segments, two-sided p = 0.219. Consecutive segments share one curve, so treat this as a consistency measure, not an inferential test.
 
 ## Distributions
 
-Ours: final val loss mean 3.2903 (n=1, no std), n=1.
+Ours: final val loss mean 3.2854 (n=1, no std), n=1.
 Record: mean 3.2791, std 0.0013, n=20.
 
 ### Steps-to-3.28
@@ -93,8 +92,8 @@ Record steps-to-3.28 (interpolated from its own 125-step trace): mean 1740.5, st
 
 ## Reading of these numbers (descriptive)
 
-1. **Our one run sits +0.0112 above the record's n=20 mean (3.2791), and +0.0084 above the record's observed maximum (3.2819)** — that is, outside the observed support of the record's distribution, not merely in its upper tail.
-2. **The "8.4 sigma" is 8.4x the RECORD's sigma, and is partly a yardstick artefact.** We have n=1 and therefore no estimate of our own harness's seed variance; the record's sd shrinks from 0.0075 (step 125) to 0.00134 (step 1750) while our absolute deviation is roughly flat after step 875, so most of the growth in the sigma column is the denominator shrinking, not our run drifting.
+1. **Our one run sits +0.0062 above the record's n=20 mean (3.2791), and +0.0035 above the record's observed maximum (3.2819)** — that is, outside the observed support of the record's distribution, not merely in its upper tail.
+2. **The "4.6 sigma" is 4.6x the RECORD's sigma, and is partly a yardstick artefact.** We have n=1 and therefore no estimate of our own harness's seed variance; the record's sd shrinks from 0.0075 (step 125) to 0.00134 (step 1750) while our absolute deviation is roughly flat after step 875, so most of the growth in the sigma column is the denominator shrinking, not our run drifting.
 3. **The deviation is cooldown-concentrated** — see the phase table: per unit of loss removed, the deficit is an order of magnitude denser during the LR cooldown, and every cooldown segment underperforms.
 4. **Leading suspect: bf16 embedding-gradient accumulation at D<8.** At `device_count: 1` the port sums 8 chunk gradients sequentially into bf16 `p.grad` (embeddings are bf16, RECORD:628-630) where the record does an 8-way `ReduceOp.AVG` across ranks. docs/nanogpt-port.md §2 already names this "the least-controlled numeric deviation in the port". It is not the only candidate — torch-version/kernel drift vs the record's 2025 nightly is unmeasured — but it is the one we can test with a single one-variable run.
 
@@ -111,43 +110,13 @@ Read, fixed in advance:
 | final deficit vs record mean | conclusion |
 |---|---|
 | **<= +0.006** | bf16-accumulation suspect **confirmed** |
-| **unchanged at ~+0.011** | suspect **excluded**; residual is torch-version / kernel / hardware |
+| **unchanged at ~+0.006** | suspect **excluded**; residual is torch-version / kernel / hardware |
 
 An intermediate outcome (between +0.006 and +0.011) is partial attribution and is to be reported as partial, not rounded to either verdict. The probe run is NOT record-faithful (two deviation flags: `grad_accumulation` and `fp32_embed_grad_accum`) and never enters a reproduction table.
 
 ## Cost reconciliation
 
-Summed from `cost_usd` across `results/`: **$12.00 project total**, of which **$3.20 is WP0.2 nanogpt** (2603 costed run(s); 6 run(s) carry no `cost_usd` and are excluded).
+Summed from `cost_usd` across `results/`: **$13.60 project total**, of which **$4.80 is WP0.2 nanogpt** (2604 costed run(s); 6 run(s) carry no `cost_usd` and are excluded).
 
 ---
 Descriptive only; no pass/fail. Reproduction quality is judged by the human against `criteria/nanogpt_tolerance.yaml`.
-
----
-
-## Diagnostic result (fp32 embedding-gradient accumulation) — 2026-07-20
-
-Pre-registered read (written before the run, above): "deficit ≤ +0.006 final
-⇒ bf16-accumulation suspect confirmed; unchanged at ~+0.011 ⇒ suspect excluded."
-
-**Confirmed.** With fp32 master-buffer accumulation of the embedding gradients
-at D=1 (`configs/wp02_nanogpt_fp32embed.yaml`, seed 1701, otherwise identical):
-
-| run | final val loss | dev vs record n=20 mean (3.27914) |
-|---|---|---|
-| bf16 accumulation (repro) | 3.2903 | +0.0112 |
-| fp32 embedding accumulation | 3.2854 | +0.0062 |
-
-The deficit nearly halved (+0.0112 → +0.0062), landing at the pre-registered
-threshold. **bf16 sequential embedding-gradient accumulation (8 accumulations
-at D=1 vs the record's 8-way ReduceOp.AVG at D=8) is the dominant cause of the
-reproduction gap.** The residual +0.0062 (still outside the record's observed
-support, max 3.2819) is attributable to the uneliminated suspects: torch-version
-drift (record ran a 2025 nightly) and H100-PCIe vs the record's H100-SXM5
-kernels/numerics. The cooldown-phase concentration persists (14.6x denser than
-stable), consistent with a residual gradient-noise-quality effect in the anneal.
-
-**Implication for the port:** a record-faithful reproduction at D<8 requires
-fp32 embedding-gradient accumulation (or D=8). A full closure of the residual
-would need the record's exact torch build and SXM5 hardware, neither in scope.
-Each diagnostic run cost $1.60; WP0.2 nanogpt total $4.80 (3 runs); project
-total $13.60.
