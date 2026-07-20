@@ -274,6 +274,8 @@ def run_airbench_smoke(
     device: torch.device,
     _hub_factory=None,
     _batch_hook=None,
+    _pre_step_hook=None,
+    _post_step_hook=None,
 ) -> Dict[str, Any]:
     """One airbench94 training run with a zoo optimizer on the filter params.
 
@@ -299,6 +301,14 @@ def run_airbench_smoke(
     callable ``(inputs, labels)`` invoked once per training step with the
     current (augmented, normalized) batch, right before ``capture_grads()``.
     ``None`` (default) leaves the loop untouched.
+
+    ``_pre_step_hook`` / ``_post_step_hook`` (internal; used by the
+    directional-smoothness probe): ``_pre_step_hook(step)`` runs immediately
+    before ``optimizer.step()`` (gradients present, weights still pre-update)
+    and ``_post_step_hook(step, lr)`` immediately after it, with ``lr`` the
+    filter-parameter learning rate actually applied on that step.  ``step`` is
+    1-based, matching the instrumentation hub's step counter.  Both are
+    read-only observers; ``None`` (default) leaves the loop untouched.
     """
     from src.optim.registry import build_optimizer
 
@@ -434,8 +444,13 @@ def run_airbench_smoke(
                 _batch_hook(inputs, labels)  # current batch for HVP probes
             if hub is not None:
                 hub.capture_grads()  # raw pre-momentum G, before any step()
+            if _pre_step_hook is not None:
+                _pre_step_hook(step + 1)  # 1-based, as the hub counts
+            step_lr = optimizer2.param_groups[0]["lr"]
             for opt in optimizers:
                 opt.step()
+            if _post_step_hook is not None:
+                _post_step_hook(step + 1, step_lr)
             if hub is not None:
                 hub.after_step()  # reads captured G + post-step momentum
             model.zero_grad(set_to_none=True)
@@ -589,6 +604,19 @@ def run_airbench_instrumented(
     ``recipe.compile: false`` (double-backward through torch.compile is
     unsupported; the config must opt out of the stock compile explicitly).
 
+    Directional-smoothness probe (``instrumentation.smoothness``, default
+    off): every ``t_meas`` steps, the SPECTRAL-norm and Euclidean directional
+    smoothness of the minibatch loss along the actual applied update, per
+    Muon-managed matrix (:class:`src.instrument.smoothness.SmoothnessProbe`;
+    pre-registered question in that module's docstring).  Like ``hvp`` it
+    requires ``recipe.compile: false``, and it is intended to run TOGETHER
+    with ``hvp: true`` so one run set yields both the Euclidean eta*lambda and
+    the generalized (spectral) smoothness.
+
+    Frozen-probe tier (``instrumentation.frozen_probes``, default off): k3
+    never-refreshed random probe directions per matrix with unbounded-window
+    cumulative t-statistics (:class:`src.instrument.tracker.FrozenProbeBank`).
+
     Zero behavior change to training itself: the hub is read-only and the
     recipe, schedules, and optimizers are exactly those of the ``airbench``
     experiment.  The returned metrics carry the full instrumentation log
@@ -650,6 +678,19 @@ def run_airbench_instrumented(
             "is unsupported; the HVP calibration run must opt out of the "
             "stock compile explicitly in its config."
         )
+    smoothness_cfg = instr_cfg.get("smoothness")
+    smoothness_requested = bool(
+        smoothness_cfg
+        if isinstance(smoothness_cfg, bool)
+        else (smoothness_cfg or {}).get("enabled", bool(smoothness_cfg))
+    )
+    if smoothness_requested and recipe.get("compile", True):
+        raise SystemExit(
+            "instrumentation.smoothness requires recipe.compile: false -- the "
+            "probe re-evaluates the loss through torch.func.functional_call "
+            "(and, with grad_source: recompute, differentiates it), which is "
+            "not supported through a torch.compile'd model."
+        )
 
     holder: Dict[str, Any] = {}
 
@@ -668,17 +709,49 @@ def run_airbench_instrumented(
             hvp_fn = holder["hvp_probe"] = AirbenchHvpProbe(
                 model, filter_params, label_smoothing=0.2
             )
+        if smoothness_requested:
+            # Trajectory directional smoothness in the spectral norm (the
+            # quantity the non-Euclidean EoS theory says governs Muon) plus
+            # its Euclidean twin, measured on the SAME runs as the HVP
+            # eta*lambda -- that side-by-side is the whole point.
+            from src.instrument.smoothness import smoothness_from_config
+
+            holder["smoothness"] = smoothness_from_config(
+                instr_cfg, model, named, label_smoothing=0.2
+            )
         holder["hub"] = hub_from_config(instr_cfg, named, optimizer2, hvp_fn=hvp_fn)
         return holder["hub"]
 
     batch_hook = None
-    if hvp_requested:
+    if hvp_requested or smoothness_requested:
 
         def batch_hook(inputs, labels):
-            holder["hvp_probe"].set_batch(inputs, labels)
+            if hvp_requested:
+                holder["hvp_probe"].set_batch(inputs, labels)
+            probe = holder.get("smoothness")
+            if probe is not None:
+                probe.set_batch(inputs, labels)
+
+    pre_hook = post_hook = None
+    if smoothness_requested:
+
+        def pre_hook(step):
+            probe = holder.get("smoothness")
+            if probe is not None:
+                probe.before_step(step)
+
+        def post_hook(step, lr):
+            probe = holder.get("smoothness")
+            if probe is not None:
+                probe.after_step(step, lr)
 
     metrics = run_airbench_smoke(
-        merged, device, _hub_factory=factory, _batch_hook=batch_hook
+        merged,
+        device,
+        _hub_factory=factory,
+        _batch_hook=batch_hook,
+        _pre_step_hook=pre_hook,
+        _post_step_hook=post_hook,
     )
     metrics["instrumented"] = True
     if hvp_requested:
@@ -688,7 +761,13 @@ def run_airbench_instrumented(
     metrics["optimizer_lr"] = merged["optimizer"]["lr"]
     if probe:
         metrics["probe_overrides"] = dict(probe)
-    metrics["_instrumentation_log"] = holder["hub"].to_log()
+    log = holder["hub"].to_log()
+    probe = holder.get("smoothness")
+    if probe is not None:
+        log["smoothness"] = probe.to_log()
+        metrics["smoothness_forward_passes"] = probe.n_forward
+        metrics["smoothness_backward_passes"] = probe.n_backward
+    metrics["_instrumentation_log"] = log
     return metrics
 
 

@@ -63,10 +63,96 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 import torch
 
-__all__ = ["AirbenchHvpProbe"]
+__all__ = [
+    "AirbenchHvpProbe",
+    "LossFn",
+    "default_ce_loss",
+    "fp32_overrides",
+    "fp32_functional_loss",
+]
 
 # loss_fn(outputs_fp32, labels) -> scalar loss tensor
 LossFn = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
+
+
+# --------------------------------------------------------- shared fp32 pattern
+#
+# The three helpers below are THE detached-fp32 / functional_call pattern
+# documented in this module's header.  They are shared with
+# ``src.instrument.smoothness`` (the directional-smoothness probe) so both
+# probes evaluate the loss on exactly the same surface -- there is one
+# implementation of "re-evaluate this model's loss in fp32 without touching
+# training state", not two.
+
+
+def default_ce_loss(label_smoothing: float = 0.2) -> LossFn:
+    """The airbench training loss: sum-reduced label-smoothed cross-entropy."""
+    ls = float(label_smoothing)
+
+    def loss_fn(outputs: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        return torch.nn.functional.cross_entropy(
+            outputs, labels, label_smoothing=ls, reduction="sum"
+        )
+
+    return loss_fn
+
+
+def fp32_overrides(
+    model: torch.nn.Module,
+    *,
+    grad_param_ids: Optional[set] = None,
+    param_values: Optional[Dict[str, torch.Tensor]] = None,
+) -> Tuple[Dict[str, torch.Tensor], Dict[int, torch.Tensor]]:
+    """Detached fp32 copies of every parameter and buffer of ``model``.
+
+    Returns ``(overrides, leaves)`` where ``overrides`` is the mapping
+    ``torch.func.functional_call`` consumes and ``leaves`` maps ``id(param)``
+    to the fp32 copy for every parameter whose id is in ``grad_param_ids``
+    (those copies have ``requires_grad_(True)``).
+
+    Float buffers are copied to fp32 (BatchNorm running stats then update
+    in-place onto the COPIES, leaving the training model untouched); integer
+    buffers (``num_batches_tracked``) are cloned unchanged.  **Fresh copies
+    per call**: callers that evaluate the loss more than once on the same
+    step must rebuild the overrides, otherwise in-place BatchNorm updates
+    from the first forward would shift the loss surface seen by the second.
+
+    ``param_values`` optionally supplies the parameter values to use
+    (name -> tensor), instead of the model's current ones -- used by the
+    smoothness probe to evaluate at the PRE-step weights after the optimizer
+    has already stepped.
+    """
+    ids = set() if grad_param_ids is None else set(grad_param_ids)
+    overrides: Dict[str, torch.Tensor] = {}
+    leaves: Dict[int, torch.Tensor] = {}
+    for name, p in model.named_parameters():
+        src = p if param_values is None else param_values[name]
+        t = src.detach().to(torch.float32).clone()
+        if id(p) in ids:
+            t.requires_grad_(True)
+            leaves[id(p)] = t
+        overrides[name] = t
+    for name, b in model.named_buffers():
+        overrides[name] = (
+            b.detach().to(torch.float32).clone()
+            if b.is_floating_point()
+            else b.detach().clone()
+        )
+    return overrides, leaves
+
+
+def fp32_functional_loss(
+    model: torch.nn.Module,
+    overrides: Dict[str, torch.Tensor],
+    inputs: torch.Tensor,
+    labels: torch.Tensor,
+    loss_fn: LossFn,
+) -> torch.Tensor:
+    """One fp32 functional forward + loss on the given (detached) overrides."""
+    outputs = torch.func.functional_call(
+        model, overrides, (inputs.detach().to(torch.float32),)
+    )
+    return loss_fn(outputs.float(), labels)
 
 
 class AirbenchHvpProbe:
@@ -102,15 +188,9 @@ class AirbenchHvpProbe:
     ) -> None:
         self.model = model
         self.params: List[torch.Tensor] = list(params)
-        if loss_fn is None:
-            ls = float(label_smoothing)
-
-            def loss_fn(outputs: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
-                return torch.nn.functional.cross_entropy(
-                    outputs, labels, label_smoothing=ls, reduction="sum"
-                )
-
-        self.loss_fn: LossFn = loss_fn
+        self.loss_fn: LossFn = (
+            default_ce_loss(label_smoothing) if loss_fn is None else loss_fn
+        )
         self._batch: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
         self._leaves: Optional[Dict[int, torch.Tensor]] = None
         self._grads: Optional[Dict[int, torch.Tensor]] = None
@@ -164,14 +244,9 @@ class AirbenchHvpProbe:
         inputs, labels = self._batch
         tracked_ids = {id(p) for p in self.params}
         with torch.enable_grad():
-            overrides: Dict[str, torch.Tensor] = {}
-            leaves: Dict[int, torch.Tensor] = {}
-            for name, p in self.model.named_parameters():
-                t = p.detach().to(torch.float32)
-                if id(p) in tracked_ids:
-                    t.requires_grad_(True)
-                    leaves[id(p)] = t
-                overrides[name] = t
+            overrides, leaves = fp32_overrides(
+                self.model, grad_param_ids=tracked_ids
+            )
             missing = [
                 tuple(p.shape) for p in self.params if id(p) not in leaves
             ]
@@ -180,19 +255,9 @@ class AirbenchHvpProbe:
                     "AirbenchHvpProbe: tracked params not found among "
                     f"model.named_parameters(): shapes {missing}"
                 )
-            for name, b in self.model.named_buffers():
-                # fp32 copies for float buffers (BN running stats update onto
-                # the copies, keeping the training model untouched); integer
-                # buffers (num_batches_tracked) cloned unchanged.
-                overrides[name] = (
-                    b.detach().to(torch.float32)
-                    if b.is_floating_point()
-                    else b.detach().clone()
-                )
-            outputs = torch.func.functional_call(
-                self.model, overrides, (inputs.detach().to(torch.float32),)
+            loss = fp32_functional_loss(
+                self.model, overrides, inputs, labels, self.loss_fn
             )
-            loss = self.loss_fn(outputs.float(), labels)
             grads = torch.autograd.grad(
                 loss, [leaves[id(p)] for p in self.params], create_graph=True
             )

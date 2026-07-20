@@ -3,7 +3,9 @@
 Public API:
     TrackedSubspace, RefreshResult              (subspace.py)
     DirectionTrack, MatrixTracker,
-    InstrumentationHub, hub_from_config         (tracker.py)
+    InstrumentationHub, hub_from_config,
+    FrozenProbeAccumulator, FrozenProbeBank     (tracker.py)
+    SmoothnessProbe, smoothness_from_config     (smoothness.py)
     validate_instrumentation, write_sidecar,
     load_instrumentation, iter_directions,
     sidecar_path                                (schema.py)
@@ -20,6 +22,7 @@ importing the hub does not pull in matplotlib on the training path.
 
 from src.instrument.schema import (
     INSTRUMENTATION_SCHEMA_VERSION,
+    SUPPORTED_SCHEMA_VERSIONS,
     InstrumentationValidationError,
     iter_directions,
     load_instrumentation,
@@ -28,8 +31,11 @@ from src.instrument.schema import (
     write_sidecar,
 )
 from src.instrument.subspace import RefreshResult, TrackedSubspace
+from src.instrument.smoothness import SmoothnessProbe, smoothness_from_config
 from src.instrument.tracker import (
     DirectionTrack,
+    FrozenProbeAccumulator,
+    FrozenProbeBank,
     InstrumentationHub,
     MatrixTracker,
     hub_from_config,
@@ -37,6 +43,7 @@ from src.instrument.tracker import (
 
 __all__ = [
     "INSTRUMENTATION_SCHEMA_VERSION",
+    "SUPPORTED_SCHEMA_VERSIONS",
     "InstrumentationValidationError",
     "TrackedSubspace",
     "RefreshResult",
@@ -49,4 +56,8 @@ __all__ = [
     "load_instrumentation",
     "iter_directions",
     "sidecar_path",
+    "FrozenProbeAccumulator",
+    "FrozenProbeBank",
+    "SmoothnessProbe",
+    "smoothness_from_config",
 ]

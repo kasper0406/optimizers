@@ -1,0 +1,87 @@
+# LR ladder for the spectral stability law: the same measurement as
+# configs/dev/instrumented_airbench_smoothness.yaml at lr multipliers
+# {0.5, 1, 2} of the airbench record lr (0.24), 2 dev seeds each.
+#
+# WHY THE LADDER IS NOT OPTIONAL.  The pre-registered question is whether the
+# generalized (spectral) directional smoothness equilibrates at c / lr for a
+# CONSTANT c.  That is an lr-scaling claim: a single-lr plateau of
+# lr * D_smooth_spectral is unfalsifiable (any measured value defines some c).
+# The claim has content only if the plateau of the dimensionless product
+# lr * D_smooth_spectral is the SAME across lr, while the Euclidean quantity
+# (lr * D_smooth_frobenius, and the HVP eta*lambda) is not.  Three rungs are
+# the minimum that can distinguish "constant" from "trending"; 2 seeds per
+# rung give a crude spread, not a comparison-grade interval, which is
+# appropriate for a dev-seed measurement.
+#
+# Rungs (Gate-1 amendment A4 probe_overrides, the ONLY sanctioned deviation
+# from the pinned record hyperparameters, dev-seeds only):
+#   lr = 0.12  (0.5x record)
+#   lr = 0.24  (1.0x record -- the stock value, duplicated here so all three
+#               rungs are produced by one identical code path)
+#   lr = 0.48  (2.0x record; reports/wp22-mechanism-probes.md documents
+#               training as stable and gracefully degrading well beyond this)
+#
+# Everything else -- instrumentation block, classifier thresholds, HVP,
+# smoothness cadence, frozen probes, compile: false -- is identical to the
+# base config, so rungs differ only in lr.
+#
+# LAUNCH PRECONDITION (WP1.2, CLAUDE.md): criteria/phase1_preregistration.md
+# must exist; scripts/run.py enforces this for airbench_instrumented.
+#
+# Launch (GPU box):
+#   uv run python scripts/sweep.py configs/dev/instrumented_airbench_smoothness_lr_ladder.yaml
+#   bash sweeps/instrumented_airbench_smoothness_lr_ladder/run_all.sh
+# (6 runs = 3 rungs x 2 seeds)
+
+experiment: airbench_instrumented
+seed: 1310
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  tta_level: 2
+  compile: false
+
+probe_overrides:
+  lr: 0.24             # overridden per rung by the sweep grid below
+
+instrumentation:
+  k1: 16
+  k2: 16
+  t_refresh: 50
+  subspace_iters: 2
+  betas: [0.9, 0.99]
+  align_min: 0.9
+  snapshot_every: 5
+  seed: 4242
+  min_dim: 8
+  momentum_key: momentum_buffer
+  hvp: true
+  smoothness:
+    enabled: true
+    t_meas: 5
+    grad_source: recompute
+  frozen_probes:
+    enabled: true
+    k3: 16
+    max_lag: 8
+    decimate: 1
+  classifier:
+    tau_sig: 4.0
+    tau_noise: 2.0
+    rho_osc: 0.5
+    n_min: 50
+    z_reset: 6.0
+    innov_needed: 2
+    innov_window: 4
+
+sweep:
+  seeds: [1310, 1311]         # 2 dev seeds per rung
+  grid:
+    probe_overrides.lr: [0.12, 0.24, 0.48]   # 0.5x / 1x / 2x the record lr

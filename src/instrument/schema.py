@@ -44,6 +44,44 @@ Schema (version 1)::
       }
     }
 
+Schema version 2 = version 1 plus two OPTIONAL, purely additive blocks; a
+version-1 sidecar remains valid and is still accepted by the reader
+(``SUPPORTED_SCHEMA_VERSIONS``).  Absence of a block means the measurement was
+switched off for that run, never that the run is malformed::
+
+    # per matrix, when instrumentation.frozen_probes is enabled
+    "frozen_probes": {
+      "k3": int, "max_lag": int, "decimate": int,
+      "n_observations": int, "lag_truncation": int,
+      "snapshot_steps": [int], "snapshot_n": [int],
+      "snapshot_lag_truncation": [int], "raw_steps": [int],
+      "probes": [
+        {"index": int,
+         "s": [float],                       # raw projections (decimated)
+         "t_naive": [float], "t_nw": [float], "ess": [float],
+         "mean": [float], "var": [float],    # cumulative, snapshot cadence
+         "final": {"n", "mean", "var", "t_naive", "t_nw", "ess",
+                   "nw_floored"}}
+      ]
+    }
+
+    # top level, when instrumentation.smoothness is enabled
+    "smoothness": {
+      "t_meas": int, "grad_source": str, "loss_reduction": str,
+      "batch_size": int, "n_measured_steps": int,
+      "n_forward": int, "n_backward": int,
+      "matrices": {<name>: {"step": [float], "lr": [float],
+                            "loss_base": [...], "loss_perturbed": [...],
+                            "inner_product": [...], "remainder": [...],
+                            "spec_norm_D": [...], "fro_norm_D": [...],
+                            "d_smooth_spectral": [...],
+                            "d_smooth_frobenius": [...],
+                            "lr_times_d_smooth_spectral": [...],
+                            "lr_times_d_smooth_frobenius": [...]}}
+    }
+
+Top level also gains ``"frozen_probes_enabled": bool`` (v2).
+
 The reader (:func:`load_instrumentation`, :func:`iter_directions`) is what
 ``src.instrument.plots`` consumes -- plots run from JSON alone, no live
 training required.
@@ -55,7 +93,10 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Iterator, Tuple
 
-INSTRUMENTATION_SCHEMA_VERSION = 1
+INSTRUMENTATION_SCHEMA_VERSION = 2
+# v1 sidecars (every run written before the smoothness / frozen-probe tiers
+# existed) stay readable: the v2 additions are optional blocks only.
+SUPPORTED_SCHEMA_VERSIONS = (1, 2)
 
 SIDECAR_SUFFIX = ".instrumentation.json"
 
@@ -110,9 +151,9 @@ def validate_instrumentation(log: Dict[str, Any]) -> Dict[str, Any]:
         if key not in log:
             problems.append(f"missing top-level key {key!r}")
     version = log.get("instrumentation_schema_version")
-    if version is not None and version != INSTRUMENTATION_SCHEMA_VERSION:
+    if version is not None and version not in SUPPORTED_SCHEMA_VERSIONS:
         problems.append(
-            f"schema version {version!r} != {INSTRUMENTATION_SCHEMA_VERSION}"
+            f"schema version {version!r} not in {SUPPORTED_SCHEMA_VERSIONS}"
         )
     for name, mat in (log.get("matrices") or {}).items():
         for key in _REQUIRED_MATRIX:
@@ -138,11 +179,114 @@ def validate_instrumentation(log: Dict[str, Any]) -> Dict[str, Any]:
                     f"matrix {name!r} direction {d.get('index')}: "
                     f"len(s)={len(d.get('s', []))} != len(steps)={n_steps}"
                 )
+        problems.extend(_validate_frozen_probes(name, mat.get("frozen_probes")))
+    problems.extend(_validate_smoothness(log.get("smoothness")))
     if problems:
         raise InstrumentationValidationError(
             "invalid instrumentation log:\n  - " + "\n  - ".join(problems)
         )
     return log
+
+
+_REQUIRED_FROZEN = (
+    "k3",
+    "max_lag",
+    "decimate",
+    "n_observations",
+    "snapshot_steps",
+    "raw_steps",
+    "probes",
+)
+_REQUIRED_FROZEN_PROBE = ("index", "s", "t_naive", "t_nw", "ess", "final")
+_REQUIRED_FROZEN_FINAL = ("n", "mean", "var", "t_naive", "t_nw", "ess")
+_REQUIRED_SMOOTHNESS = (
+    "t_meas",
+    "grad_source",
+    "loss_reduction",
+    "n_measured_steps",
+    "matrices",
+)
+_REQUIRED_SMOOTHNESS_SERIES = (
+    "step",
+    "lr",
+    "loss_base",
+    "loss_perturbed",
+    "inner_product",
+    "remainder",
+    "spec_norm_D",
+    "fro_norm_D",
+    "d_smooth_spectral",
+    "d_smooth_frobenius",
+    "lr_times_d_smooth_spectral",
+    "lr_times_d_smooth_frobenius",
+)
+
+
+def _validate_frozen_probes(name, block):
+    """Validate a matrix's optional v2 ``frozen_probes`` block."""
+    problems = []
+    if block is None:
+        return problems
+    if not isinstance(block, dict):
+        return [f"matrix {name!r}: frozen_probes must be a mapping"]
+    for key in _REQUIRED_FROZEN:
+        if key not in block:
+            problems.append(f"matrix {name!r} frozen_probes: missing key {key!r}")
+    probes = block.get("probes", [])
+    if block.get("k3") is not None and len(probes) != block["k3"]:
+        problems.append(
+            f"matrix {name!r} frozen_probes: len(probes)={len(probes)} != "
+            f"k3={block['k3']}"
+        )
+    n_snap = len(block.get("snapshot_steps", []))
+    for p in probes:
+        for key in _REQUIRED_FROZEN_PROBE:
+            if key not in p:
+                problems.append(
+                    f"matrix {name!r} frozen probe {p.get('index')}: "
+                    f"missing key {key!r}"
+                )
+        for key in ("t_naive", "t_nw", "ess"):
+            series = p.get(key)
+            if series is not None and len(series) != n_snap:
+                problems.append(
+                    f"matrix {name!r} frozen probe {p.get('index')}: "
+                    f"len({key})={len(series)} != len(snapshot_steps)={n_snap}"
+                )
+        for key in _REQUIRED_FROZEN_FINAL:
+            if key not in (p.get("final") or {}):
+                problems.append(
+                    f"matrix {name!r} frozen probe {p.get('index')}: "
+                    f"final missing {key!r}"
+                )
+    return problems
+
+
+def _validate_smoothness(block):
+    """Validate the optional v2 top-level ``smoothness`` block."""
+    problems = []
+    if block is None:
+        return problems
+    if not isinstance(block, dict):
+        return ["smoothness must be a mapping"]
+    for key in _REQUIRED_SMOOTHNESS:
+        if key not in block:
+            problems.append(f"smoothness: missing key {key!r}")
+    for mname, series in (block.get("matrices") or {}).items():
+        if not isinstance(series, dict):
+            problems.append(f"smoothness matrix {mname!r}: must be a mapping")
+            continue
+        lengths = set()
+        for key in _REQUIRED_SMOOTHNESS_SERIES:
+            if key not in series:
+                problems.append(f"smoothness matrix {mname!r}: missing series {key!r}")
+            else:
+                lengths.add(len(series[key]))
+        if len(lengths) > 1:
+            problems.append(
+                f"smoothness matrix {mname!r}: ragged series lengths {sorted(lengths)}"
+            )
+    return problems
 
 
 def sidecar_path(results_json_path: Path) -> Path:
