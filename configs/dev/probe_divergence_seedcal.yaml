@@ -1,0 +1,39 @@
+# CALIBRATION ARM: stock-vs-stock twins with DIFFERENT inits (twin_b_seed).
+# Purpose: establish the reference scale for the divergence metric. The
+# same-seed control gives exactly 0.000; intervention arms give 0.95-0.99.
+# If a mere seed change also gives ~0.95, then per-direction damping is
+# provably 'no more disruptive than reinitializing' — the crispest form of
+# the equivalent-destinations mechanism (reports/brainstorm-programs.md #1).
+# PRE-REGISTERED READ: report the ratio intervention_div / seed_div; ~1.0
+# means seed-equivalent disruption, <<1.0 means the intervention is a
+# milder perturbation than reinit, >1.0 means it is more disruptive.
+experiment: probe_divergence
+seed: 1606
+twin_b_seed: 4606   # different init for twin B (calibration)
+device: cuda
+harness: airbench
+steps: 200
+
+data:
+  root: data/cifar10
+
+train:
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  tta_level: 2
+
+twin_a:
+  name: muon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+
+twin_b:
+  name: muon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3

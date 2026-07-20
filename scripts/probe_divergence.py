@@ -296,8 +296,22 @@ def run_airbench_twin(config: Dict[str, Any], device: torch.device) -> Dict[str,
     )
     # Identical initialization: reset A, copy its state into B, whiten both
     # from the same training images.
+    #
+    # ``twin_b_seed`` (calibration arm only) instead re-seeds and resets B
+    # independently, so the twins differ by INIT rather than by optimizer.
+    # That measures the reference scale of the divergence metric: how far
+    # apart do two equally-good stock runs end up? See
+    # configs/dev/probe_divergence_seedcal.yaml.
     model_a.reset()
-    model_b.load_state_dict(model_a.state_dict())
+    twin_b_seed = config.get("twin_b_seed")
+    if twin_b_seed is None:
+        model_b.load_state_dict(model_a.state_dict())
+    else:
+        if int(twin_b_seed) < 1000:
+            raise SystemExit("twin_b_seed must be a dev seed (>= 1000)")
+        torch.manual_seed(int(twin_b_seed))
+        torch.cuda.manual_seed_all(int(twin_b_seed))
+        model_b.reset()
     train_images = train_loader.normalize(train_loader.images[:5000])
     model_a.init_whiten(train_images)
     model_b.init_whiten(train_images)
