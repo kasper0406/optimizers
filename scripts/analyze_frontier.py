@@ -112,7 +112,14 @@ def load_frontier_runs(results_dir: Path) -> List[Dict[str, Any]]:
                 "sidecar": str(results_dir / sidecar) if sidecar else None,
             }
         )
-    return runs
+    # Dedupe by (batch, lr, seed), keeping the LATEST file: the first launch
+    # of the sweep was aborted after a few runs (provenance flag fix) and
+    # results/ is append-only, so its files remain; the relaunch re-ran the
+    # same cells. Sorted glob order = timestamp order within a seed.
+    latest: Dict[Tuple[int, float, int], Dict[str, Any]] = {}
+    for r in runs:
+        latest[(r["batch_size"], r["lr"], r["seed"])] = r
+    return sorted(latest.values(), key=lambda r: r["file"])
 
 
 def cell_table(runs) -> Dict[int, Dict[float, List[Dict[str, Any]]]]:

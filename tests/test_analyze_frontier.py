@@ -153,3 +153,21 @@ class TestLoading:
         assert report["alpha_fit"]["alpha"] > 0.25
         md = af.to_markdown(report)
         assert "P1" in md and "P2" in md and "P3" in md
+
+    def test_dedupe_keeps_latest_per_cell(self, tmp_path):
+        # same (B, lr, seed) twice with different timestamps in the filename:
+        # only the later file survives
+        f1 = tmp_path / "airbench_instrumented_seed1400_20260720T190000.json"
+        f2 = tmp_path / "airbench_instrumented_seed1400_20260720T200000.json"
+        for f, acc in ((f1, 0.90), (f2, 0.94)):
+            f.write_text(json.dumps({
+                "seed": 1400,
+                "config": {"path": f"sweeps/{af.CONFIG_TAG}/x.yaml",
+                           "contents": {"train": {"batch_size": 2000, "epochs": 8},
+                                        "probe_overrides": {"lr": 0.24}}},
+                "metrics": {"tta_val_acc": acc, "steps": 200,
+                            "instrumentation_sidecar": "m.instrumentation.json"},
+            }))
+        runs = af.load_frontier_runs(tmp_path)
+        assert len(runs) == 1
+        assert runs[0]["acc"] == pytest.approx(94.0)
