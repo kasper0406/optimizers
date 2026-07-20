@@ -59,6 +59,16 @@ active at 13.6% treated fraction):
    AdaMuon / NorMuon matched stock Muon (gaps 0.29–0.82pp). Not an optimizer
    ranking; says nothing about their home-scale claims.
 
+**Follow-up programs (2026-07-20, `reports/brainstorm-programs.md`):** four
+pre-registered predictions derived from the findings above were all refuted —
+occupancy is schedule-position-dependent rather than an LR state function; the
+routing null is *not* a compounding failure (interventions drive training to
+essentially unrelated weights of equal quality — stock-vs-stock control diverges
+exactly 0.000, so this is real); spectral directional smoothness does not
+equilibrate at an lr-invariant constant (ratio 2.57 across the ladder); and
+frozen full-run probes find no hidden persistent per-direction signal
+(median |t| 0.61, slope ~0.05 vs √t's 0.5).
+
 **Where this points next** (`docs/litreview/README.md`): the temporal trust
 ratio — per-matrix/global LR control from negative-ρ occupancy, the one
 combination the literature sweep found unclaimed — and the Muon stability-law
