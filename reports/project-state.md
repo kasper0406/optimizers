@@ -197,11 +197,17 @@ is measurement-first with a clean null, not a method claim.
 3. **Per-direction SNR vs batch size** (open question #4): test whether
    per-direction signal becomes measurable at large batch; the frozen-probe
    tier (program #4) is the instrument.
-4. **Full nanogpt validation**: fp32-embed-fixed harness + a seed set to
-   establish σ and confirm a self-consistent testbed. Prerequisite for any
-   nanogpt method claim (the value is a self-consistent A/B testbed, not
-   matching the record — record-faithfulness off native hardware is not
-   attainable and is now a documented finding, not a goal).
+4. ~~Full nanogpt validation~~ **DONE 2026-07-21
+   (`reports/nanogpt-local-baseline.md`).** The port runs locally on the
+   2×5090 box (chunked-head memory path, PORT CHANGE P5; fp8+flex+compile
+   intact); n=10 baseline: final val 3.28888 ± 0.00125 — seed noise equal
+   to the record's native sd (0.0013), no variance inflation. Endpoint
+   settled: final-val-at-1750 (steps-to-3.28 censored 10/10 here). Power:
+   the plan's 3–5% effects need 2 seeds/arm; 0.0025-loss effects need 4.
+   Controls (seeds 1710–1719) are in `results/`; babysitter supervision
+   (`scripts/babysit_nanogpt.sh`) handles the box's flaky-card risk. The
+   run.py seed-injection bug this surfaced is fixed (ecd48f1) with
+   regression tests.
 5. **Finish and submit the measurement paper** (§4) — the actual deliverable
    to the field; the flag-plant the plan's risk analysis calls for while the
    niche's ~6-month idea half-life runs.
