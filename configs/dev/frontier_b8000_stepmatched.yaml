@@ -1,0 +1,56 @@
+# Program #6b Part 2 -- STEP-MATCHED B=8000 arm (undertraining deconfound).
+# Pre-registration: reports/frontier-sharpening-preregistration.md.
+# epochs: 32 matches B=2000's ~200 steps (4x the sample budget -- NOT
+# sample-budget-comparable to program #6; analyzed only against its own
+# ladder). hvp: false per amendment A1 (fp32 create-graph HVP OOMs at
+# B=8000 on 32 GB); smoothness stays on. Ladder identical to program #6.
+
+experiment: airbench_instrumented
+seed: 1410
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 32           # step-matched to B=2000 (~200 steps); 4x sample budget, see prereg
+  batch_size: 8000
+
+recipe:
+  tta_level: 2
+  compile: false
+
+probe_overrides:
+  lr: 0.24             # overridden per rung by the sweep grid below
+
+instrumentation:
+  k1: 16
+  k2: 16
+  t_refresh: 50
+  subspace_iters: 2
+  betas: [0.9, 0.99]
+  align_min: 0.9
+  snapshot_every: 5
+  seed: 4242
+  min_dim: 8
+  momentum_key: momentum_buffer
+  hvp: false           # AMENDMENT A1: OOM at B=8000 on 32 GB (see header)
+  smoothness:
+    enabled: true
+    t_meas: 5
+    grad_source: recompute
+  frozen_probes:
+    enabled: false
+  classifier:
+    tau_sig: 4.0
+    tau_noise: 2.0
+    rho_osc: 0.5
+    n_min: 50
+    z_reset: 6.0
+    innov_needed: 2
+    innov_window: 4
+
+sweep:
+  seeds: [1410, 1411]
+  grid:
+    probe_overrides.lr: [0.12, 0.24, 0.36, 0.48, 0.60, 0.72, 0.96, 1.44]
