@@ -252,7 +252,9 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         return RecordDataGenerator(
             cfg.train_files,
             local_batch_size=cfg.train_seq_len,
-            record_world_size=cfg.record_world_size,
+            # effective_chunks == record_world_size unless the program-#7
+            # chunks_per_step axis is set (the generator is generic in it).
+            record_world_size=cfg.effective_chunks,
             device_count=cfg.device_count,
             rank=rank,
             align_to_bos=cfg.train_align_to_bos,

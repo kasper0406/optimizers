@@ -181,6 +181,14 @@ class NanoGPTConfig:
     # chunk (49,152 tokens) and val sequences (262,144 tokens) on 32 GB GPUs.
     # NOT RECORD-FAITHFUL when set.
     head_chunk_rows: Optional[int] = None
+    # PORT: token-batch axis for the frontier transfer test (program #7).
+    # Number of 49,152-token record chunks consumed per optimizer step;
+    # None == record_world_size (8) == the record's 393,216-token batch.
+    # The data generator is generic in this count, so chunks_per_step: 4
+    # yields a 196,608-token step with the same BOS-aligned chunking. NOT
+    # RECORD-FAITHFUL when set to anything but None/8: changes the token
+    # batch AND the data order.
+    chunks_per_step: Optional[int] = None
     checkpoint: CheckpointConfig = field(default_factory=CheckpointConfig)
 
     # ------------------------------------------------------------------ api
@@ -192,13 +200,22 @@ class NanoGPTConfig:
         self.validate()
 
     @property
+    def effective_chunks(self) -> int:
+        """Record chunks per optimizer step (record: record_world_size)."""
+        return self.chunks_per_step if self.chunks_per_step is not None else self.record_world_size
+
+    @property
     def accum_factor(self) -> int:
         """G — micro-batches per device per optimizer step."""
-        return accumulation_factor(self.device_count, self.record_world_size)
+        if self.chunks_per_step is None:
+            return accumulation_factor(self.device_count, self.record_world_size)
+        return self.chunks_per_step // self.device_count
 
     @property
     def tokens_per_step(self) -> int:
-        return tokens_per_step(self.device_count, self.train_seq_len, self.record_world_size)
+        if self.chunks_per_step is None:
+            return tokens_per_step(self.device_count, self.train_seq_len, self.record_world_size)
+        return self.chunks_per_step * self.train_seq_len
 
     @property
     def val_chunks(self) -> int:
@@ -224,6 +241,7 @@ class NanoGPTConfig:
             self.device_count == self.record_world_size
             and not self.fp32_embed_grad_accum
             and self.head_chunk_rows is None
+            and self.chunks_per_step in (None, self.record_world_size)
             and self.precision_mode == "fp8"
             and self.attention_impl == "flex"
             and self.min_lr_frac == 0.05
@@ -262,6 +280,14 @@ class NanoGPTConfig:
                 "throughout, one backward per step). NOT RECORD-FAITHFUL: "
                 "diagnostic probe for docs/nanogpt-port.md §6.1."
             )
+        if self.chunks_per_step is not None and self.chunks_per_step != self.record_world_size:
+            out["chunks_per_step"] = (
+                f"{self.chunks_per_step} record chunks per optimizer step = "
+                f"{self.tokens_per_step} tokens/step (record: "
+                f"{self.record_world_size} chunks = {RECORD_TOKENS_PER_STEP}). "
+                "NOT RECORD-FAITHFUL: changes the token batch and data order. "
+                "Program #7 frontier-transfer axis."
+            )
         if self.head_chunk_rows is not None:
             out["head_chunk_rows"] = (
                 f"lm_head + soft-cap + cross-entropy computed over row chunks "
@@ -285,9 +311,18 @@ class NanoGPTConfig:
             raise ConfigError(f"precision_mode must be 'fp8' or 'bf16', got {self.precision_mode!r}")
         if self.attention_impl not in ("flex", "sdpa"):
             raise ConfigError(f"attention_impl must be 'flex' or 'sdpa', got {self.attention_impl!r}")
-        accumulation_factor(self.device_count, self.record_world_size)  # raises
-        if self.tokens_per_step != self.record_world_size * self.train_seq_len:
-            raise ConfigError("token batch per optimizer step does not match the record")
+        if self.chunks_per_step is None:
+            accumulation_factor(self.device_count, self.record_world_size)  # raises
+            if self.tokens_per_step != self.record_world_size * self.train_seq_len:
+                raise ConfigError("token batch per optimizer step does not match the record")
+        else:
+            if self.chunks_per_step < 1:
+                raise ConfigError(f"chunks_per_step must be >= 1, got {self.chunks_per_step}")
+            if self.chunks_per_step % self.device_count != 0:
+                raise ConfigError(
+                    f"device_count {self.device_count} does not divide "
+                    f"chunks_per_step {self.chunks_per_step}"
+                )
         if self.val_tokens % self.val_seq_len != 0:
             raise ConfigError(
                 f"val_tokens {self.val_tokens} not divisible by val_seq_len {self.val_seq_len} "

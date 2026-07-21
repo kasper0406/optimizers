@@ -157,3 +157,71 @@ class TestSeedPlumbing:
         written = json.loads(out[0].read_text())
         assert written["seed"] == 1717
         assert written["config"]["contents"]["seed"] == 1717
+
+
+class TestChunksPerStep:
+    """Program #7 batch axis: chunks_per_step changes tokens/step exactly."""
+
+    def test_default_is_record(self):
+        cfg = _cfg(device_count=8)
+        assert cfg.effective_chunks == 8
+        assert cfg.tokens_per_step == 393_216
+        assert "chunks_per_step" not in cfg.deviations()
+
+    def test_smaller_batch(self):
+        cfg = _cfg(device_count=1, chunks_per_step=2)
+        assert cfg.effective_chunks == 2
+        assert cfg.accum_factor == 2
+        assert cfg.tokens_per_step == 2 * 49_152
+        assert not cfg.record_faithful
+        assert "chunks_per_step" in cfg.deviations()
+
+    def test_larger_batch(self):
+        cfg = _cfg(device_count=1, chunks_per_step=16)
+        assert cfg.accum_factor == 16
+        assert cfg.tokens_per_step == 16 * 49_152
+
+    def test_explicit_record_value_is_faithful_axis(self):
+        cfg = _cfg(device_count=8, chunks_per_step=8)
+        assert "chunks_per_step" not in cfg.deviations()
+        assert cfg.record_faithful
+
+    def test_device_count_must_divide(self):
+        with pytest.raises(ConfigError):
+            _cfg(device_count=2, chunks_per_step=3)
+        cfg = _cfg(device_count=2, chunks_per_step=4)
+        assert cfg.accum_factor == 2
+
+    def test_positive(self):
+        with pytest.raises(ConfigError):
+            _cfg(device_count=1, chunks_per_step=0)
+
+
+def test_generator_generic_in_world_size(tmp_path):
+    """The data generator yields exactly chunks/device micro-batches per step
+    for a non-record world size (program #7 relies on this)."""
+    import numpy as np
+    from src.nanogpt.data import RecordDataGenerator
+
+    tokens = np.zeros(120_000, dtype=np.uint16)
+    tokens[::997] = 50256  # BOS markers
+    header = np.zeros(256, dtype=np.int32)
+    header[0], header[1], header[2] = 20240520, 1, len(tokens)
+    shard = tmp_path / "fineweb_train_000001.bin"
+    with open(shard, "wb") as fh:
+        fh.write(header.tobytes())
+        fh.write(tokens.tobytes())
+
+    gen = RecordDataGenerator(
+        str(tmp_path / "fineweb_train_*.bin"),
+        local_batch_size=4096,
+        record_world_size=2,          # program-#7 small-batch geometry
+        device_count=1,
+        rank=0,
+        align_to_bos=True,
+        device=torch.device("cpu"),
+    )
+    micro = list(gen.next_step())
+    assert len(micro) == 2  # 2 chunks / 1 device
+    for inputs, targets in micro:
+        assert inputs.numel() == 4096
