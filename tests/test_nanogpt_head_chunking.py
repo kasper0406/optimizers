@@ -272,3 +272,16 @@ class TestBatchSpanFloor:
         gen = self._gen(tmp_path, world=2, bos_stride=120_000)
         micro = list(gen.next_step())
         assert len(micro) == 2
+
+
+class TestConfigFingerprint:
+    def test_changes_with_trajectory_knobs(self):
+        base = _cfg(device_count=1)
+        assert base.config_fingerprint() != _cfg(device_count=1, muon_lr=0.1).config_fingerprint()
+        assert base.config_fingerprint() != _cfg(device_count=1, chunks_per_step=4).config_fingerprint()
+
+    def test_stable_across_seed_and_checkpoint(self):
+        a = _cfg(device_count=1, seed=1720)
+        b = _cfg(device_count=1, seed=1721,
+                 checkpoint={"dir": "elsewhere", "every_steps": 99, "resume": False})
+        assert a.config_fingerprint() == b.config_fingerprint()

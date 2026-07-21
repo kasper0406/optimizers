@@ -52,9 +52,21 @@ def _r(x: Optional[float], nd: int = 6) -> Optional[float]:
 
 
 def load_runs(results_dir: Path) -> Dict[int, Dict[float, List[float]]]:
-    """chunks -> muon_lr -> [final val loss], deduped (chunks, lr, seed)->latest."""
+    """chunks -> muon_lr -> [final val loss], deduped (chunks, lr, seed)->latest.
+
+    Files listed in results/INVALID_RUNS.json (append-only tombstones for
+    corrupt artifacts, e.g. the checkpoint-collision incident) are excluded.
+    """
+    tomb = results_dir / "INVALID_RUNS.json"
+    invalid = (
+        {e["file"] for e in json.loads(tomb.read_text()).get("invalid", [])}
+        if tomb.exists()
+        else set()
+    )
     latest: Dict[Tuple[int, float, int], float] = {}
     for f in sorted(results_dir.glob("nanogpt_seed*.json")):
+        if f.name in invalid:
+            continue
         d = json.loads(f.read_text())
         path = str((d.get("config") or {}).get("path", ""))
         if TAG_PREFIX not in path:

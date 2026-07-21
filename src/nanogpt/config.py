@@ -43,6 +43,7 @@ bit-comparable — see docs/nanogpt-port.md, deviation list).
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -117,6 +118,11 @@ class CheckpointConfig:
     dir: str = "checkpoints"
     every_steps: int = 0
     resume: bool = True
+    # A successfully COMPLETED run deletes its checkpoint (2 GB each; and a
+    # surviving completed checkpoint is a resume trap — see the program-#7
+    # incident where sweep variants sharing (seed, iterations) replayed a
+    # sibling's finished trajectory). Set true to keep the final checkpoint.
+    keep_on_success: bool = False
 
 
 @dataclass
@@ -357,6 +363,24 @@ class NanoGPTConfig:
         d = asdict(self)
         d["adam_betas"] = list(self.adam_betas)
         return d
+
+    def config_fingerprint(self) -> str:
+        """8-hex identity of everything that shapes the trajectory.
+
+        Excludes ``seed`` (already in the checkpoint tag) and the
+        ``checkpoint`` block (operational, not trajectory-shaping). Two runs
+        may share a checkpoint file ONLY if this matches — the program-#7
+        incident (sweep variants over muon_lr colliding on one
+        seed+iterations-keyed file and replaying each other's finished
+        trajectories) is the reason this exists.
+        """
+        import hashlib
+
+        d = self.to_dict()
+        d.pop("seed", None)
+        d.pop("checkpoint", None)
+        blob = json.dumps(d, sort_keys=True, default=str)
+        return hashlib.sha1(blob.encode()).hexdigest()[:8]
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "NanoGPTConfig":

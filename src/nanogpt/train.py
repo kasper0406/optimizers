@@ -106,7 +106,13 @@ def _checkpoint_path(cfg: NanoGPTConfig, rank: int) -> Path:
     directory = Path(cfg.checkpoint.dir)
     if not directory.is_absolute():
         directory = REPO_ROOT / directory
-    tag = f"seed{cfg.seed}_it{cfg.num_iterations}_d{cfg.device_count}_rank{rank}"
+    # cfg.config_fingerprint() keys the file to the trajectory-shaping config:
+    # sweep variants sharing (seed, iterations) must never share a checkpoint
+    # (program-#7 incident — variants replayed a sibling's finished run).
+    tag = (
+        f"seed{cfg.seed}_it{cfg.num_iterations}_d{cfg.device_count}"
+        f"_{cfg.config_fingerprint()}_rank{rank}"
+    )
     return directory / f"nanogpt_{tag}.pt"
 
 
@@ -271,6 +277,16 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
 
     if cfg.checkpoint.resume and ckpt_path.exists():
         state = torch.load(ckpt_path, map_location=device, weights_only=False)
+        # Belt-and-braces vs the fingerprinted filename: a checkpoint may
+        # only continue a run of the identical trajectory-shaping config.
+        found = state.get("config_fingerprint")
+        if found != cfg.config_fingerprint():
+            raise RuntimeError(
+                f"checkpoint {ckpt_path.name} carries config fingerprint "
+                f"{found!r} but this run is {cfg.config_fingerprint()!r}; "
+                "refusing to resume a different configuration's trajectory "
+                "(program-#7 collision guard)"
+            )
         raw_model.load_state_dict(state["model"])
         for opt, opt_state in zip(optimizers, state["optimizers"]):
             opt.load_state_dict(opt_state)
@@ -400,6 +416,7 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
             torch.save(
                 {
                     "step": step + 1,
+                    "config_fingerprint": cfg.config_fingerprint(),
                     "model": raw_model.state_dict(),
                     "optimizers": [opt.state_dict() for opt in optimizers],
                     "loader": loader.state_dict(),
@@ -409,6 +426,12 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
                 tmp,
             )
             tmp.rename(ckpt_path)
+
+    # Successful completion: the checkpoint is spent. A surviving completed
+    # checkpoint is a resume trap (program-#7 incident) and 2 GB of dead disk.
+    if not cfg.checkpoint.keep_on_success:
+        ckpt_path.unlink(missing_ok=True)
+        ckpt_path.with_suffix(".tmp").unlink(missing_ok=True)
 
     steps = [int(p["step"]) for p in val_curve]
     losses = [float(p["val_loss"]) for p in val_curve]

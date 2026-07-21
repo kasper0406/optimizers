@@ -1,0 +1,20 @@
+{
+  "_purpose": "Append-only tombstone list: results files that are scientifically invalid and must be excluded by every analysis tool. results/ is append-only, so corrupt artifacts are recorded here rather than deleted. Add entries; never remove them.",
+  "invalid": [
+    {
+      "file": "nanogpt_seed1720_20260721T164017.json",
+      "reason": "program-#7 checkpoint collision: run labeled muon_lr=0.035355 resumed the completed checkpoint of the muon_lr=0.025 sibling (checkpoint path was keyed only on seed+iterations+device_count) and replayed its finished trajectory; metrics.resumed_from_checkpoint=true, val_curve bit-identical to the 0.025 run. Fixed by config-fingerprinted checkpoint tags + resume guard + delete-on-success (commit that adds this file).",
+      "recorded": "2026-07-21"
+    },
+    {
+      "file": "nanogpt_seed1721_20260721T164101.json",
+      "reason": "same collision as nanogpt_seed1720_20260721T164017.json (muon_lr=0.035355 arm, seed 1721).",
+      "recorded": "2026-07-21"
+    },
+    {
+      "file": "nanogpt_seed1720_20260721T164144.json",
+      "reason": "same collision (muon_lr=0.05 arm, seed 1720; third rung to resume the 0.025 checkpoint).",
+      "recorded": "2026-07-21"
+    }
+  ]
+}

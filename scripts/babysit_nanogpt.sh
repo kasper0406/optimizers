@@ -31,9 +31,14 @@ mkdir -p "$LOGDIR"
 
 is_done() {
   uv run python - "$1" "$CFG_TAG" <<'PY'
-import glob, json, sys
+import glob, json, os, sys
 seed, tag = int(sys.argv[1]), sys.argv[2]
+invalid = set()
+if os.path.exists("results/INVALID_RUNS.json"):
+    invalid = {e["file"] for e in json.load(open("results/INVALID_RUNS.json")).get("invalid", [])}
 for f in sorted(glob.glob(f"results/nanogpt_seed{seed}_*.json")):
+    if os.path.basename(f) in invalid:
+        continue
     try:
         d = json.load(open(f))
     except Exception:
