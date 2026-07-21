@@ -245,6 +245,13 @@ def main(argv=None) -> int:
         seed = args.seed
 
     device = resolve_device(str(config.get("device", "cpu")))
+    # The resolved seed must travel IN the config too: experiments that read
+    # config["seed"] (NanoGPTConfig.from_config — trainer re-seed and the
+    # seed-keyed checkpoint path) would otherwise silently fall back to their
+    # defaults on sweep-materialized configs, which carry no seed key. Found
+    # the hard way: a --seed'd nanogpt sweep trained every run with the
+    # dataclass default (1000) and collided all checkpoints on one path.
+    config["seed"] = seed
     set_seed(seed)
 
     started_at = results_io.utc_now_iso()

@@ -120,3 +120,40 @@ class TestConfigWiring:
     def test_positive_validated(self):
         with pytest.raises(ConfigError):
             _cfg(head_chunk_rows=0)
+
+
+class TestSeedPlumbing:
+    """Regression: sweep-materialized configs carry no seed key; the CLI seed
+    must reach NanoGPTConfig (trainer re-seed + seed-keyed checkpoint path)."""
+
+    def test_from_config_missing_seed_falls_back_to_default(self):
+        # the failure mode: no top-level seed -> dataclass default
+        cfg = NanoGPTConfig.from_config({"nanogpt": {}})
+        assert cfg.seed == 1000
+
+    def test_run_py_injects_cli_seed_into_config(self, tmp_path, monkeypatch):
+        import importlib.util, json, yaml
+        from pathlib import Path
+        spec = importlib.util.spec_from_file_location(
+            "rm_run_seedtest", Path(__file__).resolve().parent.parent / "scripts" / "run.py"
+        )
+        run_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(run_mod)
+
+        seen = {}
+
+        def fake_experiment(config, device):
+            seen["config_seed"] = config.get("seed")
+            return {"ok": True}
+
+        monkeypatch.setitem(run_mod.EXPERIMENT_REGISTRY, "smoke", fake_experiment)
+        cfg_file = tmp_path / "sweepstyle.yaml"  # no seed key, like sweep output
+        cfg_file.write_text(yaml.safe_dump({"experiment": "smoke", "device": "cpu"}))
+        rc = run_mod.main([str(cfg_file), "--seed", "1717", "--out-dir", str(tmp_path)])
+        assert rc == 0
+        assert seen["config_seed"] == 1717
+        out = list(tmp_path.glob("smoke_seed1717_*.json"))
+        assert len(out) == 1
+        written = json.loads(out[0].read_text())
+        assert written["seed"] == 1717
+        assert written["config"]["contents"]["seed"] == 1717
