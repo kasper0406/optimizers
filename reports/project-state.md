@@ -35,8 +35,9 @@ independent adversarial agent, then amended or overturned on the record. Two
 of the biggest course-corrections (Gate 2 secondary criterion; the nanogpt
 amend-and-proceed) came from those reviews overturning the primary draft.
 
-Total cloud spend: **$13.60**. 621 tests. ~2,600 result JSONs with full
-provenance. All committed.
+Total cloud spend: **$13.60**. 639 tests. ~2,700 result JSONs with full
+provenance. All committed. (2026-07-21: program #6 ran locally on the new
+2× RTX 5090 box — the first non-cloud GPU capacity in the project.)
 
 ## 3. Findings
 
@@ -101,7 +102,30 @@ intervention buys anything — is probably task/headroom-dependent.
   Muon's stable-LR ceiling is not a smoothness plateau in either norm.
 - **No hidden persistent signal at long integration** (program #4, above).
 
-### 3.5 Infrastructure findings (nanogpt, WP0.2)
+### 3.5 Stability frontier in (lr × batch) (program #6, 2026-07-21, local 2×RTX 5090)
+
+Pre-registered before any run (`reports/stability-frontier-preregistration.md`);
+80-cell grid (5 batch × 8 lr rungs × 2 dev seeds), full report
+`reports/stability-frontier.md`.
+
+- **The useful-lr shoulder shifts right with batch at ≈ √B** where the
+  pre-registered definition applies (α = 0.50 over B 500→2000, pre-registered
+  noise-governed region; rung quantization ±0.5 keeps α=0 formally unexcluded
+  at 3 points). At B ≥ 4000 the definition breaks *informatively*: low lr
+  becomes the losing side (acc non-monotone in lr), and the post-hoc
+  peak-referenced shoulder continues the shift (slope 0.53 over B 500→4000).
+- **No instrumented quantity is the frontier invariant**: occupancy, spectral
+  and Euclidean directional smoothness, and HVP η·λ q90 all fail the
+  pre-registered tracking signature; curvature is the *least* equalized
+  (~5–6× across batch) — extending "curvature does not govern" to the batch
+  axis.
+- **Cliff-free degradation persists across a 16× batch range** (no collapse
+  to random anywhere on the ladder).
+- Infrastructure: the new local 5090/torch-2.13 stack reproduces the historic
+  baseline at the bridge cell (94.14% + P2 quantities inside prior ranges);
+  HVP probe OOMs at B=8000 on 32 GB (amendment A1, endpoint-neutral).
+
+### 3.6 Infrastructure findings (nanogpt, WP0.2)
 
 A 1×H100 port of the pinned modded-nanogpt record (2025-07-12_BosAlign) with
 exact token-batch matching (8× grad accumulation, 393,216 tokens/step). Two
@@ -121,20 +145,22 @@ methodological findings fell out:
 
 A measurement paper (`reports/paper-draft.md`) whose contributions are the
 §3.1 measurements, the §3.2 placebo-controlled null, the §3.3 equivalent-
-destinations mechanism, the §3.4 negative results, and the §3.5
-methodology notes — none of which required the routing method to work, and
+destinations mechanism, the §3.4 negative results, the §3.5 frontier
+measurement, and the §3.6 methodology notes — none of which required the
+routing method to work, and
 all of which are absent from the 2024–2026 literature we swept. The paper's
 differentiator from the "yet another Muon variant" pile is precisely that it
 is measurement-first with a clean null, not a method claim.
 
 ## 5. Open questions the data raises
 
-1. **What actually sets Muon's maximum stable LR?** §3.2 shows no divergence
-   cliff to 6×; §3.4 rules out directional-smoothness plateaus; the ICML'26
-   theory covers only full-batch momentum-free. The instrument to answer this
-   (simultaneous Euclidean-ηλ HVP + spectral directional smoothness along the
-   trajectory) is built and validated (`src/instrument/smoothness.py`,
-   `src/instrument/hvp.py`).
+1. **What actually sets Muon's maximum stable LR?** Now sharpened by §3.5:
+   the frontier is batch-coupled at ≈ √B (noise-side), but none of the four
+   instrumented quantities (occupancy, either smoothness norm, HVP η·λ) is
+   the equalized invariant along it — the frontier-setting quantity remains
+   unidentified. Tightening α past the rung-quantization envelope needs a
+   denser ladder with more seeds (see the follow-ups in
+   `reports/stability-frontier.md`).
 2. **Does the negative-ρ population's "equivalent destinations" property break
    at higher headroom / larger batch / longer horizon?** The consequence
    (nothing to gain) is the part most likely to be task-specific.
@@ -148,17 +174,16 @@ is measurement-first with a clean null, not a method claim.
 
 ## 6. Next steps (ranked by expected payoff)
 
-1. **Muon stability-frontier measurement (LR × batch size, instrument
-   attached).** Directly attacks open question #1 and the ICML'26 open problem;
-   uses already-built, already-validated instrumentation; the most robust
-   positive finding (§3.2) is the seed. Best science-per-effort. Deliverable:
-   the momentum+minibatch stability law the field lacks, plus a mechanistic
-   link to the large-batch advantage.
+1. ~~Muon stability-frontier measurement~~ **DONE 2026-07-21 (§3.5,
+   program #6).** Natural sharpening pass if pursued further: dense-rung
+   ladder (×1.15 spacing) with n ≥ 5 seeds at B ∈ {1000, 2000, 4000} to take
+   the α envelope from ±0.5 to ~±0.12 (~60 runs, ~1 h local), plus a
+   step-matched large-B arm to deconfound the B=8000 row.
 2. **Occupancy-triggered cooldown** (`criteria/occupancy_cooldown_preregistration.md`,
    pre-registered). Requires first: (a) the occupancy instrumentation ported to
    the nanogpt harness — unwritten, with a real torch.compile/FP8 graph-break
    risk; (b) our own harness seed-variance estimate (the record's cannot serve,
-   §3.5); (c) accounting for the cooldown-phase confound (§3.5) since the
+   §3.6); (c) accounting for the cooldown-phase confound (§3.6) since the
    intervention manipulates exactly that phase; (d) the pre-registered metric
    repaired away from the censored steps-to-target. The path to a "removed a
    hyperparameter" result, but gated on real setup work.
