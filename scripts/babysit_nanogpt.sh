@@ -44,7 +44,9 @@ for f in sorted(glob.glob(f"results/nanogpt_seed{seed}_*.json")):
     except Exception:
         continue
     cfg = d.get("config") or {}
-    if tag not in str(cfg.get("path", "")):
+    # EXACT basename match: substring matching skipped variant muon_lr0.1
+    # because its tag is a prefix of muon_lr0.141421's filename.
+    if os.path.basename(str(cfg.get("path", ""))) != tag + ".yaml":
         continue
     m = d.get("metrics") or {}
     curve = m.get("val_curve") or []
