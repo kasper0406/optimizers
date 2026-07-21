@@ -108,12 +108,17 @@ Pre-registered before any run (`reports/stability-frontier-preregistration.md`);
 80-cell grid (5 batch × 8 lr rungs × 2 dev seeds), full report
 `reports/stability-frontier.md`.
 
-- **The useful-lr shoulder shifts right with batch at ≈ √B** where the
-  pre-registered definition applies (α = 0.50 over B 500→2000, pre-registered
-  noise-governed region; rung quantization ±0.5 keeps α=0 formally unexcluded
-  at 3 points). At B ≥ 4000 the definition breaks *informatively*: low lr
-  becomes the losing side (acc non-monotone in lr), and the post-hoc
-  peak-referenced shoulder continues the shift (slope 0.53 over B 500→4000).
+- **The useful-lr frontier is batch-coupled at lr\* ∝ B^0.35, CI95
+  [0.30, 0.42]** (program #6b dense-ladder sharpening, n=5, interpolated
+  crossings, 2026-07-21): the deterministic (batch-independent) account is
+  decisively excluded, and so is the √B point prediction — program #6's
+  coarse α = 0.50 was rung-quantization luck, as #6b was pre-registered to
+  adjudicate. At B ≥ 4000 low lr becomes the losing side (acc non-monotone
+  in lr), a signature that survives step-matching.
+- **The B=8000 trend-break was undertraining** (program #6b Part 2):
+  step-matched (epochs 32, ~200 steps) B=8000 recovers 93.75% and its
+  peak-referenced shoulder lands at 0.96 ≥ B=4000's 0.72 — the rightward
+  shift continues, it does not saturate.
 - **No instrumented quantity is the frontier invariant**: occupancy, spectral
   and Euclidean directional smoothness, and HVP η·λ q90 all fail the
   pre-registered tracking signature; curvature is the *least* equalized
@@ -175,10 +180,12 @@ is measurement-first with a clean null, not a method claim.
 ## 6. Next steps (ranked by expected payoff)
 
 1. ~~Muon stability-frontier measurement~~ **DONE 2026-07-21 (§3.5,
-   program #6).** Natural sharpening pass if pursued further: dense-rung
-   ladder (×1.15 spacing) with n ≥ 5 seeds at B ∈ {1000, 2000, 4000} to take
-   the α envelope from ±0.5 to ~±0.12 (~60 runs, ~1 h local), plus a
-   step-matched large-B arm to deconfound the B=8000 row.
+   programs #6 + #6b; sharpening pass also done — α = 0.35 [0.30, 0.42],
+   step-matched B=8000 confirms the shift continues).** What remains open
+   from this line: the frontier-setting invariant (all four instrumented
+   scalars ruled out) and why the exponent is ~B^1/3 rather than √B —
+   both are analysis/theory questions before they are new-compute
+   questions.
 2. **Occupancy-triggered cooldown** (`criteria/occupancy_cooldown_preregistration.md`,
    pre-registered). Requires first: (a) the occupancy instrumentation ported to
    the nanogpt harness — unwritten, with a real torch.compile/FP8 graph-break

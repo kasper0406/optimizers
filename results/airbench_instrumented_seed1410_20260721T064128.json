@@ -1,0 +1,118 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_instrumented",
+      "instrumentation": {
+        "align_min": 0.9,
+        "betas": [
+          0.9,
+          0.99
+        ],
+        "classifier": {
+          "innov_needed": 2,
+          "innov_window": 4,
+          "n_min": 50,
+          "rho_osc": 0.5,
+          "tau_noise": 2.0,
+          "tau_sig": 4.0,
+          "z_reset": 6.0
+        },
+        "frozen_probes": {
+          "enabled": false
+        },
+        "hvp": false,
+        "k1": 16,
+        "k2": 16,
+        "min_dim": 8,
+        "momentum_key": "momentum_buffer",
+        "seed": 4242,
+        "smoothness": {
+          "enabled": true,
+          "grad_source": "recompute",
+          "t_meas": 5
+        },
+        "snapshot_every": 5,
+        "subspace_iters": 2,
+        "t_refresh": 50
+      },
+      "probe_overrides": {
+        "lr": 0.24
+      },
+      "recipe": {
+        "compile": false,
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 8000,
+        "epochs": 32
+      }
+    },
+    "path": "sweeps/frontier_b8000_stepmatched/frontier_b8000_stepmatched__lr0.24.yaml",
+    "sha256": "cb4376b35d173121b4eb0d28138eea76f8e7c5931957dffb7bc739300e1d8d68"
+  },
+  "cost_usd": null,
+  "experiment": "airbench_instrumented",
+  "finished_at": "2026-07-21T06:41:59.855876+00:00",
+  "git_dirty": false,
+  "git_sha": "ba5bad32f2a656445cc33b7e5babd5878019cbc4",
+  "gpu_type": "NVIDIA GeForce RTX 5090",
+  "metrics": {
+    "epochs": 32.0,
+    "instrumentation_sidecar": "airbench_instrumented_seed1410_20260721T064128.instrumentation.json",
+    "instrumented": true,
+    "optimizer": "vendor_muon",
+    "optimizer_lr": 0.24,
+    "probe_overrides": {
+      "lr": 0.24
+    },
+    "smoothness_backward_passes": 39,
+    "smoothness_forward_passes": 273,
+    "steps": 192,
+    "time_seconds": 29.478333679199217,
+    "train_acc_last": 0.9985000491142273,
+    "tta_val_acc": 0.9188999533653259,
+    "val_acc": 0.9039999842643738,
+    "val_accs": [
+      0.17059999704360962,
+      0.11879999935626984,
+      0.17219999432563782,
+      0.181099995970726,
+      0.10419999808073044,
+      0.211899995803833,
+      0.3027999997138977,
+      0.3799999952316284,
+      0.37709999084472656,
+      0.47909998893737793,
+      0.41509997844696045,
+      0.49129998683929443,
+      0.3026999831199646,
+      0.4624999761581421,
+      0.40789997577667236,
+      0.6074000000953674,
+      0.6661999821662903,
+      0.7335000038146973,
+      0.67249995470047,
+      0.7148000001907349,
+      0.7953999638557434,
+      0.6904999613761902,
+      0.8391000032424927,
+      0.8393999934196472,
+      0.8525999784469604,
+      0.8592000007629395,
+      0.8463000059127808,
+      0.8930999636650085,
+      0.8965999484062195,
+      0.8983999490737915,
+      0.9017999768257141,
+      0.9039999842643738
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1410,
+  "started_at": "2026-07-21T06:41:28.331710+00:00",
+  "wall_time_s": 31.524149511998985
+}
