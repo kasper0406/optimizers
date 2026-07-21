@@ -119,8 +119,21 @@ class RecordDataGenerator:
         self.align_to_bos = align_to_bos
         self.device = device or torch.device("cpu")
         self.batch_size = record_world_size * local_batch_size
-        # RECORD:547: buffer to handle samples up to length local_batch_size
-        self.max_batch_span = 2 * self.batch_size if align_to_bos else self.batch_size
+        # RECORD:547: buffer to handle samples up to length local_batch_size.
+        # The BOS-boundary search window is floored at the RECORD's window
+        # (2 x 8 x local_batch_size): at the program-#7 small token batches
+        # (record_world_size here < 8) a proportional window can fail to
+        # contain enough qualifying document boundaries (observed: assertion
+        # in find_batch_starts at chunks_per_step=2). A wider window never
+        # changes which chunks are selected when the search succeeds — the
+        # greedy scan is order-deterministic — it only prevents the overflow
+        # (and moves the end-of-shard advance guard correspondingly earlier
+        # for those non-record geometries). Record geometry (8 chunks) is
+        # bit-identical: its own window already equals the floor.
+        span_floor = 2 * 8 * local_batch_size
+        self.max_batch_span = (
+            max(2 * self.batch_size, span_floor) if align_to_bos else self.batch_size
+        )
         self.file_index = 0
         self.tokens = _load_data_shard(self.files[0])
         self.pos = 0

@@ -225,3 +225,50 @@ def test_generator_generic_in_world_size(tmp_path):
     assert len(micro) == 2  # 2 chunks / 1 device
     for inputs, targets in micro:
         assert inputs.numel() == 4096
+
+
+class TestBatchSpanFloor:
+    """Program #7 loader fix: the BOS search window is floored at the
+    record's window so small-chunk arms survive sparse-BOS stretches."""
+
+    def _gen(self, tmp_path, world, n_tokens=900_000, bos_stride=997):
+        import numpy as np
+        from src.nanogpt.data import RecordDataGenerator
+
+        tokens = np.zeros(n_tokens, dtype=np.uint16)
+        tokens[::bos_stride] = 50256
+        header = np.zeros(256, dtype=np.int32)
+        header[0], header[1], header[2] = 20240520, 1, len(tokens)
+        shard = tmp_path / "fineweb_train_000001.bin"
+        with open(shard, "wb") as fh:
+            fh.write(header.tobytes())
+            fh.write(tokens.tobytes())
+        return RecordDataGenerator(
+            str(tmp_path / "fineweb_train_*.bin"),
+            local_batch_size=49_152,
+            record_world_size=world,
+            device_count=1,
+            rank=0,
+            align_to_bos=True,
+            device=torch.device("cpu"),
+        )
+
+    def test_record_window_unchanged(self, tmp_path):
+        gen = self._gen(tmp_path, world=8)
+        assert gen.max_batch_span == 2 * 8 * 49_152
+
+    def test_small_chunks_get_record_floor(self, tmp_path):
+        gen = self._gen(tmp_path, world=2)
+        assert gen.max_batch_span == 2 * 8 * 49_152  # floored, not 2*2*49152
+
+    def test_large_chunks_scale_past_floor(self, tmp_path):
+        gen = self._gen(tmp_path, world=16, n_tokens=3_400_000)
+        assert gen.max_batch_span == 2 * 16 * 49_152
+
+    def test_sparse_bos_stretch_survives_at_small_chunks(self, tmp_path):
+        # one qualifying boundary per ~120k tokens: the pre-fix 2*2*49152
+        # window (196k) holds barely 1 chunk boundary and asserted; the
+        # floored window (786k) finds the 2 chunks comfortably.
+        gen = self._gen(tmp_path, world=2, bos_stride=120_000)
+        micro = list(gen.next_step())
+        assert len(micro) == 2
