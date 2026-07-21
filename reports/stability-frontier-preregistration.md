@@ -101,6 +101,17 @@ the log-log shoulder-vs-B fit with α; the P2 two-table (at-shoulder vs
 at-1×) candidate comparison; P3 min-accuracy table. Report:
 `reports/stability-frontier.md`, descriptive.
 
+## Amendment A1 (2026-07-20, post-launch, infrastructure)
+
+All 16 B=8000 cells OOM'd on the 32 GB RTX 5090: the HVP probe's fp32
+functional re-forward + create-graph backward does not fit at batch 8000.
+B=8000 reruns use `configs/dev/frontier_lrxbatch_b8000.yaml` — identical
+except `instrumentation.hvp: false` (smoothness stays on). The probe is
+read-only w.r.t. training, and no pre-registered endpoint touches B=8000
+sidecars (P2 excluded B=8000 in advance; P1/P3 are accuracy-only), so no
+prediction, definition, or threshold changes. Recorded here for the run
+ledger rather than silently.
+
 ## Caveats pre-declared
 
 - n=2 per cell resolves a 1.0pp floor (seed sd ≈ 0.15pp at stock) but not
