@@ -175,6 +175,12 @@ class NanoGPTConfig:
     # bf16-accumulation suspect at D < 8. NOT RECORD-FAITHFUL: the record does
     # one backward per step, so it never accumulates at all.
     fp32_embed_grad_accum: bool = False
+    # PORT: compute lm_head + soft-cap + cross-entropy over row chunks of this
+    # size (model.py PORT CHANGE P5). Same math as the record's full-width
+    # head up to fp32 summation order; required to fit the record's train
+    # chunk (49,152 tokens) and val sequences (262,144 tokens) on 32 GB GPUs.
+    # NOT RECORD-FAITHFUL when set.
+    head_chunk_rows: Optional[int] = None
     checkpoint: CheckpointConfig = field(default_factory=CheckpointConfig)
 
     # ------------------------------------------------------------------ api
@@ -217,6 +223,7 @@ class NanoGPTConfig:
         return (
             self.device_count == self.record_world_size
             and not self.fp32_embed_grad_accum
+            and self.head_chunk_rows is None
             and self.precision_mode == "fp8"
             and self.attention_impl == "flex"
             and self.min_lr_frac == 0.05
@@ -255,6 +262,14 @@ class NanoGPTConfig:
                 "throughout, one backward per step). NOT RECORD-FAITHFUL: "
                 "diagnostic probe for docs/nanogpt-port.md §6.1."
             )
+        if self.head_chunk_rows is not None:
+            out["head_chunk_rows"] = (
+                f"lm_head + soft-cap + cross-entropy computed over row chunks "
+                f"of {self.head_chunk_rows} (train chunks gradient-checkpointed; "
+                "record: one full-width head GEMM). Same math up to fp32 "
+                "summation order. NOT RECORD-FAITHFUL: 32 GB-GPU memory path "
+                "(model.py PORT CHANGE P5)."
+            )
         if self.num_iterations != RECORD_NUM_ITERATIONS:
             out["num_iterations"] = f"{self.num_iterations} (record {RECORD_NUM_ITERATIONS})"
         if self.min_lr_frac != 0.05:
@@ -285,6 +300,19 @@ class NanoGPTConfig:
             )
         if self.train_seq_len % 128 != 0:
             raise ConfigError("train_seq_len must be a multiple of the 128-token block size")
+        if self.head_chunk_rows is not None:
+            if self.head_chunk_rows <= 0:
+                raise ConfigError("head_chunk_rows must be positive")
+            if self.train_seq_len % self.head_chunk_rows != 0:
+                raise ConfigError(
+                    f"train_seq_len {self.train_seq_len} not divisible by "
+                    f"head_chunk_rows {self.head_chunk_rows}"
+                )
+            if self.val_seq_len % self.head_chunk_rows != 0:
+                raise ConfigError(
+                    f"val_seq_len {self.val_seq_len} not divisible by "
+                    f"head_chunk_rows {self.head_chunk_rows}"
+                )
         if self.num_layers % 2 != 0:
             raise ConfigError("num_layers must be even (RECORD:419 asserts this)")
         if self.max_steps is not None and self.max_steps < 0:

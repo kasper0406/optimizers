@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import torch
 import torch.nn.functional as F
+import torch.utils.checkpoint
 from torch import Tensor, nn
 # use of FlexAttention contributed by @KoszarskyB
 from torch.nn.attention.flex_attention import BlockMask, flex_attention
@@ -270,9 +271,21 @@ class GPT(nn.Module):
         world_size: int = 8,      # PORT CHANGE P2 (record: process world size, always 8)
         use_fp8: bool = True,     # PORT CHANGE P1 (record: hardcoded True at RECORD:415)
         attention_impl: str = "flex",  # PORT CHANGE P4 (record: always flex)
+        head_chunk_rows: int | None = None,  # PORT CHANGE P5 (record: one full-width head GEMM)
     ):
         super().__init__()
         self.attention_impl = attention_impl
+        # PORT CHANGE P5: compute lm_head + soft-cap + cross-entropy over row
+        # chunks of this size (train: each chunk checkpointed so its logits
+        # are recomputed in backward instead of saved).  The record's
+        # reduction='sum' (train) and 'mean' (eval) decompose exactly over row
+        # chunks and the fp8 head scales are static constants, so the result
+        # is the record's loss up to fp32 summation order.  NOT RECORD-
+        # FAITHFUL, but the only way the record's 49,152-token train chunk and
+        # 262,144-token val sequences fit a 32 GB GPU (the full-width path
+        # materializes multi-GB fp32 logits: 49,152 x 50,304 x 4 B in train,
+        # 262,144 x 50,304 x 4 B in val).
+        self.head_chunk_rows = head_chunk_rows
         self.embed = nn.Embedding(vocab_size, model_dim)
         for param in self.embed.parameters():
             param.lr_mul = 75.
@@ -402,8 +415,46 @@ class GPT(nn.Module):
                 skip_connections.append(x)
 
         x = norm(x)
-        logits = self.lm_head(x).float()
-        # @Grad62304977 added tanh softcapping following Gemma 2 paper, @KoszarskyB reduced it from 30 to 15, @YouJiacheng shifted it by +15 (2*sigmoid(2*x)=tanh(x)+1)
-        logits = 30 * torch.sigmoid(logits / (7.5 * x.size(-1)**0.5))
-        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), target_seq, reduction='sum' if self.training else 'mean')
-        return loss
+        if self.head_chunk_rows is None:
+            logits = self.lm_head(x).float()
+            # @Grad62304977 added tanh softcapping following Gemma 2 paper, @KoszarskyB reduced it from 30 to 15, @YouJiacheng shifted it by +15 (2*sigmoid(2*x)=tanh(x)+1)
+            logits = 30 * torch.sigmoid(logits / (7.5 * x.size(-1)**0.5))
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), target_seq, reduction='sum' if self.training else 'mean')
+            return loss
+        return self._chunked_head_loss(x, target_seq)
+
+    def _chunked_head_loss(self, x: Tensor, target_seq: Tensor) -> Tensor:
+        """PORT CHANGE P5: the record's head + soft-cap + loss over row chunks.
+
+        Identical math to the full-width path: cross_entropy with
+        reduction='sum' is additive over disjoint row chunks, and eval's
+        'mean' is the same sum divided by the row count. Each train chunk is
+        gradient-checkpointed so backward recomputes its logits instead of
+        holding every chunk's fp32 logits simultaneously; eval runs under the
+        caller's no_grad. Deviation from the record: fp32 accumulation order
+        of the loss sum and of the lm_head weight-gradient (summed per chunk
+        rather than in one GEMM).
+        """
+        x_flat = x.view(-1, x.size(-1))
+        n_rows = x_flat.size(0)
+        chunk = self.head_chunk_rows
+        assert n_rows % chunk == 0, (
+            f"sequence rows {n_rows} not divisible by head_chunk_rows {chunk}"
+        )
+
+        def chunk_loss(xc: Tensor, tc: Tensor) -> Tensor:
+            logits_c = self.lm_head(xc).float()
+            logits_c = 30 * torch.sigmoid(logits_c / (7.5 * xc.size(-1) ** 0.5))
+            return F.cross_entropy(logits_c, tc, reduction="sum")
+
+        total = x_flat.new_zeros((), dtype=torch.float32)
+        for start in range(0, n_rows, chunk):
+            xc = x_flat[start:start + chunk]
+            tc = target_seq[start:start + chunk]
+            if self.training:
+                total = total + torch.utils.checkpoint.checkpoint(
+                    chunk_loss, xc, tc, use_reentrant=False
+                )
+            else:
+                total = total + chunk_loss(xc, tc)
+        return total if self.training else total / n_rows

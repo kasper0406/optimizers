@@ -193,6 +193,7 @@ def _build(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         world_size=cfg.record_world_size,
         use_fp8=(cfg.precision_mode == "fp8"),
         attention_impl=cfg.attention_impl,
+        head_chunk_rows=cfg.head_chunk_rows,  # PORT CHANGE P5 (32 GB memory path)
     ).to(device)
     for m in model.modules():  # RECORD:628-630
         if isinstance(m, nn.Embedding):
