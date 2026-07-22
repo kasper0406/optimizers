@@ -40,9 +40,30 @@ territory that linear operations cannot shortcut (M1).
 
 ## Scope and claims
 
-Measurements stand independent of the novelty sweep (running at time of
-commit; its verdict gates any publication claim about cross-LR mode
-connectivity — to be appended). Dev-phase, one substrate, B = 1000,
+**Novelty-sweep verdict (appended 2026-07-22):** cross-LR linear
+connectivity is *partially* measured — Sadrtdinov et al. (2410.22113,
+NeurIPS 2024) tested it for fine-tuning-LR ladders from a shared anchor
+in a deliberately scale-invariant SGD-on-sphere setting (binary
+connected/not, regime-dependent) — so the phenomenon may not be claimed
+as unmeasured. Our deltas that survive: from-scratch full-run same-seed
+ladders; Muon (the Muon-connectivity paper 2605.09991 is cross-seed /
+cross-optimizer only); the quantitative graded-path structure
+(monotone distance, cos ≈ 0.5 coherence, straightness); BN-repaired
+barriers in a standard network; and the intervention-class contrast
+(graded LR path vs program #1's scattering). The M3 flat-displacement
+result should be positioned as the first direct Hessian-eigenspace test
+of the river-valley prediction on Muon (Wen et al. 2410.05192;
+Muon-specific 2606.21514): post-anneal, the wall-oscillation component
+has been annealed away and the dose displacement is pure
+river-position deficit — which is exactly what ratio ≈ 0.000 shows.
+The strongest unclaimed operator in the neighborhood — a
+hyperparameter-dose damage vector subtracted CUTS-style — is precisely
+what our M1 barrier closes in linear form; nonlinear versions remain
+open but unmotivated by our data. Must-cite: Keskar 1609.04836 (the
+batch-size interpolation ur-precedent), Altintas 2312.09832 (LR matched
+within pairs — the explicit gap), 2510.04686 (competing noise-scale
+dose framing, across seeds), 2605.28751 (smooth frontier along a
+training-condition axis). Dev-phase, one substrate, B = 1000,
 same-seed pairs only; cross-seed weight comparisons deliberately
 excluded (permutation confound, per prereg). Seeds 1476–1485 consumed;
 next fresh 1486+.
