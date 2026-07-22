@@ -502,6 +502,9 @@ def run_airbench_smoke(
         # Gate-1 amendment A5: end-of-run routing telemetry + coarse series.
         metrics["routing_stats"] = optimizer2.routing_stats()
         metrics["routing_timeseries"] = routing_timeseries
+    if hasattr(optimizer2, "tempo_stats"):
+        # Program #8: TempoMuon rho/gain telemetry (self-recorded per step).
+        metrics["tempo_stats"] = optimizer2.tempo_stats()
     return metrics
 
 

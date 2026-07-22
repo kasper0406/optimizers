@@ -1,0 +1,51 @@
+# Program #8 Phase A -- passive matrix-level rho measurement under stock-Muon
+# dynamics. TempoMuon with kappa=0 is bit-identical to Muon (unit-tested:
+# tests/test_optim_tempomuon.py::test_passive_mode_is_bitwise_stock_muon)
+# while logging per-matrix rho_hat = EMA[cos(G_t, G_{t-1})] every step.
+#
+# Purpose (before any controller run): verify the cheap matrix-level serial
+# signal is (a) well above the white-noise floor, (b) LR-monotone at matrix
+# granularity, mirroring the per-direction WP1.2 result; read off healthy
+# (1x) vs degraded (3-4x) rho ranges to set rho_star honestly from dev data.
+#
+# Optimizer hyperparameters = airbench94_muon.py record values (lr 0.24,
+# momentum 0.6, nesterov, NS steps 3), as in configs/dev/airbench_smoke_muon.yaml.
+# LR rungs {1x, 2x, 3x, 4x} bracket the known useful-LR shoulder (2-3x,
+# gate2-decision.md) on both sides. Seeds 1420-1422: fresh dev block.
+
+experiment: airbench_smoke
+seed: 1420
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: tempomuon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+  rho_beta: 0.9
+  kappa: 0.0            # passive: measure only, gain pinned at 1
+  rho_star: -0.2        # unused at kappa=0
+  gain_min: 0.25
+  gain_max: 1.0
+  warmup_steps: 25
+  scope: per_matrix
+  history_every: 1
+
+sweep:
+  seeds: [1420, 1421, 1422]
+  grid:
+    optimizer.lr: [0.24, 0.48, 0.72, 0.96]
