@@ -18,7 +18,10 @@ airbench94 record configuration with a synthetically validated statistics
 pipeline (per-direction projections of the raw gradient onto tracked singular
 pairs of momentum; EMAs, lag-1 autocorrelation, t-statistics, implied
 step-curvature) at 7.7% median step-time overhead and no measurable effect on
-training, and report five measurement findings and one intervention result:
+training, and report seven measurement findings and one intervention result
+(findings 1–5 and 7 on airbench94; finding 6 spans a second substrate as
+well — a numerics-audited port of the modded-nanogpt speedrun record on
+FineWeb):
 
 1. **A large, phase-structured negative-autocorrelation population.** 60–89%
    of per-direction snapshots have lag-1 autocorrelation ρ < −0.2 during the
@@ -50,7 +53,23 @@ training, and report five measurement findings and one intervention result:
    (|t| ≤ SNR·√ess) makes a persistent-signal population undetectable at the
    observed SNR and EMA timescales, and the "oscillating" label is a
    (direction, window) property (Jaccard 0.36 between β = 0.9 and 0.99 sets).
-6. **A placebo-controlled null for per-direction regime routing.** A minimal
+6. **The useful-LR frontier is batch-coupled at lr\* ∝ B^0.35 on airbench —
+   and batch-invariant on the LM record recipe.** Dense-ladder interpolated
+   crossings (n = 5 seeds/cell) give α = 0.350, CI95 [0.297, 0.425] at fixed
+   sample budget over B = 1000–4000 — decisively batch-coupled
+   (noise-side), and decisively *not* the √B reference; a step-matched
+   B = 8000 arm shows the shift continues rather than saturating, and at
+   B ≥ 4000 *low* LR becomes the losing side. None of four instrumented
+   scalars (oscillation occupancy, spectral or Euclidean directional
+   smoothness — neither of which equilibrates at c/lr in its own right —
+   or HVP η·λ) is conserved along the frontier. On the LM port, the same
+   pre-registered design over an 8× token-batch range (98K–786K
+   tokens/step, fixed 346M-token budget) refutes transfer: α = −0.29, CI95
+   [−0.35, +0.30], the airbench exponent excluded, the loss valley pinned
+   at ≈ 0.7× the record LR at every batch, no divergence cliff anywhere.
+   The pair bounds the law's domain: batch-coupled at CNN-scale batches,
+   batch-invariant at LM-scale token batches.
+7. **A placebo-controlled null for per-direction regime routing.** A minimal
    routed optimizer (oscillation-channel damping on tracked singular pairs,
    activity-verified at 13.6% treated direction-steps) is seed-paired
    equivalent to stock Muon over 100 evaluation seeds: routed − muon =
@@ -81,8 +100,15 @@ tracked-subspace intervention class.
   every statistic used (§2.2), non-perturbation evidence, 7.7% overhead, and
   an honest account of what the instrument structurally cannot see
   (finding 5).
+- A two-substrate, pre-registered measurement of the Muon useful-LR frontier
+  in batch (finding 6): lr\* ∝ B^0.35 [0.30, 0.42] on airbench with no
+  conserved scalar found along the frontier, versus batch-invariance across
+  98K–786K tokens/step on the LM record recipe — a domain boundary for
+  batch-aware LR scaling rules, with the practical corollary that the record's
+  Muon LR needs no retuning under grad-accumulation token-batch changes in
+  that range.
 - A pre-registered, seed-paired, placebo-controlled equivalence result for
-  online per-direction regime routing at short horizon (finding 6), including
+  online per-direction regime routing at short horizon (finding 7), including
   activity telemetry proving the intervention was live, and full disclosure of
   every deviation from the pre-registered protocol.
 
@@ -295,10 +321,14 @@ lr·λ ≈ 65 decoupling is a quantitative instance of their qualitative claim;
 the broadband negative lag-1 autocorrelation (period-2 bouncing appears as
 negative lag-1 autocorrelation in per-direction projections) matches their
 pre-EoS oscillation; momentum-independence and the absence of any divergence
-regime to 6× are, to our knowledge, unreported. What our data do *not*
-contain is the matching trajectory measurement of generalized (spectral)
-directional smoothness — the Muon analog of GD's 2/η and Adam's ≈ 38/η
-constant (Cohen et al., arXiv:2207.14484) remains unmeasured here (§7).
+regime to 6× are, to our knowledge, unreported. We subsequently added the
+matching trajectory measurement of generalized (spectral) directional
+smoothness and found that the Muon analog of GD's 2/η and Adam's ≈ 38/η
+constant (Cohen et al., arXiv:2207.14484) **does not exist as an
+LR-invariant plateau on this substrate**: across a 4× LR ladder the
+dimensionless product lr·D_smooth varies 2.57× in the spectral norm and
+2.26× in the Euclidean norm — the spectral quantity is no more LR-invariant
+than the Euclidean one (§3.6).
 
 ### 3.5 Timescale sensitivity and the t-ceiling
 
@@ -320,6 +350,66 @@ constant (Cohen et al., arXiv:2207.14484) remains unmeasured here (§7).
   Phase-2 intervention to the oscillation channel only.
 
 ---
+
+### 3.6 The useful-LR frontier in batch: B^0.35 on airbench, batch-invariant at LM token batches
+
+Three pre-registered programs (each with predictions committed before any
+run; `reports/stability-frontier-preregistration.md`,
+`frontier-sharpening-preregistration.md`,
+`frontier-nanogpt-preregistration.md`) map how the useful-LR band moves
+with batch size, and what is — and is not — conserved along it.
+
+**Airbench: batch-coupled, sub-√B.** At fixed sample budget (8 epochs), the
+largest LR keeping mean accuracy within 1.0pp of its per-batch reference
+shifts right with batch. A coarse 5-batch × 8-rung grid (n = 2) lands the
+OLS exponent at exactly 0.50 — but with a ±0.5 rung-quantization envelope,
+which the sharpening pass was pre-registered to adjudicate: dense
+×1.15-spaced ladders (n = 5/cell) with a log-linear interpolated floor
+crossing give **α = 0.350, seed-bootstrap CI95 [0.297, 0.425]** over
+B = 1000–4000. Both pre-registered nulls die: batch-independence
+(|α| < 0.1) and the √B point prediction are excluded. Two further
+structural observations: (i) at B ≥ 4000 the accuracy curve becomes
+non-monotone in LR — *low* LR becomes the losing side (at step-matched
+B = 8000, halving the record LR costs 3.1pp while tripling it costs
+0.4pp), a signature that survives step-matching; (ii) a step-matched
+B = 8000 arm (matching B = 2000's step count) recovers full accuracy and
+extends the shift (peak-referenced shoulder 0.96 ≥ B = 4000's 0.72) — the
+fixed-budget B = 8000 trend-break was undertraining, not saturation.
+
+**No conserved scalar along the frontier.** At each batch's shoulder we
+evaluated four instrumented candidates under a pre-registered
+"frontier-tracking" signature (equalized across batch at the shoulder,
+varying at fixed LR): oscillation occupancy, spectral and Euclidean
+trajectory directional smoothness, and HVP η·λ (q90). **All four fail.**
+Curvature is the *least* equalized (5–6× across batch at matched rungs),
+extending §3.3–3.4's decoupling to the batch axis; and the directional
+smoothness measurement doubles as the §3.4 plateau test — no c/η constant
+in either norm. Whatever quantity sets Muon's stochastic frontier, it is
+none of these as a scalar.
+
+**The LM record recipe: no transfer.** On a numerics-audited single-GPU
+port of the modded-nanogpt speedrun record (2025-07-12_BosAlign; §8.1
+notes the port audit and our own n = 10 baseline σ = 0.00125, equal to
+the record's native 0.0013), the same design — 4 token batches
+(98,304–786,432 tokens/step via record-chunk count) × 6 √2-spaced Muon-LR
+rungs × 2 seeds at a fixed 346M-token budget, loss-valley reference,
+interpolated floor crossing at valley + 0.010 — gives **α = −0.29, CI95
+[−0.35, +0.30]**: the airbench exponent is excluded, batch-independence is
+not, and the loss valley pins at ≈ 0.7× the record LR at every batch. No
+divergence cliff appears at any batch (worst arm mean 3.574 vs valley
+3.510). The pre-registered valley-shifts-right prediction is refuted.
+
+**Reading.** The two measurements bound the domain of any batch-aware Muon
+LR rule: batch-coupled (≈ B^1/3, not √B) at CNN-scale batches of 10²–10³
+samples; batch-invariant at LM token batches of 10⁵–10⁶. A single
+noise-governed mechanism whose coupling saturates past a critical batch
+size is consistent with both — the LM grid would then sit entirely above
+the crossover that the airbench range straddles, and the LM's smallest
+batch arm indeed shows 15–20× inflated seed noise and a 30× low-LR
+penalty — but that unification is untested here; it predicts re-emergent
+coupling at much smaller LM token batches. Practically, on this testbed
+the record's Muon LR requires no rescaling when the token batch is changed
+by grad-accumulation count anywhere in the measured range.
 
 ## 4. The routing experiment
 
@@ -575,19 +665,19 @@ baselines: OrScale, NAMO/LANTON-style noise scaling, GALA, Prodigy, hand-tuned
 schedule) committed to `criteria/` before any spend. No results are claimed
 here.
 
-**The Muon stability law (open measurement).** Islamov et al.'s stated open
-problem is the momentum+stochastic extension of non-Euclidean EoS; the Adam
-analog of the threshold constant (≈ 38/η) exists, the Muon analog does not.
-Our instrumentation is the right instrument pointed at the wrong quantity: it
-measures Euclidean lr·λ (decoupled, per their theory and our §3.3–3.4) but not
-trajectory directional smoothness in the spectral norm. The concrete
-measurement — does generalized spectral sharpness along practical Muon
-trajectories equilibrate at a c/η with c depending on β, and is the bounded
-oscillation amplitude pinned by the fixed update magnitude rather than by
-Euclidean curvature (explaining graceful degradation to 6×)? — requires only
-adding a dual-norm directional-smoothness probe to the existing hub
-(`docs/litreview/d-normalized-stability-theory.md`). No results are claimed
-here.
+**The Muon stability law (measured; invariant unidentified).** We built the
+dual-norm directional-smoothness probe this section previously called for,
+and the answer is negative twice over: generalized spectral sharpness along
+practical Muon trajectories does **not** equilibrate at a c/η constant
+(§3.4), and none of four instrumented scalars is conserved along the
+measured B^0.35 frontier (§3.6). What remains open sharpens accordingly:
+(i) what quantity *is* equalized along the airbench frontier — the
+candidates that magnitude, curvature, and serial-structure statistics
+supply are all ruled out as scalars; (ii) why the exponent sits near B^1/3
+rather than the √B that simple noise-averaging predicts; (iii) where the
+LM batch-coupling crossover sits — the critical-batch-size unification of
+§3.6 is falsifiable with small-token-batch LM arms on the released
+harness. No results are claimed for these here.
 
 ---
 
@@ -611,7 +701,28 @@ dev grids filter by this SHA to exclude the retained routing-inactive
 duplicates); comparison table at `b323ed6`; overhead benchmark at `87a997f`.
 Deterministic figure/table scripts: `scripts/analyze_phase1.py`,
 `scripts/analyze_disambiguation.py`, `scripts/analyze_mechanism.py`,
-`scripts/aggregate.py`, `reports/figures/wp05/make_figures.py`.
+`scripts/aggregate.py`, `reports/figures/wp05/make_figures.py`; frontier
+programs: `scripts/analyze_frontier.py`, `analyze_frontier_dense.py`,
+`analyze_frontier_nanogpt.py`, `analyze_local_baseline.py`.
+
+The frontier programs ran on a local 2× RTX 5090 (32 GB) workstation. The
+LM substrate is a single-GPU port of the modded-nanogpt record
+(2025-07-12_BosAlign) with exact token-batch emulation via
+grad-accumulation, an audited deviation ledger stamped into every run
+(`metrics.deviations` / `record_faithful`), an fp32 embedding-gradient
+accumulation fix isolated by a pre-registered one-variable diagnostic, and
+a row-chunked head path (loss- and gradient-equivalence pinned by tests)
+that fits the record's 49K-token train chunks and 262K-token validation
+sequences in 32 GB. Own-harness seed noise: σ = 0.00125 over n = 10
+(χ² CI [0.00086, 0.00228]), equal to the record's native 0.0013; the
+record's steps-to-3.28 endpoint is censored 10/10 on this harness, so all
+LM comparisons use final val loss at fixed steps. Long local runs are
+supervised by a retry-with-resume babysitter (hang timeout, escalating
+backoff); checkpoints are keyed by a config fingerprint and deleted on
+successful completion after an incident in which sweep variants sharing a
+(seed, iterations) key replayed a sibling's finished trajectory — the
+three affected result files are tombstoned in `results/INVALID_RUNS.json`
+(results are append-only) and all analyzers honor the tombstone list.
 
 ### 8.2 Seed discipline
 
@@ -623,21 +734,29 @@ seeds; two-stage tuning selected on dev n = 25 and evaluated on eval n = 100
 at the argmax only. One recorded caveat: the routed optimizer's internal RNG
 (subspace init, placebo gating) is a config literal (2600) common across
 seeds; model init, data order, and augmentation vary per seed (deviation 8).
+The frontier programs use later dev blocks: airbench 1400–1414 (programs
+#6/#6b), nanogpt 1700–1721 (port bring-up, 10-seed baseline, transfer
+grid) — all disjoint from every earlier block and from eval seeds.
 
 ### 8.3 Cost
 
-All GPU work ran on spot-priced NVIDIA RTX A6000 VMs (Hyperstack). Documented
-phase totals: WP0 baseline buildout $1.24; Phase-1 instrumentation VM $3.23
-(98% of it environment setup and benchmarks; the 20-seed instrumented sweep
+All cloud GPU work ran on spot-priced VMs (Hyperstack; RTX A6000 for the
+airbench phases, 1× H100 PCIe for the nanogpt port audit). Documented phase
+totals: WP0 baseline buildout $1.24; Phase-1 instrumentation VM $3.23 (98%
+of it environment setup and benchmarks; the 20-seed instrumented sweep
 itself was ~9 min ≈ $0.06); Phase-2 comparison matrix, mechanism probes, and
-Gate-2 completion runs ≈ $5.25. **Total project cloud spend ≈ $9.72.**
-Per-run attributed cost fields are stamped in all 2,585 cloud run JSONs
-(methodology: billed sweep window amortized evenly per run; attributed sum
-$8.34) — e.g., $0.003/run for the 100-seed comparison arms and ~$0.06 for the
-full instrumented Phase-1 sweep. The headline scientific results — the Phase-1
-characterization and the placebo-controlled null — cost under $10 of compute
-combined, which we note as evidence that measurement-first optimizer research
-has an extremely favorable cost profile.
+Gate-2 completion runs ≈ $5.25; nanogpt record-port reproduction and
+fp32-embed diagnostic ≈ $4.80. **Total project cloud spend $13.60**
+(reconciled against per-run cost fields; the total is pinned by a repo
+test). Per-run attributed cost fields are stamped in all cloud run JSONs
+(billed sweep window amortized evenly per run) — e.g., $0.003/run for the
+100-seed comparison arms. The frontier programs (#6/#6b/#7: 249 training
+runs plus the 10-seed LM baseline) ran on a local 2× RTX 5090 workstation
+at zero marginal cloud cost. The headline scientific results — the Phase-1
+characterization, the placebo-controlled null, and the two-substrate
+frontier — cost under $15 of cloud compute combined, which we note as
+evidence that measurement-first optimizer research has an extremely
+favorable cost profile.
 
 ### 8.4 Gates and adversarial review
 
@@ -663,3 +782,11 @@ authoritative statements of what this paper may claim.
 - `figures/wp12_hvp/eta_lambda_calibration.png` — implied η·λ vs HVP lr·λ.
 - `figures/wp05/rho_recovery.png`, `figures/wp05/eta_lambda_recovery.png`,
   `figures/wp05/switch_timeline.png` — synthetic validation of the pipeline.
+- `figures/frontier_acc_vs_lr.png`, `figures/frontier_shoulder_vs_batch.png`,
+  `figures/frontier_p2_candidates.png` — program #6: airbench accuracy-vs-LR
+  ladders per batch, shoulder scaling, invariant candidates.
+- `figures/sharpening_dense_ladders.png`, `figures/sharpening_alpha_fit.png`
+  — program #6b: dense-ladder crossings and the α = 0.35 fit with CI.
+- `figures/frontier_nanogpt_transfer.png` — program #7: LM loss-vs-LR per
+  token batch and the flat (α = −0.29) crossing fit vs the airbench 0.35
+  reference.
