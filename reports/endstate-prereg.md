@@ -1,7 +1,6 @@
-<!-- DRAFT produced by the research-guide workflow (wf_cb6d46db-53e),
-adversarially reviewed and synthesized 2026-07-22. Its own terms
-require a fresh dated novelty sweep at final commit-before-run time;
-no run has been launched under this pre-registration. -->
+<!-- Produced by the research-guide workflow (wf_cb6d46db-53e),
+adversarially reviewed 2026-07-22; finalized with the dated novelty-sweep
+verdict below. Committed BEFORE any run, checkpoint, or Track-S fit. -->
 
 # Program #13 — end-state anatomy of the useful-LR shoulder: pre-registration
 
@@ -25,25 +24,29 @@ frontier sidecars are scalars only) — there is no zero-GPU route to the
 primary question, so new runs are justified. The per-example probe
 retained from program #12 serves the example-level anatomy.
 
-Novelty sweep obligations (run same-day, date the claim, before commit):
-Cohen et al. EoS (2103.00065) and the non-Euclidean EoS line (2603.05002)
-— check for post-anneal (lr→0) endpoint-sharpness follow-ups;
-Jastrzebski et al. break-even (2002.09572) and Lewkowycz et al. catapult
-(2003.02218) — the two closest priors for "large LR leaves an endpoint
-signature", any sharpness-vs-LR result here must be positioned against
-them or it is a rediscovery; Li, Wei & Ma (1907.04595) and
-Andriushchenko et al. sparse-features (2210.05337) — large-LR changes
-*what* is learned (closest to P2/P3); Feldman & Zhang (2008.03703),
-C-scores (2002.03206), Toneva et al. forgetting (1812.05159) —
-difficulty machinery, our LOSO score is a cheap variant, not novel;
-Kornblith CKA (1905.00414), Nguyen et al. (2010.15327) — representation
-comparison across hyperparameters; Kaon (2605.11181), Huang (2606.00371)
-— check for Muon endpoint measurements; Andriushchenko et al. 2023
-sharpness-skepticism (distinct from 2210.05337) — P4's cross-batch
-equalization test is stronger than correlation, cite as caveat. The
-claimed-open cell: end-state observables tested against a pre-registered
-(lr, batch) frontier tracking signature with an accuracy-matched
-undertraining placebo, on Muon.
+Novelty sweep verdict (executed 2026-07-22, same-day, arXiv/Semantic
+Scholar; full report in the session record): **the claimed-open cell is
+open** — no found work combines (i) an LR ladder spanning the useful-LR
+shoulder at several batch sizes, (ii) a multi-observable endpoint-anatomy
+panel, (iii) a pre-registered (lr × batch) frontier tracking test, and
+(iv) an accuracy-matched fully-annealed undertraining placebo, on Muon or
+any optimizer; the placebo arm and the difficulty-quintile decomposition
+of the LR effect have no direct precedent found. Claims DROPPED per the
+sweep: "first endpoint λ1 across LR and batch" (Kaur, Cohen & Lipton,
+arXiv:2206.10654 — SGD end-of-schedule, incl. an LR×batch co-scaling
+equalization observation; O4 is hereby repositioned as the *annealed
+residue of generalized EoS for spectral descent* extending them to
+Muon/post-anneal); "first margins/linear probes under Muon"
+(arXiv:2606.09658); any novelty on the difficulty metric (C-scores /
+Feldman-Zhang / Toneva lineage, as already stated); "first LR-ladder
+endpoint anatomy" in general (Sadrtdinov et al., arXiv:2410.22113 — SGD,
+single batch, no placebo). Pre-registered expectation inherited from
+arXiv:2302.07011 + 2206.10654: λ1 is *expected* to track LR — for O4 the
+informative outcome is the cross-batch equalization test and any
+violation, not the LR trend itself. Must-cite list recorded in the sweep
+report (incl. 2306.04815, 2604.13627, 2606.04662, 2606.21514,
+2605.13079, 2505.02222, 2309.10688, 2006.15081, 1905.13277, 1711.08856,
+2605.29152, 2410.05192, 2311.04163).
 
 ## 1. Design overview and staging
 
