@@ -246,12 +246,14 @@ is measurement-first with a clean null, not a method claim.
    (d) 2×-LR under-rescue and a self-calibrating setpoint (short
    known-safe probe → own reference band) — Phase B″ material, dev seeds
    1440+ (1440–1441 consumed by (b)).
-7. **Spike-rate as a frontier-invariant candidate** (from
-   `reports/intermittency-scan.md`): the burn-in-corrected heavy-tail
-   population is LR-monotone — the one instrumented observable never
-   tested against the pre-registered frontier tracking signature.
-   Offline first (existing sidecars, B ≤ 1000); a proper batch-axis test
-   needs longer high-B instrumented runs.
+7. ~~Spike-rate as a frontier-invariant candidate~~ **TESTED 2026-07-22
+   and failed, along with the entire pair span** (program #11,
+   `reports/invariant-search-results.md`): held-out, permutation-
+   controlled search over 8 features × 40 log-linear pairs — zero
+   passes; every instrumented trajectory scalar is nearly flat along lr
+   within the frontier region. The invariant is not in the instrumented
+   span; successor candidates are end-state / anneal-phase / non-scalar
+   objects.
 8. **Paper §3.1 addition candidate**: the anchoring-artifact methodology
    note (93% of naive top-direction kurtosis spikes are the subspace
    re-anchoring transient; burn-in ≥5 required) + the corrected
