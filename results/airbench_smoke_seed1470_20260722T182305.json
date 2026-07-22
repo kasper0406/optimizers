@@ -1,0 +1,68 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_smoke",
+      "optimizer": {
+        "lr": 0.55,
+        "momentum": 0.6,
+        "name": "muon",
+        "nesterov": true,
+        "ns_steps": 3,
+        "weight_decay": 0.0
+      },
+      "recipe": {
+        "compile": true,
+        "normalize_filter_weights": true,
+        "save_endpoint": {
+          "dir": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/endstate_ckpts"
+        },
+        "save_test_logits": {
+          "dir": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/endstate_ckpts"
+        },
+        "tta_level": 2
+      },
+      "seed": 1470,
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweeps/endstate_b2000/endstate_b2000__lr0.55.yaml",
+    "sha256": "ea5dbcf7983f05da5a11203544268107e0a98b1570e551f11998ca1c9767dac7"
+  },
+  "cost_usd": null,
+  "experiment": "airbench_smoke",
+  "finished_at": "2026-07-22T18:23:12.881068+00:00",
+  "git_dirty": false,
+  "git_sha": "4bf4dbc34a2fe9bd162d40a5b0d14889256c26e9",
+  "gpu_type": "NVIDIA GeForce RTX 5090",
+  "metrics": {
+    "endpoint_path": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/endstate_ckpts/endpoint_02774c2d76b5.pt",
+    "epochs": 8.0,
+    "logits_path": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/endstate_ckpts/logits_02774c2d76b5.pt",
+    "optimizer": "muon",
+    "steps": 200,
+    "time_seconds": 5.54982674407959,
+    "train_acc_last": 0.9455000162124634,
+    "tta_val_acc": 0.9327999949455261,
+    "val_acc": 0.9251999855041504,
+    "val_accs": [
+      0.3263999819755554,
+      0.5979999899864197,
+      0.48169997334480286,
+      0.7071999907493591,
+      0.7322999835014343,
+      0.8130999803543091,
+      0.8914999961853027,
+      0.9251999855041504
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1470,
+  "started_at": "2026-07-22T18:23:05.853087+00:00",
+  "wall_time_s": 7.027965274057351
+}

@@ -51,9 +51,10 @@ def load_runs():
             arm = "replicate"
         else:
             continue
-        if not (Path(m["endpoint_path"]).exists() and Path(m["logits_path"]).exists()):
-            continue
+        cached = not (Path(m["endpoint_path"]).exists()
+                      and Path(m["logits_path"]).exists())
         runs.append({
+            "cached": cached,
             "file": f, "arm": arm, "lr": lr, "epochs": epochs, "B": b,
             "seed": d["seed"], "acc": float(m["tta_val_acc"]),
             "ckpt": m["endpoint_path"], "logits": m["logits_path"],
@@ -135,6 +136,22 @@ def main(argv=None):
           f"({sum(r['arm']=='ladder' for r in runs)} ladder, "
           f"{sum(r['arm']=='placebo' for r in runs)} placebo, "
           f"{sum(r['arm']=='replicate' for r in runs)} replicate)")
+    # Merge policy (prereg §8: checkpoints are deleted after extraction):
+    # runs whose artifacts are gone keep their previously-extracted scalars
+    # from the existing features JSON and are excluded from artifact-
+    # dependent recomputation.
+    old = {}
+    if Path(args.out).exists():
+        old = {r["file"]: r for r in json.load(open(args.out)).get("runs", [])}
+    kept, fresh = [], []
+    for r in runs:
+        if r["cached"]:
+            if r["file"] in old:
+                kept.append(old[r["file"]])
+        else:
+            fresh.append(r)
+    runs = fresh
+    print(f"fresh: {len(runs)}; cached-from-json: {len(kept)}")
     fx = FeatureExtractor()
     test_labels = fx.test_loader.labels.cpu()
     slab_labels = fx.slab_labels.cpu()
@@ -153,12 +170,19 @@ def main(argv=None):
         r["O3_probe_acc"] = ridge_probe(sf, slab_labels.numpy(), tf, test_labels.numpy())
         r["O4_lambda1"] = fx.lam1(r["ckpt"], args.iters)
 
-    # O2: LOSO difficulty from each batch's 10 peak-rung (lowest-rung) runs
-    ladder = [r for r in runs if r["arm"] == "ladder"]
+    # O2: LOSO difficulty from each batch's 10 peak-rung (lowest-rung) runs.
+    # Replicate-arm runs share the B=1000 peak config and stand in for the
+    # peak set when the ladder's own artifacts have been scratch-deleted.
+    ladder = [r for r in runs if r["arm"] in ("ladder", "replicate")]
     peak_lr_of = {b: min(r["lr"] for r in ladder if r["B"] == b)
                   for b in {r["B"] for r in ladder}}
-    peaks = {b: [r for r in ladder if r["B"] == b and r["lr"] == peak_lr_of[b]]
-             for b in peak_lr_of}
+    peaks = {}
+    for b, plr in peak_lr_of.items():
+        cand = [r for r in ladder if r["B"] == b and r["lr"] == plr]
+        by_seed = {}
+        for r in cand:  # one per seed (latest file wins)
+            by_seed[r["seed"]] = r
+        peaks[b] = list(by_seed.values())
     b1000_peak = peaks.get(1000, [])
     for r in runs:
         pset = peaks.get(r.get("B"), b1000_peak) if r["arm"] == "ladder" else b1000_peak
@@ -195,8 +219,9 @@ def main(argv=None):
 
     for r in runs:
         r.pop("_hardest_idx", None)
-    out = {"runs": [{k: v for k, v in r.items()} for r in runs],
-           "replicate_pair_cka": rep_ckas}
+    old_extra = json.load(open(args.out)).get("replicate_pair_cka", []) if Path(args.out).exists() else []
+    out = {"runs": [{k: v for k, v in r.items()} for r in runs] + kept,
+           "replicate_pair_cka": rep_ckas or old_extra}
     Path(args.out).write_text(json.dumps(out, indent=1, sort_keys=True))
     print(f"features written to {args.out}")
 
