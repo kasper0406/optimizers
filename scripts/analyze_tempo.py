@@ -53,6 +53,8 @@ def run_lr(run: Dict[str, Any]) -> float:
 def run_opt(run: Dict[str, Any]) -> str:
     name = _opt_cfg(run)["name"]
     if name == "tempomuon":
+        if _opt_cfg(run).get("gain_schedule"):
+            return "tempomuon-replay"
         scope = _opt_cfg(run).get("scope", "per_matrix")
         kappa = float(_opt_cfg(run).get("kappa", 0.0))
         if kappa == 0.0:
