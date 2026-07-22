@@ -60,6 +60,27 @@ def test_compare_paired_deltas(tmp_path):
     assert abs(delta["mean_pp"] - 1.0) < 1e-9
 
 
+def test_nanogpt_passive_fixed_step_table():
+    from scripts.analyze_tempo import analyze_nanogpt_passive
+
+    def run(lr, base):
+        rows = []
+        for step in range(2, 301):
+            for m in (0, 2):
+                rows.append({"step": step, "matrix": m,
+                             "cos_gg": base + 0.001 * m, "cos_gm": base / 2})
+        return {
+            "seed": 1440,
+            "config": {"contents": {"nanogpt": {"muon_lr": lr}}},
+            "metrics": {"tempo_probe": {"rows": rows}, "final_val_loss": 4.0},
+        }
+
+    out = analyze_nanogpt_passive([run(0.035, -0.5), run(0.15, -0.2)],
+                                  steps=(100, 200))
+    assert out["per_lr"]["0.035"]["cos_gg"]["100"] < out["per_lr"]["0.15"]["cos_gg"]["100"]
+    assert abs(out["per_lr"]["0.15"]["cos_gm"]["200"] - (-0.1)) < 1e-9
+
+
 def test_spearman_perfect_orders():
     assert spearman([1, 2, 3], [10, 20, 30]) == 1.0
     assert spearman([1, 2, 3], [30, 20, 10]) == -1.0

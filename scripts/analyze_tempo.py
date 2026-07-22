@@ -257,14 +257,74 @@ def analyze_compare(runs: List[Dict[str, Any]]) -> Dict[str, Any]:
     return out
 
 
+# ------------------------------------------------------------ nanogpt probe
+
+
+def analyze_nanogpt_passive(
+    runs: List[Dict[str, Any]], steps: Sequence[int] = (50, 100, 200, 300, 400, 500, 600)
+) -> Dict[str, Any]:
+    """Fixed-step cos_gg / cos_gm vs muon_lr from tempo_probe rows.
+
+    Rows are per-(step, matrix) raw cosines; this aggregates the matrix mean
+    inside a +/-25-step window around each anchor step, then averages seeds.
+    """
+    runs = [r for r in runs if "tempo_probe" in r["metrics"]]
+    if not runs:
+        raise SystemExit("no runs with tempo_probe found")
+    by_lr: Dict[float, List[Dict[str, Any]]] = defaultdict(list)
+    for r in runs:
+        by_lr[float(r["config"]["contents"]["nanogpt"]["muon_lr"])].append(r)
+
+    def window_mean(rows, key, anchor):
+        v = [x[key] for x in rows
+             if x[key] is not None and abs(x["step"] - anchor) <= 25]
+        return sum(v) / len(v) if v else None
+
+    out: Dict[str, Any] = {"anchors": list(steps), "per_lr": {}}
+    lines = ["# Program #8 nanogpt Phase A: fixed-step cos vs muon_lr", ""]
+    for key in ("cos_gg", "cos_gm"):
+        lines += [f"## {key}", "", "| step | " + " | ".join(
+            f"lr={lr}" for lr in sorted(by_lr)) + " |",
+            "|" + "---|" * (1 + len(by_lr))]
+        for anchor in steps:
+            cells = []
+            for lr in sorted(by_lr):
+                vals = [window_mean(r["metrics"]["tempo_probe"]["rows"], key, anchor)
+                        for r in by_lr[lr]]
+                vals = [v for v in vals if v is not None]
+                if vals:
+                    m = sum(vals) / len(vals)
+                    cells.append(f"{m:+.3f}")
+                    out["per_lr"].setdefault(str(lr), {}).setdefault(key, {})[
+                        str(anchor)
+                    ] = m
+                else:
+                    cells.append(" n/a ")
+            lines.append(f"| {anchor} | " + " | ".join(cells) + " |")
+        lines.append("")
+    for lr in sorted(by_lr):
+        losses = [r["metrics"].get("final_val_loss") for r in by_lr[lr]]
+        lines.append(
+            f"- lr={lr}: n={len(by_lr[lr])}, final_val_loss(truncated) = "
+            + ", ".join("None" if l is None else f"{l:.4f}" for l in losses)
+        )
+    out["report"] = "\n".join(lines)
+    return out
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("mode", choices=["passive", "compare"])
+    ap.add_argument("mode", choices=["passive", "compare", "nanogpt-passive"])
     ap.add_argument("results", nargs="+")
     ap.add_argument("--json", dest="json_out", default=None)
     args = ap.parse_args(argv)
     runs = load_runs(args.results)
-    out = analyze_passive(runs) if args.mode == "passive" else analyze_compare(runs)
+    if args.mode == "passive":
+        out = analyze_passive(runs)
+    elif args.mode == "nanogpt-passive":
+        out = analyze_nanogpt_passive(runs)
+    else:
+        out = analyze_compare(runs)
     print(out["report"])
     if args.json_out:
         report = out.pop("report")
