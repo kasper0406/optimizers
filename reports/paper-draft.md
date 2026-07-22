@@ -1,9 +1,11 @@
-# Per-Direction Gradient Statistics Under Muon: Measurement, Stability, and a Placebo-Controlled Null for Regime Routing
+# Per-Direction Gradient Statistics Under Muon: Measurement, Stability, a Placebo-Controlled Null for Regime Routing, and a Serial-Correlation LR Controller
 
-*Draft (agent-written, 2026-07-20). Status: internal draft for human review; all
-gate-relevant claims follow the final decision records
-`reports/gate1-decision.md` and `reports/gate2-decision.md` verbatim in scope
-and framing. Nothing in this draft re-adjudicates a gate.*
+*Draft (agent-written, 2026-07-20; program #8 folded in 2026-07-22). Status:
+internal draft for human review; all gate-relevant claims follow the final
+decision records `reports/gate1-decision.md` and `reports/gate2-decision.md`
+verbatim in scope and framing. Nothing in this draft re-adjudicates a gate;
+the program-#8 results (§5) carry their own disclosure of protocol deviations
+from the Gate-2 conditional approval and await human judgment.*
 
 ---
 
@@ -18,10 +20,10 @@ airbench94 record configuration with a synthetically validated statistics
 pipeline (per-direction projections of the raw gradient onto tracked singular
 pairs of momentum; EMAs, lag-1 autocorrelation, t-statistics, implied
 step-curvature) at 7.7% median step-time overhead and no measurable effect on
-training, and report seven measurement findings and one intervention result
-(findings 1–5 and 7 on airbench94; finding 6 spans a second substrate as
-well — a numerics-audited port of the modded-nanogpt speedrun record on
-FineWeb):
+training, and report eight measurement findings and two intervention results —
+one placebo-controlled null and one positive-but-bounded (findings 1–5 and 7
+on airbench94; findings 6 and 8 span a second substrate as well — a
+numerics-audited port of the modded-nanogpt speedrun record on FineWeb):
 
 1. **A large, phase-structured negative-autocorrelation population.** 60–89%
    of per-direction snapshots have lag-1 autocorrelation ρ < −0.2 during the
@@ -82,8 +84,31 @@ FineWeb):
    confirmation with inverted sign — a small case study in why the
    confirmation step exists.
 
+8. **A matrix-level serial-correlation signal that rescues mis-set learning
+   rates — with a schedule-discovery mechanism and a bounded domain.** The
+   near-free statistic ρ̂ = EMA[cos(G_t, G_{t−1})] per weight matrix is a
+   ~20σ LR dial early in airbench training with an *inverted* sign (the
+   healthy record run is deepest negative, ρ̂ ≈ −0.51; excess LR
+   *decorrelates* consecutive gradients toward 0) and a late-anneal reversal.
+   A bounded multiplicative gain regulated against this signal (globally
+   pooled, active only before the reversal) is, over 100 seed-paired
+   evaluation seeds, exactly free at the record LR (+0.001pp ± 0.016) and
+   recovers most of the accuracy stock Muon loses at mis-set LR (+0.245pp at
+   2×, +0.842pp at 3×, +1.536pp ± 0.024 at 4×). Three qualifications are as
+   informative as the effect: an open-loop replay of the controller's mean
+   gain trajectory reproduces the closed loop within noise at every LR (the
+   mechanism is online *schedule discovery*, not per-step feedback —
+   consistent with finding 7's equivalent-destinations reading); per-matrix
+   gains *lose* to a single pooled gain (per-matrix baseline ρ̂ levels differ
+   by more than the LR effect); and the signal does not transfer to the LM
+   record recipe (serial anti-correlation is even stronger there, −0.55…−0.74,
+   but LR-flat over a 4.3× range) — extending finding 6's pattern that
+   airbench-derived LR laws bound, rather than predict, LM behavior.
+
 The null is scoped: airbench-8-epoch record config, 200-step horizon, and the
-tracked-subspace intervention class.
+tracked-subspace intervention class. The finding-8 controller is likewise
+scoped: airbench substrate, task-calibrated setpoint, no external-baseline
+comparison yet (§5.6).
 
 ### Contributions
 
@@ -95,7 +120,7 @@ tracked-subspace intervention class.
   (findings 3–4): Euclidean lr·λ up to ≈ 65 during stable training, amplitude
   ratios at their noise floor, graceful degradation to 6× record LR — the
   empirical regime named as open by the non-Euclidean edge-of-stability line
-  (§6.3).
+  (§7.3).
 - A validated, cheap measurement instrument: synthetic recovery guarantees for
   every statistic used (§2.2), non-perturbation evidence, 7.7% overhead, and
   an honest account of what the instrument structurally cannot see
@@ -111,6 +136,17 @@ tracked-subspace intervention class.
   online per-direction regime routing at short horizon (finding 7), including
   activity telemetry proving the intervention was live, and full disclosure of
   every deviation from the pre-registered protocol.
+- The temporal trust ratio executed (finding 8): the first LR gain in any
+  optimizer family driven by measured *serial* structure of the update stream
+  (the signal family that spatial-norm and noise-magnitude trust ratios
+  provably cannot see), with a two-sided verdict — an n = 100 seed-paired
+  LR-robustness result on airbench, a placebo decomposition attributing the
+  entire effect to the discovered gain schedule, a granularity result
+  (global pooling beats per-matrix), and a pre-registered transfer test that
+  bounds the signal's domain at CNN scale. Plus a methodology hazard we hit
+  and documented: subspace re-anchoring fabricates a heavy-tail (kurtosis
+  ≈ +47) population in tracked-direction statistics unless a post-refresh
+  burn-in is applied (§5.7).
 
 ---
 
@@ -388,7 +424,7 @@ in either norm. Whatever quantity sets Muon's stochastic frontier, it is
 none of these as a scalar.
 
 **The LM record recipe: no transfer.** On a numerics-audited single-GPU
-port of the modded-nanogpt speedrun record (2025-07-12_BosAlign; §8.1
+port of the modded-nanogpt speedrun record (2025-07-12_BosAlign; §9.1
 notes the port audit and our own n = 10 baseline σ = 0.00125, equal to
 the record's native 0.0013), the same design — 4 token batches
 (98,304–786,432 tokens/step via record-chunk count) × 6 √2-spaced Muon-LR
@@ -535,7 +571,157 @@ on the 2σ clause. WP0.3 non-execution is recorded as a deviation.
 
 ---
 
-## 5. Scoping and limitations
+## 5. The temporal trust ratio (program #8): serial-correlation LR control
+
+The §8 future-directions entry of the 2026-07-20 draft is now executed
+(2026-07-22, one day of local compute). Evidence trail:
+`reports/tempo-phase-a.md` (signal measurement + Phase-B pre-registration,
+commit `082a09d`, predating every Phase-B run), `tempo-phase-b.md` (dev
+results, prediction scorecard, placebo), `tempo-eval.md` (n = 100
+evaluation table), `tempo-nanogpt-phase-a.md` (transfer test),
+`intermittency-scan.md` (the §5.7 methodology note). Optimizer:
+`src/optim/tempomuon.py`, bit-identical to stock Muon at κ = 0
+(unit-tested).
+
+### 5.1 Position
+
+A same-day three-sweep literature re-check confirmed the slot the §8
+proposal targeted remains open: no published method in any optimizer family
+modulates an LR gain by measured temporal/serial statistics of the
+gradient/update stream (hard arXiv abstract queries for sign-flip × LR and
+oscillation × layer-wise LR return zero papers). The wall is closing:
+Greedy Alignment (arXiv:2512.06370; global scalar, adapts *momentum*, not
+LR), MGUP-Muon (arXiv:2606.17526; instantaneous per-parameter sign
+agreement), and CLARA (arXiv:2508.05408; global path-length LR, an implicit
+serial statistic) each occupy one adjacent cell.
+
+### 5.2 The signal, and why the naive controller design is wrong
+
+Per matrix: ρ̂ = bias-corrected EMA (β = 0.9) of cos(G_t, G_{t−1}) on raw
+pre-momentum gradients — one dot product and one prev-grad buffer per
+matrix per step, computed in fp32 (in fp16 the elementwise products
+overflow; the resulting `exp(0·nan)` poisoned early passive runs at *low*
+LR, where large early gradients persist longest — disclosed as the
+program's first incident, regression-tested). Passive measurement
+(κ = 0 ≡ stock Muon) on dev seeds across LR ∈ {1, 2, 3, 4}× record:
+
+- The **window-averaged level is useless** — non-monotone in LR (−0.365,
+  −0.401, −0.386, −0.358), 4× indistinguishable from 1×.
+- The **fixed-step level is a clean dial with an inverted sign**: at step
+  20, ρ̂ = −0.512 / −0.455 / −0.361 / −0.305 across 1–4× (seed sd ≈ 0.01,
+  ~20σ separation) — the healthy run is *deepest* negative; excess LR
+  destroys serial structure. The ordering **fully reverses late in the
+  anneal** (step 160: −0.179 / −0.297 / −0.373 / −0.398), reproducing the
+  §3.1 phase structure at matrix level with a near-free statistic.
+- Per-matrix baseline levels differ by more than the LR effect (−0.30 to
+  −0.43 at 1×) — foreshadowing §5.4's granularity result.
+
+### 5.3 Controller and dev-phase results (pre-registered predictions P1–P5)
+
+gain ← clip(gain · exp(κ(ρ̂ − ρ\*)), [0.2, 1]) with κ = −0.25 (negative:
+shrink when ρ̂ is *above* the setpoint), ρ\* = −0.48 (the healthy early
+band), warm-up 25 steps, active window ending before the reversal, gain
+frozen thereafter; applied as W −= lr·gain·O. Dev Phase B (n = 10
+seed-paired, arms stock / per-matrix / globally-pooled × 4 LRs) with the
+window at step 100: rescue confirmed (**P2**: +1.11pp at 3×, +1.92pp at 4×,
+global arm) but **P1 failed** — at 1× the controller cost −0.26pp because
+the healthy run's ρ̂ relaxes past the fixed setpoint after ~step 60 and the
+[25, 100] window guaranteed late engagement (telemetry: mean 1× gain fell
+to 0.36 by step 100 — the same diagnosis explains the **P3** failure).
+Disclosed, not re-tuned in place: the one-variable fix (window → step 60)
+ran as a labeled exploration on fresh dev seeds.
+
+### 5.4 Placebo decomposition and granularity
+
+Two results qualify the mechanism before the headline number:
+
+- **Open-loop replay ≡ closed loop.** Replaying the global arm's mean gain
+  trajectory as a fixed schedule (feedback off) matches the closed-loop
+  controller within noise at every LR (e.g., +1.807 vs +1.918pp at 4×;
+  −0.185 vs −0.258pp at 1×). The controller's value is *discovering* the
+  LR-appropriate schedule online from the serial signal — within-run
+  feedback beyond the mean trajectory contributes nothing, consistent with
+  §4's equivalent-destinations reading. We state this plainly: this is an
+  adaptive method whose entire effect is schedule discovery.
+- **Global pooling beats per-matrix at every LR** (e.g., +1.92 vs +1.49pp
+  at 4×; −0.26 vs −0.58pp at 1×): heterogeneous per-matrix ρ̂ baselines
+  against a shared setpoint mis-treat matrices; pooling matches the
+  calibration. The novelty cell as originally framed ("per-matrix ×
+  temporal") is thus the part our own data argues against on this testbed —
+  continuing the project's monotone pattern: per-direction null (§4),
+  per-matrix worse, global works.
+
+### 5.5 Evaluation-seed result (n = 100, seed-paired, frozen config)
+
+Configuration frozen on dev seeds (window-60 variant), committed before
+launch (`30a32ee`); seeds 0–99; single GPU type (RTX 5090); endpoint
+tta_val_acc:
+
+| lr | stock Muon | TempoMuon (global) | Δ paired (mean ± SE) |
+|---|---|---|---|
+| 0.24 (1×) | 0.9399 ± 0.0013 | 0.9399 ± 0.0013 | **+0.001pp ± 0.016** |
+| 0.48 (2×) | 0.9346 ± 0.0012 | 0.9370 ± 0.0014 | +0.245pp ± 0.017 |
+| 0.72 (3×) | 0.9262 ± 0.0016 | 0.9346 ± 0.0016 | +0.842pp ± 0.022 |
+| 0.96 (4×) | 0.9177 ± 0.0020 | 0.9330 ± 0.0017 | **+1.536pp ± 0.024** |
+
+Exactly free at the record LR (95% CI ≈ [−0.03, +0.03]pp); recovers ~69% of
+stock's 4× deficit. The dev-phase failure mode did not recur at n = 100.
+
+### 5.6 Transfer to the LM record recipe: negative, with one live thread
+
+A passive probe inside the record's Muon step (measurement-only; update
+path untouched, unit-tested) on the §3.6 LM port — 4 Muon-LR rungs
+{0.7, 1, 2, 3}× record × 2 seeds, 600-step stable-phase truncation:
+serial anti-correlation is *stronger* at LM scale (cos_gg −0.55…−0.74)
+but **LR-flat** (≤ 0.06 spread over 4.3×; per-matrix orderings split both
+ways in every window). The airbench-calibrated dial does not transfer —
+the same shape of result as §3.6's frontier non-transfer, and together
+they make the pattern explicit: airbench LR laws have repeatedly bounded,
+never predicted, this LM recipe. One thread stays live: the zero-memory
+variant cos(G_t, momentum buffer) shows an airbench-sign dial in steps
+25–100 only (median per-matrix Spearman(lr, ·) = +0.80, 52% of matrices
+> +0.5 vs 9% < −0.5; n = 2 seeds — suggestive, unconfirmed).
+
+**Protocol deviations from the Gate-2 conditional approval (disclosed).**
+The §8 direction was approved conditional on (i) a pre-registration
+committed to `criteria/` (human-audited) and (ii) mandatory baselines
+(OrScale, NAMO/LANTON-style noise scaling, GALA, Prodigy, hand-tuned
+schedule). As executed: the pre-registration lived in `reports/`
+(agent-committed; commit order verifiably predates the runs, but without
+the human audit step), and **no external-baseline arm has run** — the only
+comparators are stock Muon and the internal placebo/granularity arms. Both
+gaps must close before any comparative claim against those methods; the
+natural hand-tuned-schedule baseline (an earlier LR anneal tuned per
+mis-set LR) is exactly what the placebo replay approximates from the
+discovered side, but a properly tuned version has not been run. The
+setpoint ρ\* is calibrated on this task's healthy runs; setpoint transfer
+is untested.
+
+### 5.7 A methodology hazard: subspace re-anchoring fabricates heavy tails
+
+An offline scan of the §3.6 programs' stored per-direction series (25,920
+directions; zero new compute) for excess kurtosis / spike-rate — motivated
+by the observation that findings 5's t-ceiling and the frozen-probe null
+are both *mean*-based, so an intermittent sign-varying signal could hide
+from them — produced a spectacular false positive: median excess kurtosis
++47 in top-tracked directions, 56% of all directions above an
+AR(1)-Gaussian pipeline null's 99th percentile, split-half spike stability
++0.80. The offset diagnostic attributes it: **93.4% of top-direction
+spikes sit in the first 5 steps after subspace re-anchoring** (the tracked
+direction is aligned to the momentum top at refresh; the projection starts
+large and decays). Any 4th-moment statistic on subspace-tracked streams
+requires a post-refresh burn-in. After burn-in, the surviving population
+is modest (~10% of directions above the null q99 vs 1% expected,
+split-half +0.29, robust to doubling the burn-in) and **LR-monotone**
+(4.3% above null at record LR → 18.9% above the useful-LR shoulder) —
+instability-flavored, not hidden-signal-flavored, and near-null exactly
+where hidden signal would have mattered. The LR-monotone spike-rate is
+the one instrumented observable not yet tested against §3.6's
+frontier-tracking signature.
+
+---
+
+## 6. Scoping and limitations
 
 The null result is precisely scoped; we claim nothing beyond it.
 
@@ -560,9 +746,10 @@ The null result is precisely scoped; we claim nothing beyond it.
 3. **Intervention class.** The null covers the tracked-subspace intervention
    class: rank-≤16 multiplicative corrections on singular pairs of the
    momentum matrix, gains in [0.1, 1], with this classifier and these
-   timescales. It says nothing about other actuators (e.g., per-matrix or
-   global LR control driven by the same statistics; §7), other response
-   functions, or other substrates. Song et al. (arXiv:2405.16002) found
+   timescales. It says nothing about other response functions or other substrates —
+   and the per-matrix/global LR actuator driven by the same statistic
+   family has now been tested, with a positive-but-bounded result (§5)
+   that leaves this null intact. Song et al. (arXiv:2405.16002) found
    projecting out the dominant subspace entirely leaves training unharmed at
    short horizons, and Damian et al.'s self-stabilization result gives a
    principled reason externally damping oscillating directions may be
@@ -579,9 +766,9 @@ The null result is precisely scoped; we claim nothing beyond it.
 
 ---
 
-## 6. Related work
+## 7. Related work
 
-### 6.1 DynMuon and scheduled/global spectral shaping
+### 7.1 DynMuon and scheduled/global spectral shaping
 
 DynMuon (arXiv:2605.17109) replaces Muon's UVᵀ with UΣᵖVᵀ where p follows "a
 simple decreasing logistic schedule … interpolating from positive values early
@@ -599,7 +786,7 @@ response class we tested) has no effect, while their global schedule's home
 claims (10.6–26.5% fewer steps at 127M–1.1B/10–20B tokens) live at a scale and
 metric we did not test (§4.4).
 
-### 6.2 Per-direction and subspace-selective optimizers
+### 7.2 Per-direction and subspace-selective optimizers
 
 COSMOS (arXiv:2502.17410) splits by eigenvalue rank and applies different
 optimizers per subspace — subspace-selective treatment without behavioral
@@ -619,7 +806,7 @@ does help at LLM scale. To the best of our literature review
 classification with routed responses in a spectral optimizer was unoccupied
 territory; this paper populates it with a measurement study and a null.
 
-### 6.3 Edge-of-stability theory for normalized updates
+### 7.3 Edge-of-stability theory for normalized updates
 
 The theory line runs from normalized-GD EoS (Arora, Li & Panigrahi,
 arXiv:2205.09745) through preconditioned sharpness for Adam (≈ 38/η; Cohen et
@@ -640,30 +827,24 @@ momentum) or names as open.
 
 ---
 
-## 7. Future directions
+## 8. Future directions
 
-**Temporal trust ratios (per-matrix/global LR control from occupancy).** The
-strongest signal in our data is population-level: negative-ρ occupancy is
-large, LR-monotone in late phases, momentum-independent, and cheap to measure
-— while the per-direction actuator we tested is inert and the global-LR
-actuator is demonstrably potent (the baseline arms move by 0.3–0.8pp under
-small LR changes). The literature has trust ratios driven by spatial norms
-(LARS/LAMB/OrScale) and by noise magnitude (LANTON/NAMO/MoLS), but no method
-in any family modulates a per-matrix LR by measured serial structure — a
-signal magnitude statistics provably cannot see (equal-variance AR(+ρ) vs
-AR(−ρ) are indistinguishable to any second-moment method)
-(`docs/litreview/a-autocorr-lr-control.md`, `b-layer-temporal-trust-ratio.md`).
-The lineage runs Pflug/Chee-Toulis → hypergradient descent → GALA, all global
-scalars with known variance failure modes that an occupancy fraction (a
-binned, population-level order parameter) directly addresses; the control
-framing is a setpoint controller holding occupancy at a nonzero target —
-edge-of-stability targeting without Hessian access, in a family where norm-
-and distance-based signals are degenerate because update norms are fixed. Per
-the Gate-2 record this direction is conditionally approved with a mandatory
-pre-registered protocol (falsifiable LR-recovery/setpoint predictions;
-baselines: OrScale, NAMO/LANTON-style noise scaling, GALA, Prodigy, hand-tuned
-schedule) committed to `criteria/` before any spend. No results are claimed
-here.
+**Temporal trust ratios — executed; what remains.** The direction this
+entry proposed on 2026-07-20 is now §5 (executed 2026-07-22): the setpoint
+controller exists, the LR-recovery prediction held at n = 100 on airbench,
+and the mechanism decomposed into schedule discovery. What remains open, in
+order of bindingness: (i) the **mandatory external baselines** from the
+Gate-2 conditional protocol (OrScale, NAMO/LANTON-style noise scaling,
+GALA, Prodigy, and — most pointedly — a hand-tuned earlier-anneal schedule,
+which the placebo replay approximates from the discovered side but which
+has not been independently tuned); (ii) **setpoint transfer** — ρ\* is
+read off this task's healthy runs; a self-calibrating variant (short
+known-safe probe → own reference band) is designed but unrun; (iii) the
+**LM thread**: the cos(G, momentum) early-window dial (§5.6; n = 2,
+suggestive) plus a spike-gate on the controller (motivated by §5.7 — LM
+training spikes at healthy LR would read as spurious "too hot"); (iv) the
+2×-LR region is under-rescued by the window-60 configuration (+0.25pp of a
+−0.53pp deficit). No results are claimed for these here.
 
 **The Muon stability law (measured; invariant unidentified).** We built the
 dual-norm directional-smoothness probe this section previously called for,
@@ -681,9 +862,9 @@ harness. No results are claimed for these here.
 
 ---
 
-## 8. Reproducibility appendix
+## 9. Reproducibility appendix
 
-### 8.1 Pipeline and provenance
+### 9.1 Pipeline and provenance
 
 Every run is driven by a pinned YAML config (no CLI-arg science) through one
 entrypoint; every results JSON carries config hash, git SHA, seed, GPU type
@@ -703,7 +884,9 @@ Deterministic figure/table scripts: `scripts/analyze_phase1.py`,
 `scripts/analyze_disambiguation.py`, `scripts/analyze_mechanism.py`,
 `scripts/aggregate.py`, `reports/figures/wp05/make_figures.py`; frontier
 programs: `scripts/analyze_frontier.py`, `analyze_frontier_dense.py`,
-`analyze_frontier_nanogpt.py`, `analyze_local_baseline.py`.
+`analyze_frontier_nanogpt.py`, `analyze_local_baseline.py`; program #8:
+`scripts/analyze_tempo.py` (passive / compare / nanogpt-passive modes),
+`scripts/analyze_intermittency.py` (synthetic-validated null pipeline).
 
 The frontier programs ran on a local 2× RTX 5090 (32 GB) workstation. The
 LM substrate is a single-GPU port of the modded-nanogpt record
@@ -724,7 +907,7 @@ successful completion after an incident in which sweep variants sharing a
 three affected result files are tombstoned in `results/INVALID_RUNS.json`
 (results are append-only) and all analyzers honor the tombstone list.
 
-### 8.2 Seed discipline
+### 9.2 Seed discipline
 
 Evaluation seeds 0–99 appear only in comparison tables (§4); development,
 debugging, tuning, and measurement-only runs use seeds ≥ 1000 (Phase-1
@@ -736,9 +919,13 @@ at the argmax only. One recorded caveat: the routed optimizer's internal RNG
 seeds; model init, data order, and augmentation vary per seed (deviation 8).
 The frontier programs use later dev blocks: airbench 1400–1414 (programs
 #6/#6b), nanogpt 1700–1721 (port bring-up, 10-seed baseline, transfer
-grid) — all disjoint from every earlier block and from eval seeds.
+grid); program #8 uses 1420–1439 (airbench phases A/B/B′ — 1430–1439 the
+labeled B′ exploration after the disclosed window re-tune) and 1440–1441
+(LM passive probe) — all disjoint from every earlier block and from eval
+seeds. The §5.5 evaluation table's controller configuration was frozen and
+committed before any eval-seed run.
 
-### 8.3 Cost
+### 9.3 Cost
 
 All cloud GPU work ran on spot-priced VMs (Hyperstack; RTX A6000 for the
 airbench phases, 1× H100 PCIe for the nanogpt port audit). Documented phase
@@ -751,14 +938,16 @@ fp32-embed diagnostic ≈ $4.80. **Total project cloud spend $13.60**
 test). Per-run attributed cost fields are stamped in all cloud run JSONs
 (billed sweep window amortized evenly per run) — e.g., $0.003/run for the
 100-seed comparison arms. The frontier programs (#6/#6b/#7: 249 training
-runs plus the 10-seed LM baseline) ran on a local 2× RTX 5090 workstation
-at zero marginal cloud cost. The headline scientific results — the Phase-1
-characterization, the placebo-controlled null, and the two-substrate
-frontier — cost under $15 of cloud compute combined, which we note as
-evidence that measurement-first optimizer research has an extremely
-favorable cost profile.
+runs plus the 10-seed LM baseline) and program #8 (~1,170 airbench runs
+incl. the 800-run evaluation table, 8 LM probe runs, and the zero-compute
+offline intermittency scan) ran on a local 2× RTX 5090 workstation at zero
+marginal cloud cost. The headline scientific results — the Phase-1
+characterization, the placebo-controlled null, the two-substrate frontier,
+and the §5 controller with its n = 100 table — cost under $15 of cloud
+compute combined, which we note as evidence that measurement-first
+optimizer research has an extremely favorable cost profile.
 
-### 8.4 Gates and adversarial review
+### 9.4 Gates and adversarial review
 
 The project ran under pre-registered gates with hard stops. Gate 1
 (measurement → intervention) and Gate 2 (intervention verdict) were each
@@ -774,7 +963,7 @@ every accepted amendment and every disclosed deviation, are in the repository
 (`reports/gate1-decision.md`, `reports/gate2-decision.md`) and are the
 authoritative statements of what this paper may claim.
 
-### 8.5 Figures
+### 9.5 Figures
 
 - `figures/wp12/regime_scatter.png` — (SNR, ρ) scatter, 20 seeds.
 - `figures/wp12/regime_occupancy.png` — regime occupancy vs step (labels
