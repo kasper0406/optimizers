@@ -338,6 +338,13 @@ def run_airbench_smoke(
     wd = float(recipe_cfg.get("sgd_weight_decay", 2e-6)) * batch_size
     normalize_filter_weights = bool(recipe_cfg.get("normalize_filter_weights", True))
     tta_level = int(recipe_cfg.get("tta_level", 2))
+    # Program #10 (branched-probe meta-control) Phase A: mid-run LR fork.
+    # Two runs with the same seed are bitwise-identical until ``step``; a
+    # multiplier applied from ``step`` onward makes them a perfectly
+    # common-randomness-paired branch pair at full-run cost (~15 s here).
+    lr_fork = recipe_cfg.get("lr_fork") or None  # {"step": int, "mult": float}
+    if lr_fork is not None:
+        lr_fork = {"step": int(lr_fork["step"]), "mult": float(lr_fork["mult"])}
 
     model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
     if bool(recipe_cfg.get("compile", False)):
@@ -398,6 +405,7 @@ def run_airbench_smoke(
     # coarse aggregate time series every ROUTING_TS_EVERY steps. Read-only.
     track_routing = hasattr(optimizer2, "routing_stats")
     routing_timeseries = []
+    train_loss_series: list = []  # P10: populated only when lr_fork is set
 
     starter = torch.cuda.Event(enable_timing=True)
     ender = torch.cuda.Event(enable_timing=True)
@@ -427,15 +435,33 @@ def run_airbench_smoke(
         model.train()
         for inputs, labels in train_loader:
             outputs = model(inputs, whiten_bias_grad=(step < whiten_bias_train_steps))
-            torch.nn.functional.cross_entropy(
+            loss = torch.nn.functional.cross_entropy(
                 outputs, labels, label_smoothing=0.2, reduction="sum"
-            ).backward()
+            )
+            loss.backward()
+            if lr_fork is not None:
+                # P10: per-step loss series (GPU-resident; synced once at end).
+                # Recomputed in fp32: the recipe's fp16 sum-reduction loss
+                # overflows to inf mid-run (harmless to training — CE backward
+                # never uses the forward value — but useless as telemetry).
+                with torch.no_grad():
+                    train_loss_series.append(
+                        torch.nn.functional.cross_entropy(
+                            outputs.detach().float(), labels,
+                            label_smoothing=0.2, reduction="sum",
+                        )
+                    )
             for group in optimizer1.param_groups[:1]:
                 group["lr"] = group["initial_lr"] * (
                     1 - step / whiten_bias_train_steps
                 )
             for group in optimizer1.param_groups[1:] + optimizer2.param_groups:
                 group["lr"] = group["initial_lr"] * (1 - step / total_train_steps)
+            if lr_fork is not None and step >= lr_fork["step"]:
+                # P10: scale ALL optimizer LRs from the fork step on (the
+                # branch differs from its same-seed twin only in this).
+                for group in optimizer1.param_groups + optimizer2.param_groups:
+                    group["lr"] = group["lr"] * lr_fork["mult"]
             if normalize_filter_weights:
                 # airbench94_muon.py:83 (recipe step, applied uniformly)
                 for p in filter_params:
@@ -505,6 +531,11 @@ def run_airbench_smoke(
     if hasattr(optimizer2, "tempo_stats"):
         # Program #8: TempoMuon rho/gain telemetry (self-recorded per step).
         metrics["tempo_stats"] = optimizer2.tempo_stats()
+    if lr_fork is not None:
+        metrics["lr_fork"] = lr_fork
+        metrics["train_loss_series"] = [
+            float(v) for v in torch.stack(train_loss_series).cpu()
+        ]
     return metrics
 
 
