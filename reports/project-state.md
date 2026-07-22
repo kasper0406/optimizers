@@ -221,6 +221,40 @@ is measurement-first with a clean null, not a method claim.
    to the field; the flag-plant the plan's risk analysis calls for while the
    niche's ~6-month idea half-life runs.
 
+### Added 2026-07-22 (program #8 + intermittency scan)
+
+6. **Program #8 (TempoMuon temporal trust ratio) — active.** Eval-seed
+   table done (`reports/tempo-eval.md`: controller exactly free at record
+   LR, +1.54pp at 4×, n=100 paired; placebo decomposition in
+   `reports/tempo-phase-b.md`). Open, in order:
+   (a) **HUMAN: gate judgment** on the eval table (no `criteria/` file
+   exists for it); decide whether this becomes a method section of the
+   paper or a separate note.
+   (b) **nanogpt transfer, Phase A passive** — probe runs in flight
+   (PORT CHANGE P6; 4-rung muon_lr ladder, seeds 1440–1441); analysis
+   `analyze_tempo.py nanogpt-passive`. If the early-training dial exists
+   at LM scale, controller-on runs are the follow-up (power: 2–4
+   seeds/arm per the local baseline sigma).
+   (c) **Spike-gate for the controller** before any nanogpt controller
+   run: don't advance the gain on spike steps (motivated by
+   `reports/intermittency-scan.md` §3 — LM training has loss spikes at
+   normal LR; a spike pushes cos toward 0 and would cause spurious
+   shrink).
+   (d) 2×-LR under-rescue and a self-calibrating setpoint (short
+   known-safe probe → own reference band) — Phase B″ material, dev seeds
+   1440+ (1440–1441 consumed by (b)).
+7. **Spike-rate as a frontier-invariant candidate** (from
+   `reports/intermittency-scan.md`): the burn-in-corrected heavy-tail
+   population is LR-monotone — the one instrumented observable never
+   tested against the pre-registered frontier tracking signature.
+   Offline first (existing sidecars, B ≤ 1000); a proper batch-axis test
+   needs longer high-B instrumented runs.
+8. **Paper §3.1 addition candidate**: the anchoring-artifact methodology
+   note (93% of naive top-direction kurtosis spikes are the subspace
+   re-anchoring transient; burn-in ≥5 required) + the corrected
+   LR-dependent intermittency measurement. Cheap to fold in; guards
+   future instrumentation work against the same trap.
+
 ## 7. Reproducibility / repo state
 
 `docs/litreview/` — nine literature reports with novelty verdicts. `criteria/`
