@@ -65,10 +65,11 @@ def window_psd(s: np.ndarray, refresh, t_refresh: int):
     freqs = np.fft.rfftfreq(wlen)
     mask = np.ones(len(freqs), bool)
     mask[0] = False  # DC
-    if t_refresh:
-        f_r = 1.0 / t_refresh
-        for k in range(1, int(0.5 / f_r) + 1):
-            mask &= np.abs(freqs - k * f_r) > (0.5 / wlen)
+    # The prereg's refresh-harmonic notch concern does not apply here:
+    # each periodogram is computed WITHIN a single refresh period (window
+    # length < t_refresh), so no refresh cadence can appear in it. A notch
+    # at k/t_refresh with these window lengths would blanket the whole
+    # spectrum (bands wider than their spacing) — implementation note.
     return acc / cnt, (freqs, mask)
 
 
