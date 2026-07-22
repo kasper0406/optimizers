@@ -1,0 +1,42 @@
+# Program #13 Stage 1 (reports/endstate-prereg.md sections 1-3; committed
+# before any run). Endpoint hooks write to session scratch, never results/.
+# Accuracy-matched undertraining placebo: fully-annealed shorter schedules.
+experiment: airbench_smoke
+seed: 1466
+device: cuda
+data:
+  root: data/cifar10
+train:
+  epochs: 8
+  batch_size: 1000
+recipe:
+  normalize_filter_weights: true
+  compile: true
+  tta_level: 2
+  save_endpoint:
+    dir: /tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/endstate_ckpts
+  save_test_logits:
+    dir: /tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/endstate_ckpts
+optimizer:
+  name: muon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+sweep:
+  seeds:
+  - 1466
+  - 1467
+  - 1468
+  - 1469
+  - 1470
+  - 1471
+  - 1472
+  - 1473
+  - 1474
+  - 1475
+  grid:
+    train.epochs:
+    - 6
+    - 7

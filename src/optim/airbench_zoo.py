@@ -351,6 +351,11 @@ def run_airbench_smoke(
     # between optimizer steps. {"n_fixed": int, "n_fresh": int, "every": int,
     # "topk": int}.
     example_probe = recipe_cfg.get("example_probe") or None
+    # Program #13 (reports/endstate-prereg.md §2): endpoint hooks.
+    # Measurement-only, run once after training; checkpoints go to a
+    # scratch dir (never results/), paths recorded in metrics.
+    save_endpoint = recipe_cfg.get("save_endpoint") or None      # {"dir": str}
+    save_test_logits = recipe_cfg.get("save_test_logits") or None  # {"dir": str}
 
     model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
     if bool(recipe_cfg.get("compile", False)):
@@ -595,6 +600,34 @@ def run_airbench_smoke(
         ]
     if example_probe is not None:
         metrics["example_probe"] = {"config": example_probe, "rows": probe_rows}
+    if save_endpoint is not None or save_test_logits is not None:
+        import os as _os
+        run_uid = _os.urandom(6).hex()
+        if save_endpoint is not None:
+            d = Path(save_endpoint["dir"])
+            d.mkdir(parents=True, exist_ok=True)
+            p = d / f"endpoint_{run_uid}.pt"
+            torch.save(model.state_dict(), p)
+            metrics["endpoint_path"] = str(p)
+        if save_test_logits is not None:
+            d = Path(save_test_logits["dir"])
+            d.mkdir(parents=True, exist_ok=True)
+            slab = types.SimpleNamespace(
+                images=train_loader.images[:2000],
+                labels=train_loader.labels[:2000],
+                normalize=train_loader.normalize,
+            )
+            bundle = {
+                "test_tta": ab.infer(model, test_loader, tta_level=tta_level).float().cpu(),
+                "test_plain": ab.infer(model, test_loader, tta_level=0).float().cpu(),
+                "train_tta": ab.infer(model, slab, tta_level=tta_level).float().cpu(),
+                "train_plain": ab.infer(model, slab, tta_level=0).float().cpu(),
+                "test_labels": test_loader.labels.cpu(),
+                "train_labels": slab.labels.cpu(),
+            }
+            p = d / f"logits_{run_uid}.pt"
+            torch.save(bundle, p)
+            metrics["logits_path"] = str(p)
     return metrics
 
 
