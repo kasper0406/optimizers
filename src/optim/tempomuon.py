@@ -133,8 +133,10 @@ class TempoMuon(Muon):
 
     @staticmethod
     def _advance_gain(
-        gain: float, rho_hat: float, group: Dict[str, Any]
+        gain: float, rho_hat: Optional[float], group: Dict[str, Any]
     ) -> float:
+        if rho_hat is None or not math.isfinite(rho_hat):
+            return gain
         factor = math.exp(group["kappa"] * (rho_hat - group["rho_star"]))
         return min(max(gain * factor, group["gain_min"]), group["gain_max"])
 
@@ -143,19 +145,30 @@ class TempoMuon(Muon):
     ) -> None:
         prev = state.get("tempo_prev_grad")
         if prev is not None:
-            num = torch.sum(G * prev)
-            den = G.norm() * prev.norm()
+            # fp32 throughout: the airbench model trains in fp16, where the
+            # elementwise products of sum-reduction CE gradients overflow
+            # (fp16 max 65504) — observed as the program-#8 Phase-A NaN
+            # collapse at low LR. flatten() also normalizes conv shapes.
+            g32 = G.detach().reshape(-1).float()
+            p32 = prev.reshape(-1).float()
+            num = torch.dot(g32, p32)
+            den = g32.norm() * p32.norm()
             cos = float((num / den.clamp_min(1e-30)).item())
-            beta = group["rho_beta"]
-            state["tempo_rho_raw"] = (
-                beta * state.get("tempo_rho_raw", 0.0) + (1.0 - beta) * cos
-            )
-            state["tempo_obs"] = state.get("tempo_obs", 0) + 1
-            if self.scope == "global":
-                self._pool.append(cos)
-            else:
-                rho = self._rho_hat(state["tempo_rho_raw"], state["tempo_obs"], beta)
-                if state["tempo_obs"] > group["warmup_steps"]:
+            if math.isfinite(cos):
+                beta = group["rho_beta"]
+                state["tempo_rho_raw"] = (
+                    beta * state.get("tempo_rho_raw", 0.0) + (1.0 - beta) * cos
+                )
+                state["tempo_obs"] = state.get("tempo_obs", 0) + 1
+                if self.scope == "global":
+                    self._pool.append(cos)
+                elif (
+                    group["kappa"] != 0.0
+                    and state["tempo_obs"] > group["warmup_steps"]
+                ):
+                    rho = self._rho_hat(
+                        state["tempo_rho_raw"], state["tempo_obs"], beta
+                    )
                     state["tempo_gain"] = self._advance_gain(
                         state.get("tempo_gain", 1.0), rho, group
                     )

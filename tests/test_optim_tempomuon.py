@@ -214,6 +214,25 @@ def test_state_dict_roundtrip_resumes_trajectory():
     assert torch.allclose(p_full.data, p_b.data, atol=1e-6)
 
 
+def test_fp16_large_gradients_do_not_poison_rho_or_gain():
+    """Regression (program #8 Phase-A collapse): fp16 gradients whose
+    elementwise products overflow fp16 (max 65504) must not produce NaN in
+    rho_hat or the gain — the cosine is computed in fp32."""
+    p = torch.nn.Parameter(torch.randn(SHAPE, dtype=torch.float16))
+    opt = tempo(p, kappa=0.3, warmup_steps=2)
+    big = [
+        (300.0 * torch.randn(SHAPE, generator=torch.Generator().manual_seed(s))).half()
+        for s in range(20)
+    ]
+    # sanity: the naive fp16 product does overflow for these magnitudes
+    assert torch.isinf(big[0] * big[0]).any()
+    drive(opt, [p], [[g] for g in big])
+    stats = opt.tempo_stats()["final"][f"matrix0_{SHAPE[0]}x{SHAPE[1]}"]
+    assert math.isfinite(stats["rho"])
+    assert math.isfinite(stats["gain"])
+    assert torch.isfinite(p.data).all()
+
+
 def test_history_and_telemetry_shapes():
     p = make_param()
     opt = tempo(p, kappa=0.3, history_every=5)
