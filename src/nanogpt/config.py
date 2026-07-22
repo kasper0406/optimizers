@@ -175,6 +175,13 @@ class NanoGPTConfig:
     precision_mode: str = "fp8"  # "fp8" == record. "bf16" == NOT record-faithful
     attention_impl: str = "flex"  # "flex" == record. "sdpa" == NOT record-faithful
     max_steps: Optional[int] = None  # PORT: early stop for smoke runs (not a run of record)
+    # PORT CHANGE P6 (program #8): passive per-matrix serial-alignment probe
+    # inside Muon.step (src/nanogpt/tempo_probe.py). Measurement only; the
+    # update path is untouched. Costs ~85 MB (subset=2, bf16 prev-grad) +
+    # a CPU sync every tempo_probe_flush_every steps.
+    tempo_probe: bool = False
+    tempo_probe_subset: int = 2
+    tempo_probe_flush_every: int = 10
     # PORT: docs/nanogpt-port.md §6.1 diagnostic probe. Accumulate embedding
     # gradients across micro-batches in an fp32 master buffer instead of in the
     # bf16 `p.grad`, casting back once at the end of the step. Isolates the
@@ -308,6 +315,11 @@ class NanoGPTConfig:
             out["min_lr_frac"] = f"{self.min_lr_frac} (record 0.05)"
         if self.max_steps is not None:
             out["max_steps"] = f"truncated at {self.max_steps} steps — smoke run, not a record run"
+        if self.tempo_probe:
+            out["tempo_probe"] = (
+                f"program-#8 passive tempo probe on (subset {self.tempo_probe_subset}); "
+                "measurement-only, update path untouched (optim.py PORT CHANGE P6)"
+            )
         if not self.compile:
             out["compile"] = "torch.compile disabled (record compiles); slower, ML-neutral"
         return out
@@ -358,6 +370,10 @@ class NanoGPTConfig:
             raise ConfigError("num_layers must be even (RECORD:419 asserts this)")
         if self.max_steps is not None and self.max_steps < 0:
             raise ConfigError("max_steps must be >= 0")
+        if self.tempo_probe_subset < 1:
+            raise ConfigError("tempo_probe_subset must be >= 1")
+        if self.tempo_probe_flush_every < 1:
+            raise ConfigError("tempo_probe_flush_every must be >= 1")
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)

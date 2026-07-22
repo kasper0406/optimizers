@@ -1,0 +1,68 @@
+# NANOGPT LOCAL BASELINE SET — own-harness seed variance (project-state
+# next-step #4; human go-ahead 2026-07-21 "go get nanogpt working, create
+# baselines").
+#
+# The harness-standard local config: the pinned record's hyperparameters with
+# the three documented local deviations —
+#   grad_accumulation      device_count 1 -> 8 micro-batches (port geometry)
+#   fp32_embed_grad_accum  the WP0.2-diagnosed accumulation fix (standard
+#                          per reports/project-state.md next-step #4)
+#   head_chunk_rows        32 GB memory path (PORT CHANGE P5); chunked head
+#                          equals the record head up to fp32 summation order
+#                          (tests/test_nanogpt_head_chunking.py)
+#
+# PURPOSE: establish OUR OWN sigma for final val loss on THIS harness/GPU
+# stack. Record-faithfulness off native hardware is a documented non-goal
+# (project-state §3.6); the value is a self-consistent A/B testbed. These
+# baselines are the control arm for any later method comparison here.
+#
+# n=10 dev seeds -> chi-square 95% CI on sigma spans ~[0.69, 1.83]x the
+# point estimate; enough for the power analysis any method proposal needs.
+#
+# Launch (this box): split seeds across the two GPUs,
+#   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True required (31.4 GB peak).
+# ~75 min per run -> ~6.5 h for the set.
+# --- program #8 nanogpt Phase A overrides (see reports/tempo-phase-a.md) ---
+# Truncated to the stable LR phase (cooldown starts at step ~962): the
+# airbench dial lives early in training; 600 steps ≈ 26 min/run.
+# tempo_probe: PORT CHANGE P6, measurement-only. Seeds 1440-1441 (fresh).
+experiment: nanogpt
+device: auto
+seed: 1440
+nanogpt:
+  head_chunk_rows: 8192
+  fp32_embed_grad_accum: true
+  device_count: 1
+  precision_mode: fp8
+  attention_impl: flex
+  compile: true
+  warmup_steps: 10
+  num_iterations: 1750
+  cooldown_frac: 0.45
+  min_lr_frac: 0.05
+  val_loss_every: 125
+  val_tokens: 10485760
+  train_seq_len: 49152
+  val_seq_len: 262144
+  muon_lr: 0.035
+  muon_momentum: 0.95
+  muon_weight_decay: 0.0
+  adam_lr: 0.008
+  adam_betas:
+  - 0.8
+  - 0.95
+  adam_eps: 1.0e-10
+  adam_weight_decay: 0.0
+  target_val_loss: 3.28
+  checkpoint:
+    dir: checkpoints
+    every_steps: 250
+    resume: true
+  max_steps: 600
+  tempo_probe: true
+  tempo_probe_subset: 2
+  tempo_probe_flush_every: 10
+sweep:
+  seeds:
+  - 1440
+  - 1441

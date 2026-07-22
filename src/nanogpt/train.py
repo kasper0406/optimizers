@@ -235,6 +235,18 @@ def _build(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
 
 def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int) -> Dict[str, Any]:
     model, optimizers, muon = _build(cfg, device, rank, world_size)
+    tempo_probe = None
+    if cfg.tempo_probe:
+        # PORT CHANGE P6 (program #8): passive serial-alignment measurement
+        # inside Muon.step. Each rank probes only the matrices it owns; the
+        # metrics carry this rank's rows (world_size 1 locally -> all of them).
+        from src.nanogpt.tempo_probe import TempoProbe
+
+        tempo_probe = TempoProbe(
+            subset=cfg.tempo_probe_subset,
+            flush_every=cfg.tempo_probe_flush_every,
+        )
+        muon.tempo_probe = tempo_probe
     raw_model = model
 
     @lru_cache(maxsize=None)
@@ -463,4 +475,6 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
     }
     if torch.cuda.is_available():
         metrics["peak_memory_mib"] = torch.cuda.max_memory_allocated() // 1024 // 1024
+    if tempo_probe is not None:
+        metrics["tempo_probe"] = tempo_probe.to_log()
     return metrics
