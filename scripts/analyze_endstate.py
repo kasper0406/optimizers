@@ -27,8 +27,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from src.instrument.endstate import endpoint_lambda1  # noqa: E402
 from src.optim.airbench_zoo import load_vendor_airbench  # noqa: E402
 
-PEAK_LR = 0.24
-PROBE_SEED = 20260722
+PROBE_SEED = 20260722  # peak rung = lowest rung of each batch's ladder
 
 
 def load_runs():
@@ -44,7 +43,7 @@ def load_runs():
         lr = float(cfg["optimizer"]["lr"])
         epochs = int(cfg["train"]["epochs"])
         b = int(cfg["train"]["batch_size"])
-        if "endstate_b1000" in path:
+        if "endstate_b" in path:
             arm = "ladder"
         elif "endstate_placebo" in path:
             arm = "placebo"
@@ -154,23 +153,28 @@ def main(argv=None):
         r["O3_probe_acc"] = ridge_probe(sf, slab_labels.numpy(), tf, test_labels.numpy())
         r["O4_lambda1"] = fx.lam1(r["ckpt"], args.iters)
 
-    # O2: LOSO difficulty from the 10 ladder peak-rung runs
-    peak = [r for r in runs if r["arm"] == "ladder" and r["lr"] == PEAK_LR]
-    peak_correct = np.stack([correct[r["file"]] for r in peak])
+    # O2: LOSO difficulty from each batch's 10 peak-rung (lowest-rung) runs
+    ladder = [r for r in runs if r["arm"] == "ladder"]
+    peak_lr_of = {b: min(r["lr"] for r in ladder if r["B"] == b)
+                  for b in {r["B"] for r in ladder}}
+    peaks = {b: [r for r in ladder if r["B"] == b and r["lr"] == peak_lr_of[b]]
+             for b in peak_lr_of}
+    b1000_peak = peaks.get(1000, [])
     for r in runs:
-        if r in peak:
-            others = np.stack([correct[p["file"]] for p in peak if p is not r])
+        pset = peaks.get(r.get("B"), b1000_peak) if r["arm"] == "ladder" else b1000_peak
+        if r in pset:
+            others = np.stack([correct[p["file"]] for p in pset if p is not r])
         else:
-            others = peak_correct
+            others = np.stack([correct[p["file"]] for p in pset])
         diff = others.mean(0)  # fraction correct = easiness
         hardest = np.argsort(diff)[: len(diff) // 5]
         r["O2_hard_quintile_acc"] = float(correct[r["file"]][hardest].mean())
         r["_hardest_idx"] = hardest
 
-    # O5/O7: same-seed comparisons to the peak rung
-    peak_by_seed = {r["seed"]: r for r in peak}
+    # O5/O7: same-seed comparisons to the SAME BATCH's peak rung
+    peak_by_bs = {(b, r["seed"]): r for b, ps in peaks.items() for r in ps}
     for r in runs:
-        pk = peak_by_seed.get(r["seed"])
+        pk = peak_by_bs.get((r.get("B", 1000), r["seed"])) or peak_by_bs.get((1000, r["seed"]))
         if pk is None or r is pk:
             r["O5_cka_to_peak"] = None
             r["O7_reldist"] = None
