@@ -214,6 +214,42 @@ def test_state_dict_roundtrip_resumes_trajectory():
     assert torch.allclose(p_full.data, p_b.data, atol=1e-6)
 
 
+def test_negative_kappa_shrinks_gain_when_rho_above_setpoint():
+    """The Phase-A rescue law: kappa < 0, setpoint deep-negative; a
+    decorrelated (too-hot-like, rho ~ 0) stream must drive the gain down."""
+    p = make_param()
+    opt = tempo(p, kappa=-0.25, rho_star=-0.48)
+    drive(opt, [p], [[g] for g in ar1_stream(0.0, 100, seed=21)])
+    stats = opt.tempo_stats()["final"][f"matrix0_{SHAPE[0]}x{SHAPE[1]}"]
+    assert stats["gain"] == pytest.approx(0.25, abs=1e-9)
+
+
+def test_negative_kappa_idles_at_cap_for_coherent_oscillation():
+    """Same law: a healthy-like deep-negative stream (rho below setpoint)
+    must leave the gain pinned at the cap (stock behavior)."""
+    p = make_param()
+    opt = tempo(p, kappa=-0.25, rho_star=-0.48)
+    drive(opt, [p], [[g] for g in ar1_stream(-0.8, 100, seed=21)])
+    stats = opt.tempo_stats()["final"][f"matrix0_{SHAPE[0]}x{SHAPE[1]}"]
+    assert stats["gain"] == pytest.approx(1.0, abs=1e-9)
+
+
+def test_ctrl_end_step_freezes_gain():
+    p1, p2 = make_param(8), make_param(8)
+    grads = ar1_stream(0.0, 80, seed=23)
+    frozen = tempo(p1, kappa=-0.1, rho_star=-0.48, warmup_steps=5, ctrl_end_step=20)
+    free = tempo(p2, kappa=-0.1, rho_star=-0.48, warmup_steps=5)
+    drive(frozen, [p1], [[g] for g in grads])
+    drive(free, [p2], [[g] for g in grads])
+    label = f"matrix0_{SHAPE[0]}x{SHAPE[1]}"
+    g_frozen = frozen.tempo_stats()["final"][label]["gain"]
+    g_free = free.tempo_stats()["final"][label]["gain"]
+    hist = frozen.tempo_stats()["history"]
+    gain_at_20 = hist[19]["gain"][label]
+    assert g_frozen == pytest.approx(gain_at_20, abs=1e-12)  # frozen after window
+    assert g_free < g_frozen  # kept falling without the window
+
+
 def test_fp16_large_gradients_do_not_poison_rho_or_gain():
     """Regression (program #8 Phase-A collapse): fp16 gradients whose
     elementwise products overflow fp16 (max 65504) must not produce NaN in

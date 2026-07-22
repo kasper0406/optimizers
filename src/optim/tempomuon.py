@@ -18,9 +18,14 @@ Signal
 Controller (delta-bar-delta lifted to matrix granularity, in Muon)
     gain <- clip(gain * exp(kappa * (rho_hat - rho_star)),
                  gain_min, gain_max)
-    applied as ``W -= lr_adjusted * gain * O``. The setpoint rho_star is
-    *negative*: the healthy record regime carries substantial negative-rho
-    occupancy (WP1.2), so driving rho_hat to 0 would fight a well-tuned run.
+    applied as ``W -= lr_adjusted * gain * O``. kappa may be negative: the
+    Phase-A measurement (reports/tempo-phase-a.md) found the early-training
+    matrix-level rho is *inverted* vs the per-direction occupancy intuition
+    — the healthy record run sits deepest negative (~-0.51) and too-hot
+    runs decorrelate toward 0 — so the rescue controller uses kappa < 0
+    (shrink the gain when rho_hat is *above* the setpoint) with an active
+    window ending at ``ctrl_end_step`` (the ordering reverses late in the
+    anneal; the gain freezes at its reached value after the window).
     kappa = 0 makes the optimizer bit-identical to stock Muon while still
     measuring rho_hat (passive/Phase-A mode).
 
@@ -69,13 +74,12 @@ class TempoMuon(Muon):
         gain_min: float = 0.25,
         gain_max: float = 1.0,
         warmup_steps: int = 25,
+        ctrl_end_step: int = 10**9,
         scope: str = "per_matrix",
         history_every: int = 1,
     ) -> None:
         if not 0.0 < rho_beta < 1.0:
             raise ValueError(f"rho_beta must be in (0, 1), got {rho_beta}")
-        if kappa < 0.0:
-            raise ValueError(f"kappa must be >= 0, got {kappa}")
         if not -1.0 <= rho_star <= 1.0:
             raise ValueError(f"rho_star must be in [-1, 1], got {rho_star}")
         if not 0.0 < gain_min <= gain_max:
@@ -102,6 +106,7 @@ class TempoMuon(Muon):
             gain_min=gain_min,
             gain_max=gain_max,
             warmup_steps=warmup_steps,
+            ctrl_end_step=ctrl_end_step,
         )
         self.defaults.update(extra)
         for group in self.param_groups:
@@ -165,6 +170,7 @@ class TempoMuon(Muon):
                 elif (
                     group["kappa"] != 0.0
                     and state["tempo_obs"] > group["warmup_steps"]
+                    and state["step"] <= group["ctrl_end_step"]
                 ):
                     rho = self._rho_hat(
                         state["tempo_rho_raw"], state["tempo_obs"], beta
@@ -189,7 +195,11 @@ class TempoMuon(Muon):
         g["rho_raw"] = beta * g["rho_raw"] + (1.0 - beta) * cos_mean
         g["obs"] = g["obs"] + 1
         rho = self._rho_hat(g["rho_raw"], g["obs"], beta)
-        if g["obs"] > self.defaults["warmup_steps"]:
+        if (
+            self.defaults["kappa"] != 0.0
+            and g["obs"] > self.defaults["warmup_steps"]
+            and self._step_count < self.defaults["ctrl_end_step"]
+        ):
             g["gain"] = self._advance_gain(g["gain"], rho, self.defaults)
 
     def _label(self, param: torch.Tensor) -> str:
@@ -288,6 +298,7 @@ class TempoMuon(Muon):
                     "gain_min",
                     "gain_max",
                     "warmup_steps",
+                    "ctrl_end_step",
                 )
             },
             "final": self._per_matrix_rows(),

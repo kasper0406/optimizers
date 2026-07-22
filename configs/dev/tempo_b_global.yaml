@@ -1,0 +1,41 @@
+# Program #8 Phase B arm: TempoMuon global-pool controller (granularity ablation).
+# Controller constants derived in Phase A (reports/tempo-phase-a.md 2.4)
+# BEFORE any Phase-B run: kappa=-0.25 (inverted sign, see report),
+# rho_star=-0.48 (healthy 1x early band), active window [warmup 25, 100].
+experiment: airbench_smoke
+seed: 1420
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: tempomuon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+  rho_beta: 0.9
+  kappa: -0.25
+  rho_star: -0.48
+  gain_min: 0.2
+  gain_max: 1.0
+  warmup_steps: 25
+  ctrl_end_step: 100
+  scope: global
+  history_every: 1
+
+sweep:
+  seeds: [1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429]
+  grid:
+    optimizer.lr: [0.24, 0.48, 0.72, 0.96]
