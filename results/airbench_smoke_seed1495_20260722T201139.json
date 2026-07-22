@@ -1,0 +1,68 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_smoke",
+      "optimizer": {
+        "lr": 0.24,
+        "momentum": 0.6,
+        "name": "muon",
+        "nesterov": true,
+        "ns_steps": 3,
+        "weight_decay": 0.0
+      },
+      "recipe": {
+        "compile": true,
+        "normalize_filter_weights": true,
+        "save_test_logits": {
+          "dir": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_ckpts"
+        },
+        "tail_phase": {
+          "hard_frac": 0.5,
+          "tail_epochs": 2
+        },
+        "tta_level": 2
+      },
+      "seed": 1495,
+      "train": {
+        "batch_size": 1000,
+        "epochs": 8
+      }
+    },
+    "path": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_D.yaml",
+    "sha256": "d5f48962a25fd7e7cd2baa654f3e5ee7377bc213674a79fcc9e2731cdf8e9ac9"
+  },
+  "cost_usd": null,
+  "experiment": "airbench_smoke",
+  "finished_at": "2026-07-22T20:11:46.774936+00:00",
+  "git_dirty": false,
+  "git_sha": "12288db2fe70bc841022f937ae1e3a6c29027b87",
+  "gpu_type": "NVIDIA GeForce RTX 5090",
+  "metrics": {
+    "epochs": 8.0,
+    "logits_path": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_ckpts/logits_6851da09efb3.pt",
+    "optimizer": "muon",
+    "steps": 400,
+    "time_seconds": 5.414358833312989,
+    "train_acc_last": 0.9630000591278076,
+    "tta_val_acc": 0.9373999834060669,
+    "val_acc": 0.9265999794006348,
+    "val_accs": [
+      0.5604000091552734,
+      0.774399995803833,
+      0.7893999814987183,
+      0.8181999921798706,
+      0.8460999727249146,
+      0.8949999809265137,
+      0.9131999611854553,
+      0.9265999794006348
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1495,
+  "started_at": "2026-07-22T20:11:39.682520+00:00",
+  "wall_time_s": 7.092401484027505
+}

@@ -1,0 +1,68 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_smoke",
+      "optimizer": {
+        "lr": 0.24,
+        "momentum": 0.6,
+        "name": "muon",
+        "nesterov": true,
+        "ns_steps": 3,
+        "weight_decay": 0.0
+      },
+      "recipe": {
+        "compile": true,
+        "normalize_filter_weights": true,
+        "save_test_logits": {
+          "dir": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_ckpts"
+        },
+        "tail_phase": {
+          "hard_frac": 0.5,
+          "tail_epochs": 2
+        },
+        "tta_level": 2
+      },
+      "seed": 1491,
+      "train": {
+        "batch_size": 1000,
+        "epochs": 8
+      }
+    },
+    "path": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_D.yaml",
+    "sha256": "d5f48962a25fd7e7cd2baa654f3e5ee7377bc213674a79fcc9e2731cdf8e9ac9"
+  },
+  "cost_usd": null,
+  "experiment": "airbench_smoke",
+  "finished_at": "2026-07-22T20:11:11.791931+00:00",
+  "git_dirty": false,
+  "git_sha": "12288db2fe70bc841022f937ae1e3a6c29027b87",
+  "gpu_type": "NVIDIA GeForce RTX 5090",
+  "metrics": {
+    "epochs": 8.0,
+    "logits_path": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_ckpts/logits_c0f919ba3f14.pt",
+    "optimizer": "muon",
+    "steps": 400,
+    "time_seconds": 5.417286170959473,
+    "train_acc_last": 0.968000054359436,
+    "tta_val_acc": 0.9388999938964844,
+    "val_acc": 0.9303999543190002,
+    "val_accs": [
+      0.6943999528884888,
+      0.7664999961853027,
+      0.6237999796867371,
+      0.8317999839782715,
+      0.8569999933242798,
+      0.8847000002861023,
+      0.9160999655723572,
+      0.9303999543190002
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1491,
+  "started_at": "2026-07-22T20:11:04.705517+00:00",
+  "wall_time_s": 7.086400158004835
+}

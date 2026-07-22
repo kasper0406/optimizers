@@ -1,0 +1,64 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_smoke",
+      "optimizer": {
+        "lr": 0.48,
+        "momentum": 0.6,
+        "name": "muon",
+        "nesterov": true,
+        "ns_steps": 3,
+        "weight_decay": 0.0
+      },
+      "recipe": {
+        "compile": true,
+        "normalize_filter_weights": true,
+        "save_test_logits": {
+          "dir": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_ckpts"
+        },
+        "tta_level": 2
+      },
+      "seed": 1488,
+      "train": {
+        "batch_size": 1000,
+        "epochs": 8
+      }
+    },
+    "path": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_B.yaml",
+    "sha256": "3edec69c514e4afbd6f69caa283882314bc6e8f7d21762a103c27e0bea7ae6d5"
+  },
+  "cost_usd": null,
+  "experiment": "airbench_smoke",
+  "finished_at": "2026-07-22T20:07:50.945194+00:00",
+  "git_dirty": false,
+  "git_sha": "12288db2fe70bc841022f937ae1e3a6c29027b87",
+  "gpu_type": "NVIDIA GeForce RTX 5090",
+  "metrics": {
+    "epochs": 8.0,
+    "logits_path": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_ckpts/logits_64fb56c0cf96.pt",
+    "optimizer": "muon",
+    "steps": 400,
+    "time_seconds": 5.373037826538086,
+    "train_acc_last": 0.9300000667572021,
+    "tta_val_acc": 0.9297999739646912,
+    "val_acc": 0.9217999577522278,
+    "val_accs": [
+      0.5042999982833862,
+      0.5223999619483948,
+      0.6694999933242798,
+      0.7346000075340271,
+      0.7071999907493591,
+      0.7975999712944031,
+      0.8853999972343445,
+      0.9217999577522278
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1488,
+  "started_at": "2026-07-22T20:07:43.918068+00:00",
+  "wall_time_s": 7.027112292009406
+}
