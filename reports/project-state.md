@@ -119,6 +119,15 @@ Pre-registered before any run (`reports/stability-frontier-preregistration.md`);
   step-matched (epochs 32, ~200 steps) B=8000 recovers 93.75% and its
   peak-referenced shoulder lands at 0.96 ≥ B=4000's 0.72 — the rightward
   shift continues, it does not saturate.
+- **The law does NOT transfer to the nanogpt record recipe** (program #7,
+  2026-07-22, pre-registered, 48 cells on the validated local testbed):
+  across an 8× token-batch range (98K–786K tokens/step, fixed 346M-token
+  budget) the useful Muon-lr band is batch-invariant — α = −0.29, CI95
+  [−0.35, +0.30]; the airbench point 0.35 is excluded; valley pinned at
+  ~0.7× record lr at every batch; no cliff anywhere. Domain-bounding
+  result: batch-coupled at CNN-scale batches, batch-invariant at LM-scale
+  token batches — consistent with (untested) critical-batch-size
+  saturation. `reports/frontier-nanogpt.md`.
 - **No instrumented quantity is the frontier invariant**: occupancy, spectral
   and Euclidean directional smoothness, and HVP η·λ q90 all fail the
   pre-registered tracking signature; curvature is the *least* equalized
