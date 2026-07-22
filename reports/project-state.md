@@ -230,11 +230,14 @@ is measurement-first with a clean null, not a method claim.
    (a) **HUMAN: gate judgment** on the eval table (no `criteria/` file
    exists for it); decide whether this becomes a method section of the
    paper or a separate note.
-   (b) **nanogpt transfer, Phase A passive** — probe runs in flight
-   (PORT CHANGE P6; 4-rung muon_lr ladder, seeds 1440–1441); analysis
-   `analyze_tempo.py nanogpt-passive`. If the early-training dial exists
-   at LM scale, controller-on runs are the follow-up (power: 2–4
-   seeds/arm per the local baseline sigma).
+   (b) **nanogpt transfer, Phase A passive — DONE 2026-07-22, largely
+   negative** (`reports/tempo-nanogpt-phase-a.md`): the airbench cos_gg
+   dial does not transfer (lr-flat, per-matrix orderings split); the
+   zero-memory cos_gm variant shows an airbench-sign dial in steps
+   25–100 only (median per-matrix Spearman +0.80, n=2 seeds).
+   **HUMAN: decide** whether to chase it — the cheap confirm is 4 lr ×
+   6 seeds at 150-step truncation (~3 GPU-h) before any controller-on
+   run (which would use cos_gm, early window, spike-gated, global pool).
    (c) **Spike-gate for the controller** before any nanogpt controller
    run: don't advance the gain on spike steps (motivated by
    `reports/intermittency-scan.md` §3 — LM training has loss spikes at
