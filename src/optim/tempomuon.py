@@ -77,6 +77,7 @@ class TempoMuon(Muon):
         ctrl_end_step: int = 10**9,
         scope: str = "per_matrix",
         history_every: int = 1,
+        gain_schedule: Optional[List[float]] = None,
     ) -> None:
         if not 0.0 < rho_beta < 1.0:
             raise ValueError(f"rho_beta must be in (0, 1), got {rho_beta}")
@@ -113,6 +114,11 @@ class TempoMuon(Muon):
             for k, v in extra.items():
                 group.setdefault(k, v)
         self.scope = scope
+        # Placebo mode (report guardrail 4): a fixed per-step gain sequence
+        # replayed open-loop, ignoring all feedback. Distinguishes "the
+        # controller's adaptivity matters" from "any matching effective-LR
+        # reduction would do".
+        self.gain_schedule = list(gain_schedule) if gain_schedule else None
         self.history_every = int(history_every)
         self._step_count = 0
         self._pool: List[float] = []  # this step's cosines (global scope)
@@ -229,7 +235,10 @@ class TempoMuon(Muon):
         if wd != 0.0:
             param.mul_(1.0 - lr * wd)
         alpha = adjusted_lr_for_shape(lr, param.shape, group.get("adjust_lr"))
-        if self.scope == "global":
+        if self.gain_schedule is not None:
+            idx = min(self._step_count, len(self.gain_schedule) - 1)
+            gain = self.gain_schedule[idx]
+        elif self.scope == "global":
             gain = self._gstate["gain"]
         else:
             gain = state.get("tempo_gain", 1.0)

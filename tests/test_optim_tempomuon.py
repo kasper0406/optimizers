@@ -269,6 +269,27 @@ def test_fp16_large_gradients_do_not_poison_rho_or_gain():
     assert torch.isfinite(p.data).all()
 
 
+def test_gain_schedule_replay_ignores_feedback():
+    """Placebo mode: the applied gain follows the supplied schedule exactly,
+    regardless of what the stream's serial structure says."""
+    grads = ar1_stream(0.0, 6, seed=31)
+    sched = [1.0, 1.0, 0.5, 0.5, 0.5, 0.5]
+    p_replay, p_stock = make_param(9), make_param(9)
+    replay = tempo(p_replay, kappa=-5.0, rho_star=-0.48, warmup_steps=1,
+                   gain_schedule=sched)
+    stock = Muon([p_stock], lr=0.01, momentum=0.6, nesterov=True, ns_steps=3)
+    # steps 1-2: schedule gain 1.0 -> identical to stock
+    for g in grads[:2]:
+        p_replay.grad = g.clone(); p_stock.grad = g.clone()
+        replay.step(); stock.step()
+    assert torch.equal(p_replay.data, p_stock.data)
+    # step 3: gain 0.5 -> step is half of stock's
+    w_r, w_s = p_replay.data.clone(), p_stock.data.clone()
+    p_replay.grad = grads[2].clone(); p_stock.grad = grads[2].clone()
+    replay.step(); stock.step()
+    assert torch.allclose(p_replay.data - w_r, 0.5 * (p_stock.data - w_s), atol=1e-6)
+
+
 def test_history_and_telemetry_shapes():
     p = make_param()
     opt = tempo(p, kappa=0.3, history_every=5)

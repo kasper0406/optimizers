@@ -1,0 +1,51 @@
+# Program #8 Phase B' (labeled exploration, fresh seeds 1430-1439 per the
+# prereg's re-tuning rule): one change vs Phase B — ctrl_end_step 100 -> 60,
+# ending the active window before the healthy run's rho relaxes past the
+# setpoint (the diagnosed cause of the P1/P3 failures). Global scope only
+# (won Phase B at every lr).
+experiment: airbench_smoke
+seed: 1430
+device: cuda
+data:
+  root: data/cifar10
+train:
+  epochs: 8
+  batch_size: 2000
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+optimizer:
+  name: tempomuon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+  rho_beta: 0.9
+  kappa: -0.25
+  rho_star: -0.48
+  gain_min: 0.2
+  gain_max: 1.0
+  warmup_steps: 25
+  ctrl_end_step: 60
+  scope: global
+  history_every: 1
+sweep:
+  seeds:
+  - 1430
+  - 1431
+  - 1432
+  - 1433
+  - 1434
+  - 1435
+  - 1436
+  - 1437
+  - 1438
+  - 1439
+  grid:
+    optimizer.lr:
+    - 0.24
+    - 0.48
+    - 0.72
+    - 0.96
