@@ -356,6 +356,14 @@ def run_airbench_smoke(
     # scratch dir (never results/), paths recorded in metrics.
     save_endpoint = recipe_cfg.get("save_endpoint") or None      # {"dir": str}
     save_test_logits = recipe_cfg.get("save_test_logits") or None  # {"dir": str}
+    # Program #14 (reports/tailrepair-prereg.md): in the final tail_epochs
+    # epochs, keep only the hardest hard_frac of each batch's per-example
+    # losses, rescaled by 1/hard_frac (expectation-preserving selection).
+    # Absent => the stock sum-reduction path, bit-identical.
+    tail_phase = recipe_cfg.get("tail_phase") or None  # {"tail_epochs": int, "hard_frac": float}
+    if tail_phase is not None:
+        tail_phase = {"tail_epochs": int(tail_phase["tail_epochs"]),
+                      "hard_frac": float(tail_phase.get("hard_frac", 0.5))}
 
     model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
     if bool(recipe_cfg.get("compile", False)):
@@ -495,9 +503,21 @@ def run_airbench_smoke(
         model.train()
         for inputs, labels in train_loader:
             outputs = model(inputs, whiten_bias_grad=(step < whiten_bias_train_steps))
-            loss = torch.nn.functional.cross_entropy(
-                outputs, labels, label_smoothing=0.2, reduction="sum"
+            in_tail = (
+                tail_phase is not None
+                and step >= total_train_steps
+                - tail_phase["tail_epochs"] * len(train_loader)
             )
+            if in_tail:
+                per_ex = torch.nn.functional.cross_entropy(
+                    outputs, labels, label_smoothing=0.2, reduction="none"
+                )
+                k = max(1, int(len(per_ex) * tail_phase["hard_frac"]))
+                loss = per_ex.topk(k).values.sum() / tail_phase["hard_frac"]
+            else:
+                loss = torch.nn.functional.cross_entropy(
+                    outputs, labels, label_smoothing=0.2, reduction="sum"
+                )
             loss.backward()
             if lr_fork is not None:
                 # P10: per-step loss series (GPU-resident; synced once at end).
