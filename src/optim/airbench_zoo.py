@@ -364,6 +364,13 @@ def run_airbench_smoke(
     if tail_phase is not None:
         tail_phase = {"tail_epochs": int(tail_phase["tail_epochs"]),
                       "hard_frac": float(tail_phase.get("hard_frac", 0.5))}
+    # Program #16 (reports/readout-prereg.md): per-step weight snapshots for
+    # offline readout-averaging analysis. Measurement-only; scratch dir.
+    save_iterates = recipe_cfg.get("save_iterates") or None  # {"dir": str, "from_step": int}
+    if save_iterates is not None:
+        save_iterates = {"dir": save_iterates["dir"],
+                         "from_step": int(save_iterates.get("from_step", 0))}
+        Path(save_iterates["dir"]).mkdir(parents=True, exist_ok=True)
 
     model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
     if bool(recipe_cfg.get("compile", False)):
@@ -563,6 +570,9 @@ def run_airbench_smoke(
             step += 1
             if example_probe is not None and step % int(example_probe.get("every", 10)) == 0:
                 _run_example_probe(step, inputs, labels)
+            if save_iterates is not None and step >= save_iterates["from_step"]:
+                torch.save({k: v.clone() for k, v in model.state_dict().items()},
+                           Path(save_iterates["dir"]) / f"iter_{step:04d}.pt")
             if track_routing and step % ROUTING_TS_EVERY == 0:
                 agg = optimizer2.routing_stats()["aggregate"]["last"]
                 if agg is not None:
