@@ -345,6 +345,12 @@ def run_airbench_smoke(
     lr_fork = recipe_cfg.get("lr_fork") or None  # {"step": int, "mult": float}
     if lr_fork is not None:
         lr_fork = {"step": int(lr_fork["step"]), "mult": float(lr_fork["mult"])}
+    # Program #12 Phase A (reports/data-selection-prereg.md): per-example
+    # momentum-alignment probe. Measurement-only; eval-mode forwards (BN
+    # running stats untouched); grads computed in a separate autograd pass
+    # between optimizer steps. {"n_fixed": int, "n_fresh": int, "every": int,
+    # "topk": int}.
+    example_probe = recipe_cfg.get("example_probe") or None
 
     model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
     if bool(recipe_cfg.get("compile", False)):
@@ -406,6 +412,55 @@ def run_airbench_smoke(
     track_routing = hasattr(optimizer2, "routing_stats")
     routing_timeseries = []
     train_loss_series: list = []  # P10: populated only when lr_fork is set
+    probe_rows: list = []  # P12: per-example momentum-alignment records
+
+    def _run_example_probe(step_now: int, batch_inputs, batch_labels) -> None:
+        n_fixed = int(example_probe.get("n_fixed", 64))
+        n_fresh = int(example_probe.get("n_fresh", 64))
+        topk = int(example_probe.get("topk", 8))
+        was_training = model.training
+        model.eval()
+        model.zero_grad(set_to_none=True)
+        # momentum buffers + their top-k singular pairs, fixed for this probe
+        bufs, bases = {}, {}
+        for p in filter_params:
+            st = optimizer2.state.get(p, {})
+            m = st.get("momentum_buffer")
+            if m is None:
+                continue
+            m2 = m.reshape(len(m), -1).float()
+            bufs[p] = m2
+            u, s, v = torch.svd_lowrank(m2, q=min(topk, min(m2.shape)))
+            bases[p] = (u, v)
+        fixed_x = train_loader.images[:n_fixed]
+        fixed_y = train_loader.labels[:n_fixed]
+        sets = [("fixed", fixed_x, fixed_y),
+                ("fresh", batch_inputs[:n_fresh], batch_labels[:n_fresh])]
+        for which, xs, ys in sets:
+            for i in range(len(xs)):
+                model.zero_grad(set_to_none=True)
+                out = model(xs[i:i + 1])
+                li = torch.nn.functional.cross_entropy(
+                    out.float(), ys[i:i + 1], label_smoothing=0.2
+                )
+                li.backward()
+                row = {"step": step_now, "which": which, "idx": i,
+                       "loss": float(li.detach()), "m": []}
+                for p in filter_params:
+                    if p.grad is None or p not in bufs:
+                        continue
+                    g2 = p.grad.reshape(len(p.grad), -1).float()
+                    m2 = bufs[p]
+                    gn = g2.norm().clamp_min(1e-30)
+                    cos = float((g2 * m2).sum() / (gn * m2.norm().clamp_min(1e-30)))
+                    u, v = bases[p]
+                    coef = (u.T @ g2 @ v).diagonal()
+                    frac = float((coef ** 2).sum() / gn ** 2)
+                    row["m"].append({"cos": round(cos, 5), "topk_frac": round(frac, 5)})
+                probe_rows.append(row)
+        model.zero_grad(set_to_none=True)
+        if was_training:
+            model.train()
 
     starter = torch.cuda.Event(enable_timing=True)
     ender = torch.cuda.Event(enable_timing=True)
@@ -481,6 +536,8 @@ def run_airbench_smoke(
                 hub.after_step()  # reads captured G + post-step momentum
             model.zero_grad(set_to_none=True)
             step += 1
+            if example_probe is not None and step % int(example_probe.get("every", 10)) == 0:
+                _run_example_probe(step, inputs, labels)
             if track_routing and step % ROUTING_TS_EVERY == 0:
                 agg = optimizer2.routing_stats()["aggregate"]["last"]
                 if agg is not None:
@@ -536,6 +593,8 @@ def run_airbench_smoke(
         metrics["train_loss_series"] = [
             float(v) for v in torch.stack(train_loss_series).cpu()
         ]
+    if example_probe is not None:
+        metrics["example_probe"] = {"config": example_probe, "rows": probe_rows}
     return metrics
 
 
