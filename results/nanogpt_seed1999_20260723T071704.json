@@ -1,0 +1,345 @@
+{
+  "config": {
+    "contents": {
+      "device": "auto",
+      "experiment": "nanogpt",
+      "nanogpt": {
+        "adam_betas": [
+          0.8,
+          0.95
+        ],
+        "adam_eps": 1e-10,
+        "adam_lr": 0.008,
+        "adam_weight_decay": 0.0,
+        "attention_impl": "flex",
+        "checkpoint": {
+          "dir": "checkpoints",
+          "every_steps": 0,
+          "keep_on_success": false,
+          "resume": false
+        },
+        "compile": true,
+        "cooldown_frac": 0.45,
+        "device_count": 1,
+        "fp32_embed_grad_accum": true,
+        "head_chunk_rows": 8192,
+        "max_steps": 30,
+        "min_lr_frac": 1.0,
+        "muon_lr": 0.05,
+        "muon_momentum": 0.95,
+        "muon_weight_decay": 0.0,
+        "num_iterations": 1750,
+        "precision_mode": "fp8",
+        "tail": {
+          "accumulate": true,
+          "spike_warmup": 5,
+          "start_step": 5,
+          "w1_window": [
+            10,
+            20
+          ],
+          "w2_window": [
+            20,
+            30
+          ]
+        },
+        "target_val_loss": 3.28,
+        "train_seq_len": 49152,
+        "val_loss_every": 125,
+        "val_seq_len": 262144,
+        "val_tokens": 10485760,
+        "warmup_steps": 10
+      },
+      "seed": 1999
+    },
+    "path": "configs/dev/wave1_smoke_acc.yaml",
+    "sha256": "ed15e55e53e8f70b201bc7d64ad3d6da059a80317a263ea04c42df4530feb80a"
+  },
+  "cost_usd": null,
+  "experiment": "nanogpt",
+  "finished_at": "2026-07-23T07:19:19.567278+00:00",
+  "git_dirty": false,
+  "git_sha": "62d0d8efa9b1c4cfd1bbc2dcf2be01c86b65d770",
+  "gpu_type": "NVIDIA GeForce RTX 5090",
+  "metrics": {
+    "accumulation_factor": 8,
+    "attention_impl": "flex",
+    "compiled": true,
+    "deviations": {
+      "fp32_embed_grad_accum": "embedding gradients accumulate across micro-batches in an fp32 master buffer, cast back to bf16 once per step (record: bf16 throughout, one backward per step). NOT RECORD-FAITHFUL: diagnostic probe for docs/nanogpt-port.md \u00a76.1.",
+      "grad_accumulation": "1 device(s) x 8 micro-batches = 8 record chunks per optimizer step; tokens/step 393216 (record 393216)",
+      "head_chunk_rows": "lm_head + soft-cap + cross-entropy computed over row chunks of 8192 (train chunks gradient-checkpointed; record: one full-width head GEMM). Same math up to fp32 summation order. NOT RECORD-FAITHFUL: 32 GB-GPU memory path (model.py PORT CHANGE P5).",
+      "max_steps": "truncated at 30 steps \u2014 smoke run, not a record run",
+      "min_lr_frac": "1.0 (record 0.05)",
+      "tail_accumulate": "streaming fp32 tail iterate means (W1/W2/Polyak + final), spike-gated; measurement only, update path untouched (prereg \u00a70.3)"
+    },
+    "device_count": 1,
+    "final_val_loss": 5.518672943115234,
+    "forked_from": null,
+    "fp32_embed_grad_accum": true,
+    "nanogpt_config": {
+      "adam_betas": [
+        0.8,
+        0.95
+      ],
+      "adam_eps": 1e-10,
+      "adam_lr": 0.008,
+      "adam_weight_decay": 0.0,
+      "attention_impl": "flex",
+      "checkpoint": {
+        "dir": "checkpoints",
+        "every_steps": 0,
+        "keep_on_success": false,
+        "resume": false
+      },
+      "chunks_per_step": null,
+      "compile": true,
+      "cooldown_frac": 0.45,
+      "device_count": 1,
+      "fork_from": null,
+      "fp32_embed_grad_accum": true,
+      "head_chunk_rows": 8192,
+      "max_steps": 30,
+      "min_lr_frac": 1.0,
+      "model_dim": 768,
+      "momentum_end": 0.95,
+      "momentum_start": 0.85,
+      "momentum_warmup_steps": 300,
+      "muon_lr": 0.05,
+      "muon_momentum": 0.95,
+      "muon_weight_decay": 0.0,
+      "num_heads": 6,
+      "num_iterations": 1750,
+      "num_layers": 12,
+      "precision_mode": "fp8",
+      "record_world_size": 8,
+      "seed": 1999,
+      "tail": {
+        "accumulate": true,
+        "artifact_dir": "results/tail_artifacts",
+        "kappa": 1.0,
+        "mode": "none",
+        "rho": 0.8,
+        "spike_beta": 0.9,
+        "spike_warmup": 5,
+        "spike_z": 4.0,
+        "start_step": 5,
+        "w1_window": [
+          10,
+          20
+        ],
+        "w2_window": [
+          20,
+          30
+        ]
+      },
+      "target_val_loss": 3.28,
+      "tempo_probe": false,
+      "tempo_probe_flush_every": 10,
+      "tempo_probe_subset": 2,
+      "train_align_to_bos": true,
+      "train_files": "data/fineweb10B/fineweb_train_*.bin",
+      "train_seq_len": 49152,
+      "val_align_to_bos": false,
+      "val_files": "data/fineweb10B/fineweb_val_*.bin",
+      "val_loss_every": 125,
+      "val_seq_len": 262144,
+      "val_tokens": 10485760,
+      "vocab_size": 50257,
+      "warmup_steps": 10,
+      "window_warmup_max": 1728
+    },
+    "num_iterations": 1750,
+    "peak_memory_mib": 28563,
+    "precision_mode": "fp8",
+    "record": "2025-07-12_BosAlign",
+    "record_faithful": false,
+    "record_log": "0c5449cc-0b01-4ecc-bec3-f46a09741d60.txt",
+    "record_world_size": 8,
+    "resumed_from_checkpoint": false,
+    "steps_to_target_loss": null,
+    "tail_accumulators": {
+      "excluded": 0,
+      "n1": 10,
+      "n2": 10,
+      "n_polyak": 25,
+      "steps_seen": 25
+    },
+    "tail_artifact": "results/tail_artifacts/nanogpt_tail_seed1999_2cc7248f_none.pt",
+    "tail_gate_log": [
+      {
+        "included": true,
+        "step": 5,
+        "train_loss": 345872.21875,
+        "z": 0.0
+      },
+      {
+        "included": true,
+        "step": 6,
+        "train_loss": 328417.15625,
+        "z": -17455062500.0
+      },
+      {
+        "included": true,
+        "step": 7,
+        "train_loss": 324160.90625,
+        "z": -3.813
+      },
+      {
+        "included": true,
+        "step": 8,
+        "train_loss": 323192.125,
+        "z": -2.434
+      },
+      {
+        "included": true,
+        "step": 9,
+        "train_loss": 311736.59375,
+        "z": -3.059
+      },
+      {
+        "included": true,
+        "step": 10,
+        "train_loss": 314305.0625,
+        "z": -1.877
+      },
+      {
+        "included": true,
+        "step": 11,
+        "train_loss": 308674.59375,
+        "z": -1.946
+      },
+      {
+        "included": true,
+        "step": 12,
+        "train_loss": 304734.4375,
+        "z": -1.833
+      },
+      {
+        "included": true,
+        "step": 13,
+        "train_loss": 301073.59375,
+        "z": -1.726
+      },
+      {
+        "included": true,
+        "step": 14,
+        "train_loss": 298282.1875,
+        "z": -1.593
+      },
+      {
+        "included": true,
+        "step": 15,
+        "train_loss": 297639.40625,
+        "z": -1.383
+      },
+      {
+        "included": true,
+        "step": 16,
+        "train_loss": 293829.25,
+        "z": -1.396
+      },
+      {
+        "included": true,
+        "step": 17,
+        "train_loss": 290278.9375,
+        "z": -1.385
+      },
+      {
+        "included": true,
+        "step": 18,
+        "train_loss": 291788.34375,
+        "z": -1.132
+      },
+      {
+        "included": true,
+        "step": 19,
+        "train_loss": 287053.96875,
+        "z": -1.233
+      },
+      {
+        "included": true,
+        "step": 20,
+        "train_loss": 283454.375,
+        "z": -1.256
+      },
+      {
+        "included": true,
+        "step": 21,
+        "train_loss": 283907.09375,
+        "z": -1.087
+      },
+      {
+        "included": true,
+        "step": 22,
+        "train_loss": 287044.8125,
+        "z": -0.834
+      },
+      {
+        "included": true,
+        "step": 23,
+        "train_loss": 283185.28125,
+        "z": -0.942
+      },
+      {
+        "included": true,
+        "step": 24,
+        "train_loss": 276766.5625,
+        "z": -1.154
+      },
+      {
+        "included": true,
+        "step": 25,
+        "train_loss": 278632.78125,
+        "z": -0.943
+      },
+      {
+        "included": true,
+        "step": 26,
+        "train_loss": 277475.6875,
+        "z": -0.911
+      },
+      {
+        "included": true,
+        "step": 27,
+        "train_loss": 281754.96875,
+        "z": -0.629
+      },
+      {
+        "included": true,
+        "step": 28,
+        "train_loss": 275424.5625,
+        "z": -0.893
+      },
+      {
+        "included": true,
+        "step": 29,
+        "train_loss": 270795.1875,
+        "z": -1.043
+      }
+    ],
+    "target_val_loss": 3.28,
+    "tokens_per_step": 393216,
+    "tokens_to_target_loss": null,
+    "train_steps_run": 30,
+    "train_time_s": 67.73130077705719,
+    "val_curve": [
+      {
+        "step": 0,
+        "tokens": 0,
+        "train_time_ms": 0.007980037480592728,
+        "val_loss": 10.825837135314941
+      },
+      {
+        "step": 30,
+        "tokens": 11796480,
+        "train_time_ms": 67731.30077705719,
+        "val_loss": 5.518672943115234
+      }
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1999,
+  "started_at": "2026-07-23T07:17:04.357852+00:00",
+  "wall_time_s": 135.2094112059567
+}
