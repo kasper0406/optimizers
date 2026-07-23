@@ -126,6 +126,52 @@ class CheckpointConfig:
 
 
 @dataclass
+class TailConfig:
+    """Wave-1 tail-phase machinery (programs #17/#18/#19; pre-registered in
+    reports/wave1-anneal-decomposition-prereg.md §0). All fields are PORT-only
+    and deviation-flagged. ``mode: none`` with ``accumulate: false`` (the
+    default) leaves the training loop byte-identical to the pre-Wave-1 port.
+
+    Modes (active from ``start_step``):
+      schedule_free  LR factor pinned to ``kappa``; gradients evaluated at
+                     y = (1-rho)*z + rho*xbar (xbar = equal-weight Polyak mean
+                     of the post-update iterate z over the tail); the stock
+                     optimizer updates z. Primary val readout is at xbar.
+      batch_ramp     LR factor pinned to ``kappa``; token batch grows with
+                     record-equivalent progress u as B(u) = B0/max(w(u), 1/8),
+                     w(u) = 1 - (1 - min_lr_frac_record)*u, in whole
+                     49,152-token chunks, until the record's tail token budget
+                     is consumed. No LR compensation (the registered
+                     Muon-specific prediction).
+
+    ``accumulate: true`` (any mode) maintains streaming fp32 means of the
+    post-update iterate — W1 over ``w1_window``, W2 over ``w2_window``
+    (half-open step ranges), Polyak from ``start_step`` — spike-gated on the
+    step train-loss z-score, and saves them plus the raw final iterate to an
+    fp32 artifact under ``artifact_dir``. Measurement only; the update path is
+    never touched by the accumulators.
+    """
+
+    mode: str = "none"  # none | schedule_free | batch_ramp
+    start_step: int = 963  # T_c: first decayed step of the record schedule
+    kappa: float = 1.0  # tail LR factor (modes schedule_free / batch_ramp)
+    rho: float = 0.8  # schedule_free interpolation weight on xbar
+    accumulate: bool = False
+    w1_window: Tuple[int, int] = (1450, 1600)  # [start, end) post-update steps
+    w2_window: Tuple[int, int] = (1600, 1750)
+    spike_z: float = 4.0  # exclude steps with train-loss z-score > this
+    spike_warmup: int = 20  # first N tail steps always included (EMA warm-in)
+    spike_beta: float = 0.9  # EMA decay for the spike gate's mean/var
+    artifact_dir: str = "results/tail_artifacts"
+
+    def __post_init__(self) -> None:
+        if isinstance(self.w1_window, list):
+            self.w1_window = tuple(self.w1_window)
+        if isinstance(self.w2_window, list):
+            self.w2_window = tuple(self.w2_window)
+
+
+@dataclass
 class NanoGPTConfig:
     """All knobs. Defaults == the pinned record; deviations are flagged."""
 
@@ -203,14 +249,37 @@ class NanoGPTConfig:
     # batch AND the data order.
     chunks_per_step: Optional[int] = None
     checkpoint: CheckpointConfig = field(default_factory=CheckpointConfig)
+    # PORT (Wave 1, prereg §0): tail-phase machinery. See TailConfig.
+    tail: TailConfig = field(default_factory=TailConfig)
+    # PORT (Wave 1, prereg §0.2): resume from ANOTHER config's checkpoint,
+    # allowed iff the checkpoint's hot fingerprint, seed, and stable-phase
+    # bounds match (train.py validates). None == normal resume semantics.
+    fork_from: Optional[str] = None
 
     # ------------------------------------------------------------------ api
     def __post_init__(self) -> None:
         if isinstance(self.checkpoint, dict):
             self.checkpoint = CheckpointConfig(**self.checkpoint)
+        if isinstance(self.tail, dict):
+            self.tail = TailConfig(**self.tail)
         if isinstance(self.adam_betas, list):
             self.adam_betas = tuple(self.adam_betas)
         self.validate()
+
+    @property
+    def stable_through_step(self) -> int:
+        """Last training step at LR factor exactly 1.0 under this config.
+
+        ``get_lr`` gives w = 1 iff step <= num_iterations*(1-cooldown_frac);
+        with ``min_lr_frac == 1.0`` the factor is 1.0 at every step. Used by
+        the fork guard: a fork at step s is legal only when steps < s were all
+        on the shared stable plateau (prereg §0.2).
+        """
+        if self.min_lr_frac == 1.0:
+            return self.num_iterations
+        import math
+
+        return int(math.floor(self.num_iterations * (1 - self.cooldown_frac) + 1e-9))
 
     @property
     def effective_chunks(self) -> int:
@@ -262,6 +331,9 @@ class NanoGPTConfig:
             and self.train_seq_len == RECORD_TRAIN_SEQ_LEN
             and self.tokens_per_step == RECORD_TOKENS_PER_STEP
             and self.max_steps is None
+            and self.tail.mode == "none"
+            and not self.tail.accumulate
+            and self.fork_from is None
         )
 
     def deviations(self) -> Dict[str, str]:
@@ -322,6 +394,24 @@ class NanoGPTConfig:
             )
         if not self.compile:
             out["compile"] = "torch.compile disabled (record compiles); slower, ML-neutral"
+        if self.tail.mode != "none":
+            out["tail_mode"] = (
+                f"Wave-1 tail mode {self.tail.mode!r} from step "
+                f"{self.tail.start_step} (kappa {self.tail.kappa}"
+                + (f", rho {self.tail.rho}" if self.tail.mode == "schedule_free" else "")
+                + "). NOT RECORD-FAITHFUL: replaces the record's LR decay "
+                "(prereg reports/wave1-anneal-decomposition-prereg.md §0)."
+            )
+        if self.tail.accumulate:
+            out["tail_accumulate"] = (
+                "streaming fp32 tail iterate means (W1/W2/Polyak + final), "
+                "spike-gated; measurement only, update path untouched (prereg §0.3)"
+            )
+        if self.fork_from is not None:
+            out["fork_from"] = (
+                f"trajectory forked from checkpoint {self.fork_from} "
+                "(hot-fingerprint + stable-plateau guarded; prereg §0.2)"
+            )
         return out
 
     def validate(self) -> None:
@@ -374,6 +464,54 @@ class NanoGPTConfig:
             raise ConfigError("tempo_probe_subset must be >= 1")
         if self.tempo_probe_flush_every < 1:
             raise ConfigError("tempo_probe_flush_every must be >= 1")
+        # ---- Wave-1 tail block (prereg §0) --------------------------------
+        t = self.tail
+        if t.mode not in ("none", "schedule_free", "batch_ramp"):
+            raise ConfigError(f"tail.mode must be none|schedule_free|batch_ramp, got {t.mode!r}")
+        if t.mode != "none" or t.accumulate:
+            if not (1 <= t.start_step <= self.num_iterations):
+                raise ConfigError(
+                    f"tail.start_step {t.start_step} outside [1, {self.num_iterations}]"
+                )
+        if t.mode == "schedule_free" and not (0.0 <= t.rho < 1.0):
+            raise ConfigError(f"tail.rho must be in [0, 1), got {t.rho}")
+        if t.mode == "schedule_free" and self.checkpoint.every_steps:
+            raise ConfigError(
+                "tail.mode schedule_free does not support periodic checkpoints "
+                "(the xbar/stash state is not checkpointed; a resume would "
+                "silently reset the Polyak average). Set checkpoint.every_steps: "
+                "0 — retries restart the tail from the fork prefix."
+            )
+        if t.mode != "none" and t.kappa <= 0:
+            raise ConfigError(f"tail.kappa must be > 0, got {t.kappa}")
+        if t.mode == "batch_ramp":
+            if self.device_count != 1:
+                raise ConfigError(
+                    "tail.mode batch_ramp requires device_count == 1 (the ramp "
+                    "varies micro-batch count per step; multi-rank splitting of "
+                    "a variable chunk count is not implemented)"
+                )
+            if self.checkpoint.every_steps:
+                raise ConfigError(
+                    "tail.mode batch_ramp does not support periodic checkpoints "
+                    "(mid-ramp loader buffer state is not checkpointable); set "
+                    "checkpoint.every_steps: 0 and rely on the fork prefix"
+                )
+            if self.max_steps is not None:
+                raise ConfigError("tail.mode batch_ramp is incompatible with max_steps")
+        if t.accumulate:
+            for name, (lo, hi) in (("w1_window", t.w1_window), ("w2_window", t.w2_window)):
+                if not (t.start_step <= lo < hi <= self.num_iterations):
+                    raise ConfigError(
+                        f"tail.{name} {lo, hi} must satisfy start_step <= lo < hi <= "
+                        f"num_iterations ({t.start_step}, {self.num_iterations})"
+                    )
+            if t.mode == "batch_ramp":
+                raise ConfigError(
+                    "tail.accumulate with batch_ramp is not supported: window "
+                    "steps are record-step-indexed and the ramp compresses the "
+                    "step axis (prereg registers no ramp accumulators)"
+                )
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -395,6 +533,25 @@ class NanoGPTConfig:
         d = self.to_dict()
         d.pop("seed", None)
         d.pop("checkpoint", None)
+        blob = json.dumps(d, sort_keys=True, default=str)
+        return hashlib.sha1(blob.encode()).hexdigest()[:8]
+
+    def hot_fingerprint(self) -> str:
+        """8-hex identity of everything shaping the STABLE-PHASE trajectory.
+
+        Excludes, beyond ``config_fingerprint``'s exclusions, the fields that
+        only act at or after decay onset — cooldown_frac, min_lr_frac (both
+        inert while w == 1), max_steps, the tail block, and fork_from itself.
+        Two configs sharing this fingerprint produce identical trajectories
+        through any step on both configs' stable plateaus; the fork guard in
+        train.py additionally checks the plateau bounds (prereg §0.2).
+        """
+        import hashlib
+
+        d = self.to_dict()
+        for key in ("seed", "checkpoint", "cooldown_frac", "min_lr_frac",
+                    "max_steps", "tail", "fork_from"):
+            d.pop(key, None)
         blob = json.dumps(d, sort_keys=True, default=str)
         return hashlib.sha1(blob.encode()).hexdigest()[:8]
 

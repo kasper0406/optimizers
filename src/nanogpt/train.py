@@ -30,6 +30,15 @@ T6. **The profiler block** of the validation script (its lines 700-712, a
     (RECORD:714-717), so this is wall-time-only.
 T7. **``torch.empty(1, device="cuda").backward()``** (RECORD:15) runs here
     instead of at import.
+T9. **Wave-1 tail machinery** (prereg reports/wave1-anneal-decomposition-
+    prereg.md §0; config: ``nanogpt.tail`` + ``nanogpt.fork_from``). With the
+    default config (tail.mode none, accumulate false, fork_from null) every
+    branch added for T9 is dead and the loop is the pre-Wave-1 port. Active
+    pieces: cross-config prefix forking (hot-fingerprint + stable-plateau
+    guarded), spike-gated streaming iterate means, the schedule-free tail
+    (gradients at y, stock optimizer on z, validation at both xbar and z),
+    and the batch-ramp tail (variable chunks/step at constant LR, matched
+    token budget).
 T8. **Process-group bootstrap.** The record (RECORD:592-598) requires
     ``torchrun`` — it reads ``os.environ["RANK"]`` etc. and lets
     ``init_process_group`` rendezvous through the env store. The port defaults
@@ -46,6 +55,7 @@ schedules, data pipeline, validation protocol — is the record.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import os
 import random
 import time
@@ -63,6 +73,12 @@ from src.nanogpt.data import RecordDataGenerator
 from src.nanogpt.model import GPT, next_multiple_of_n
 from src.nanogpt.optim import DistAdam, Muon
 from src.nanogpt.record_log import steps_to_target
+from src.nanogpt.tail import (
+    ChunkBuffer,
+    ScheduleFreeTail,
+    TailAccumulators,
+    ramp_chunk_schedule,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -114,6 +130,59 @@ def _checkpoint_path(cfg: NanoGPTConfig, rank: int) -> Path:
         f"_{cfg.config_fingerprint()}_rank{rank}"
     )
     return directory / f"nanogpt_{tag}.pt"
+
+
+def _resolve_fork_path(cfg: NanoGPTConfig) -> Path:
+    # "{seed}" lets one sweep config fork each --seed run from its own
+    # seed-paired prefix checkpoint (the fork guard cross-checks the seed
+    # stored inside the checkpoint either way).
+    path = Path(str(cfg.fork_from).format(seed=cfg.seed))
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def _validate_fork(state: Dict[str, Any], cfg: NanoGPTConfig, path: Path) -> None:
+    """Fork guard (prereg §0.2): a checkpoint from ANOTHER config may seed
+    this run only when the shared trajectory is provably identical — same hot
+    fingerprint and seed, and every step before the fork on both configs'
+    stable-LR plateaus. Extends the program-#7 collision guard rather than
+    weakening it: normal resume still requires the full fingerprint."""
+    missing = [k for k in ("hot_fingerprint", "seed", "stable_through", "step") if k not in state]
+    if missing:
+        raise RuntimeError(
+            f"fork_from checkpoint {path.name} lacks fork metadata {missing}; "
+            "it predates the Wave-1 checkpoint format and cannot be fork-validated"
+        )
+    if state["hot_fingerprint"] != cfg.hot_fingerprint():
+        raise RuntimeError(
+            f"fork_from checkpoint {path.name} has hot fingerprint "
+            f"{state['hot_fingerprint']!r} but this config is "
+            f"{cfg.hot_fingerprint()!r}; refusing to fork a different "
+            "stable-phase trajectory (program-#7 collision guard, prereg §0.2)"
+        )
+    if int(state["seed"]) != cfg.seed:
+        raise RuntimeError(
+            f"fork_from checkpoint {path.name} was seeded {state['seed']}, "
+            f"this run is seeded {cfg.seed}; forked arms must be seed-paired"
+        )
+    fork_step = int(state["step"])
+    if fork_step - 1 > int(state["stable_through"]):
+        raise RuntimeError(
+            f"fork_from checkpoint {path.name} is at step {fork_step} but its "
+            f"source config left the stable LR plateau after step "
+            f"{state['stable_through']}; forks must branch on the plateau"
+        )
+    if fork_step - 1 > cfg.stable_through_step:
+        raise RuntimeError(
+            f"fork at step {fork_step} but this config's stable plateau ends "
+            f"at step {cfg.stable_through_step}; the forked run would "
+            "misattribute decayed prefix steps to its own schedule"
+        )
+    if cfg.tail.mode != "none" and fork_step != cfg.tail.start_step:
+        raise RuntimeError(
+            f"tail.mode {cfg.tail.mode!r} declares tail.start_step "
+            f"{cfg.tail.start_step} but the fork checkpoint is at step "
+            f"{fork_step}; the tail must begin exactly at the fork"
+        )
 
 
 # ------------------------------------------------------------------- runner
@@ -249,6 +318,18 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         muon.tempo_probe = tempo_probe
     raw_model = model
 
+    # PORT CHANGE T9 (Wave 1): tail machinery. All None/inert on the default
+    # config. `tail_named` is the raw model's parameter dict; in-place writes
+    # through it are seen by the compiled wrapper (shared storage).
+    tail_cfg = cfg.tail
+    tail_named = None
+    tail_acc = None
+    sf: Optional[ScheduleFreeTail] = None
+    if tail_cfg.mode != "none" or tail_cfg.accumulate:
+        tail_named = dict(raw_model.named_parameters())
+    if tail_cfg.accumulate:
+        tail_acc = TailAccumulators(tail_cfg, tail_named)
+
     @lru_cache(maxsize=None)
     def window_blocks(step: int) -> torch.Tensor:
         return torch.tensor(window_size_blocks_value(step, cfg), dtype=torch.int32, device=device)
@@ -285,6 +366,7 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
     training_time_ms = 0.0
     ckpt_path = _checkpoint_path(cfg, rank)
     resumed = False
+    forked_from: Optional[str] = None
     loader_state: Optional[Dict[str, int]] = None
 
     if cfg.checkpoint.resume and ckpt_path.exists():
@@ -306,7 +388,26 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         val_curve = list(state["val_curve"])
         training_time_ms = float(state["training_time_ms"])
         loader_state = state["loader"]
+        if tail_acc is not None:
+            tail_acc.load_state_dict(state.get("tail_accumulators"))
         resumed = True
+    elif cfg.fork_from is not None:
+        # PORT CHANGE T9: cross-config prefix fork (prereg §0.2). Own resume
+        # above takes precedence so a babysitter retry continues this run's
+        # own trajectory rather than restarting the tail.
+        fork_path = _resolve_fork_path(cfg)
+        if not fork_path.exists():
+            raise RuntimeError(f"fork_from checkpoint {fork_path} does not exist")
+        state = torch.load(fork_path, map_location=device, weights_only=False)
+        _validate_fork(state, cfg, fork_path)
+        raw_model.load_state_dict(state["model"])
+        for opt, opt_state in zip(optimizers, state["optimizers"]):
+            opt.load_state_dict(opt_state)
+        start_step = int(state["step"])
+        val_curve = list(state["val_curve"])
+        training_time_ms = float(state["training_time_ms"])
+        loader_state = state["loader"]
+        forked_from = str(fork_path)
     elif cfg.warmup_steps > 0:
         warm = train_loader()
         # RECORD:690-691 — save the initial state so warmup isn't cheating.
@@ -329,8 +430,13 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
     if loader_state is not None:
         loader.load_state_dict(loader_state)
 
-    def validate(step: int) -> float:
-        """RECORD:729-748 — same fixed val_tokens, same fixed chunking."""
+    def validate(step: int, window_step: Optional[int] = None) -> float:
+        """RECORD:729-748 — same fixed val_tokens, same fixed chunking.
+
+        ``window_step`` (T9, batch_ramp only): the record-equivalent step for
+        the sliding-window schedule when the loop step axis is compressed.
+        """
+        window_step = step if window_step is None else window_step
         model.eval()
         val_steps = cfg.val_tokens // (cfg.record_world_size * cfg.val_seq_len)
         val_loader = RecordDataGenerator(
@@ -347,7 +453,7 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         with torch.no_grad():
             for _ in range(val_steps):
                 for inputs, targets in val_loader.next_step():
-                    val_loss = val_loss + model(inputs, targets, window_blocks(step))
+                    val_loss = val_loss + model(inputs, targets, window_blocks(window_step))
                     n_chunks += 1
         val_loss = val_loss / n_chunks
         del val_loader
@@ -357,27 +463,69 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         return float(val_loss.item())
 
     # ---- training (RECORD:719-779) ---------------------------------------
-    train_steps = cfg.num_iterations if cfg.max_steps is None else min(cfg.num_iterations, cfg.max_steps)
+    # PORT CHANGE T9: batch_ramp compresses the step axis — precompute the
+    # deterministic per-step chunk counts, the record-equivalent step before
+    # each tail step (for the window schedule + analysis), and which loop
+    # steps validate (the record's val marks, mapped onto the ramp by
+    # record-equivalent progress so arms compare at matched token counts).
+    ramp_ks: Optional[List[int]] = None
+    ramp_eq: Optional[List[float]] = None
+    ramp_val_steps: set = set()
+    chunk_buffer: Optional[ChunkBuffer] = None
+    if tail_cfg.mode == "batch_ramp":
+        ramp_ks = ramp_chunk_schedule(cfg)
+        rws = cfg.effective_chunks
+        ramp_eq = [tail_cfg.start_step]
+        for k in ramp_ks:
+            ramp_eq.append(ramp_eq[-1] + k / rws)
+        train_steps = tail_cfg.start_step + len(ramp_ks)
+        if cfg.val_loss_every > 0:
+            for i in range(1, len(ramp_ks) + 1):
+                lo, hi = ramp_eq[i - 1], ramp_eq[i]
+                first_mark = (int(lo // cfg.val_loss_every) + 1) * cfg.val_loss_every
+                if first_mark <= hi:
+                    ramp_val_steps.add(tail_cfg.start_step + i)
+    else:
+        train_steps = cfg.num_iterations if cfg.max_steps is None else min(cfg.num_iterations, cfg.max_steps)
+    cum_tokens = start_step * cfg.tokens_per_step
     if torch.cuda.is_available():
         torch.cuda.synchronize()
     t0 = time.perf_counter()
 
     for step in range(start_step, train_steps + 1):
         last_step = step == train_steps
+        in_tail = tail_cfg.mode != "none" and step >= tail_cfg.start_step
+        ramp_i = step - tail_cfg.start_step if ramp_ks is not None else None
+        # record-equivalent step for the window schedule (ramp only)
+        eq_step = int(ramp_eq[ramp_i]) if ramp_eq is not None and in_tail else step
 
-        if last_step or (cfg.val_loss_every > 0 and step % cfg.val_loss_every == 0):
+        if ramp_ks is not None:
+            do_val = last_step or step in ramp_val_steps
+        else:
+            do_val = last_step or (cfg.val_loss_every > 0 and step % cfg.val_loss_every == 0)
+        if do_val:
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             training_time_ms += 1000 * (time.perf_counter() - t0)
-            loss_value = validate(step)
-            val_curve.append(
-                {
-                    "step": step,
-                    "tokens": step * cfg.tokens_per_step,
-                    "val_loss": loss_value,
-                    "train_time_ms": training_time_ms,
-                }
-            )
+            loss_value = validate(step, window_step=eq_step)
+            entry = {
+                "step": step,
+                "tokens": cum_tokens,
+                "val_loss": loss_value,
+                "train_time_ms": training_time_ms,
+            }
+            if ramp_eq is not None and in_tail:
+                entry["eq_step"] = round(ramp_eq[ramp_i], 2)
+            if sf is not None:
+                # T9 (schedule_free): the run's primary readout is the Polyak
+                # average xbar (prereg §0.4); the raw iterate z is kept as a
+                # secondary trace.
+                sf.swap_in_xbar()
+                entry["val_loss"] = validate(step, window_step=eq_step)
+                sf.swap_back()
+                entry["val_loss_z"] = loss_value
+                loss_value = entry["val_loss"]
+            val_curve.append(entry)
             if rank == 0:
                 print(
                     f"step:{step}/{train_steps} val_loss:{loss_value:.4f} "
@@ -392,10 +540,34 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         if last_step:
             break
 
-        # ---- TRAINING SECTION (RECORD:762-776) + PORT CHANGE T1 ----------
-        for inputs, targets in loader.next_step():
-            # micro-loss scaled by 1/accum: see config.py accumulation math.
-            (model(inputs, targets, window_blocks(step)) / accum).backward()
+        # ---- TRAINING SECTION (RECORD:762-776) + PORT CHANGES T1, T9 -----
+        if tail_cfg.mode == "schedule_free" and step >= tail_cfg.start_step and sf is None:
+            sf = ScheduleFreeTail(tail_cfg, tail_named)  # xbar initialized at z
+        sf_active = sf is not None
+        if sf_active:
+            sf.to_y()  # gradients evaluated at the interpolate y
+
+        track_loss = tail_acc is not None and step >= tail_cfg.start_step
+        step_loss = torch.zeros((), device=device) if track_loss else None
+        if ramp_ks is not None and in_tail:
+            if chunk_buffer is None:
+                chunk_buffer = ChunkBuffer(loader)
+            k_chunks = ramp_ks[ramp_i]
+            micro_iter = chunk_buffer.next_chunks(k_chunks)
+            loss_scale = k_chunks
+            step_tokens = k_chunks * cfg.train_seq_len
+        else:
+            micro_iter = loader.next_step()
+            loss_scale = accum
+            step_tokens = cfg.tokens_per_step
+        for inputs, targets in micro_iter:
+            # micro-loss scaled by 1/loss_scale: see config.py accumulation
+            # math (loss_scale == accum == the record's arithmetic whenever
+            # the T9 ramp is inactive).
+            loss = model(inputs, targets, window_blocks(eq_step)) / loss_scale
+            if step_loss is not None:
+                step_loss = step_loss + loss.detach()
+            loss.backward()
             # docs/nanogpt-port.md §6.1 probe: drain each micro-batch's bf16
             # embedding grad into an fp32 master buffer and clear `p.grad`, so
             # the running sum never touches bf16.
@@ -404,6 +576,7 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
                     if p.grad is not None:
                         fp32_embed_accum[p].add_(p.grad.float())
                         p.grad = None
+        cum_tokens += step_tokens
         # ...then write the fp32 total back once, in the record's dtype: one
         # rounding for the whole step instead of one per micro-batch. Done
         # after the loop (not on a `micro == accum - 1` index) so the buffer is
@@ -412,15 +585,22 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
             for p, buf in fp32_embed_accum.items():
                 p.grad = buf.to(p.dtype)
                 buf.zero_()
-        for opt in optimizers:  # RECORD:766-768
+        if sf_active:
+            sf.to_z()  # restore the iterate z; the stock optimizer updates z
+        for opt in optimizers:  # RECORD:766-768 (+T9 tail LR pin)
             for group in opt.param_groups:
-                group["lr"] = group["initial_lr"] * get_lr(step, cfg)
+                lr_factor = tail_cfg.kappa if in_tail else get_lr(step, cfg)
+                group["lr"] = group["initial_lr"] * lr_factor
         frac = min(step / cfg.momentum_warmup_steps, 1)  # RECORD:769
         for group in muon.param_groups:  # RECORD:770-771
             group["momentum"] = (1 - frac) * cfg.momentum_start + frac * cfg.momentum_end
         for opt in optimizers:  # RECORD:773-774
             opt.step()
         model.zero_grad(set_to_none=True)  # RECORD:776
+        if sf_active:
+            sf.update_average()
+        if track_loss:
+            tail_acc.observe(step, float(step_loss.item()))
 
         if cfg.checkpoint.every_steps and (step + 1) % cfg.checkpoint.every_steps == 0:
             ckpt_path.parent.mkdir(parents=True, exist_ok=True)
@@ -429,11 +609,16 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
                 {
                     "step": step + 1,
                     "config_fingerprint": cfg.config_fingerprint(),
+                    # T9 fork metadata (prereg §0.2)
+                    "hot_fingerprint": cfg.hot_fingerprint(),
+                    "seed": cfg.seed,
+                    "stable_through": cfg.stable_through_step,
                     "model": raw_model.state_dict(),
                     "optimizers": [opt.state_dict() for opt in optimizers],
                     "loader": loader.state_dict(),
                     "val_curve": val_curve,
                     "training_time_ms": training_time_ms + 1000 * (time.perf_counter() - t0),
+                    "tail_accumulators": tail_acc.state_dict() if tail_acc is not None else None,
                 },
                 tmp,
             )
@@ -448,6 +633,46 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
     steps = [int(p["step"]) for p in val_curve]
     losses = [float(p["val_loss"]) for p in val_curve]
     n_steps = steps_to_target(steps, losses, cfg.target_val_loss)
+
+    # ---- PORT CHANGE T9: tail artifact + metrics --------------------------
+    tail_metrics: Dict[str, Any] = {}
+    if (tail_acc is not None or sf is not None) and rank == 0:
+        art_dir = Path(tail_cfg.artifact_dir)
+        if not art_dir.is_absolute():
+            art_dir = REPO_ROOT / art_dir
+        art_dir.mkdir(parents=True, exist_ok=True)
+        art_path = art_dir / (
+            f"nanogpt_tail_seed{cfg.seed}_{cfg.config_fingerprint()}_{tail_cfg.mode}.pt"
+        )
+        artifact: Dict[str, Any] = {
+            "seed": cfg.seed,
+            "config_fingerprint": cfg.config_fingerprint(),
+            "hot_fingerprint": cfg.hot_fingerprint(),
+            "tail_config": dataclasses.asdict(tail_cfg),
+        }
+        if tail_acc is not None:
+            artifact.update(tail_acc.artifact())
+        if sf is not None:
+            artifact.update(sf.artifact())
+        tmp = art_path.with_suffix(".tmp")
+        torch.save(artifact, tmp)
+        tmp.rename(art_path)
+        try:
+            tail_metrics["tail_artifact"] = str(art_path.relative_to(REPO_ROOT))
+        except ValueError:  # artifact_dir outside the repo (tests)
+            tail_metrics["tail_artifact"] = str(art_path)
+    if tail_acc is not None:
+        tail_metrics["tail_accumulators"] = tail_acc.summary()
+        tail_metrics["tail_gate_log"] = tail_acc.gate_log
+    if sf is not None:
+        tail_metrics["tail_sf_t"] = sf.t
+        z_vals = [p.get("val_loss_z") for p in val_curve if "val_loss_z" in p]
+        tail_metrics["final_val_loss_z"] = z_vals[-1] if z_vals else None
+    if ramp_ks is not None:
+        tail_metrics["tail_ramp_steps"] = len(ramp_ks)
+        tail_metrics["tail_ramp_chunks"] = ramp_ks
+        tail_metrics["tail_budget_exhausted"] = True
+        tail_metrics["tail_final_tokens"] = cum_tokens
 
     metrics: Dict[str, Any] = {
         "record": "2025-07-12_BosAlign",
@@ -471,6 +696,8 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         "record_faithful": cfg.record_faithful,
         "deviations": cfg.deviations(),
         "resumed_from_checkpoint": resumed,
+        "forked_from": forked_from,
+        **tail_metrics,
         "nanogpt_config": cfg.to_dict(),
     }
     if torch.cuda.is_available():

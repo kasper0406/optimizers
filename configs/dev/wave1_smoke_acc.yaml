@@ -1,0 +1,45 @@
+# Wave-1 (prereg reports/wave1-anneal-decomposition-prereg.md). GPU smoke: accumulators at scale, 30 steps.
+experiment: nanogpt
+device: auto
+seed: 1999
+nanogpt:
+  head_chunk_rows: 8192
+  fp32_embed_grad_accum: true
+  device_count: 1
+  precision_mode: fp8
+  attention_impl: flex
+  compile: true
+  warmup_steps: 10
+  num_iterations: 1750
+  cooldown_frac: 0.45
+  min_lr_frac: 1.0
+  val_loss_every: 125
+  val_tokens: 10485760
+  train_seq_len: 49152
+  val_seq_len: 262144
+  muon_lr: 0.05
+  muon_momentum: 0.95
+  muon_weight_decay: 0.0
+  adam_lr: 0.008
+  adam_betas:
+  - 0.8
+  - 0.95
+  adam_eps: 1.0e-10
+  adam_weight_decay: 0.0
+  target_val_loss: 3.28
+  max_steps: 30
+  tail:
+    accumulate: true
+    start_step: 5
+    w1_window:
+    - 10
+    - 20
+    w2_window:
+    - 20
+    - 30
+    spike_warmup: 5
+  checkpoint:
+    dir: checkpoints
+    every_steps: 0
+    resume: false
+    keep_on_success: false

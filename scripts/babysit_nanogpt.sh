@@ -51,6 +51,12 @@ for f in sorted(glob.glob(f"results/nanogpt_seed{seed}_*.json")):
     m = d.get("metrics") or {}
     curve = m.get("val_curve") or []
     ng = cfg.get("contents", {}).get("nanogpt", {}) or {}
+    if (ng.get("tail") or {}).get("mode") == "batch_ramp":
+        # Wave-1 ramp tails compress the step axis; completion is budget
+        # exhaustion, not a step count (prereg §0.5).
+        if m.get("tail_budget_exhausted") and m.get("final_val_loss") is not None:
+            sys.exit(0)
+        continue
     want = ng.get("num_iterations", 1750)
     if ng.get("max_steps") is not None:
         want = min(want, ng["max_steps"])
