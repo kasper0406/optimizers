@@ -1,0 +1,121 @@
+<!--
+Provenance: multi-agent ideation workflow, 2026-07-23 (session b6bc7241).
+32 agents: 6 lens generators (18 raw ideas) -> dedup (12) -> per-idea novelty
+referee (web-grounded, 2024-26 literature) + adversarial feasibility review ->
+ranked synthesis. All generators/reviewers were fed the full graveyard of
+programs #1-#16 and the harness constraints (2x5090, 75-min nanogpt runs,
+n=10 baseline 3.28888 +/- 0.00125).
+Status: BRAINSTORM. Nothing here is pre-registered; kill-test designs are
+drafts for human review. Seed claim (dev seeds 1511+ fresh) verified against
+results/ (max consumed seed field: 1510). Literature citations are
+agent-reported and should be spot-checked before any prereg cites them.
+-->
+
+# Ideation Report: Post-Graveyard Optimizer Programs for the nanogpt Harness
+
+**Date:** 2026-07-23. **Basis:** 13 vetted proposals (merged to 10 after de-duplication), each with an independent novelty referee and adversarial feasibility review. Two proposals drew `already_done` verdicts and are rejected outright. No proposal earned a "clean novel mechanism" verdict — the Muon literature in 2025-26 is moving extremely fast, and every surviving idea is a recombination or controlled-ablation increment. The top 5 below are ranked on expected information gain given *this lab's* graveyard and live findings, not on standalone publishability. All five genuinely deserve recommendation; none is being laundered — but caveats are stated where referees flagged them.
+
+A structural observation that shapes the ranking: the lab's own results triangulate on the cooldown/anneal phase (10-15x loss density; endpoint objects carry signal; #16's "anneal is irreducible" claim rests on airbench-only evidence). Three of the top five are mechanistically distinct probes of that phase, and they share infrastructure (constant-LR tails, prefix forking at decay onset, streaming tail accumulators), which drives marginal cost down sharply.
+
+**Seed hygiene applying to every design below (per harness memory):** fresh dev seeds start at **1511+** (several proposals wrote 1476/1480 — those are consumed); eval arms seed-pair on **1710-1719** against the existing n=10 baseline (3.28888 ± 0.00125); endpoint = final-val-at-step-1750 (or matched token budget where noted); 4 paired seeds resolve 0.0025 loss.
+
+---
+
+## 1. Recommended programs (ranked)
+
+### #1 — Schedule-Free Tail Graft (closed-loop anchored averaging replacing only the decay segment)
+
+**Mechanism.** Keep the record's tuned hot phase to decay onset T_c (~step 962). From T_c: freeze LR at κ·η(T_c), maintain a Polyak average x̄ of the fast iterate z, and evaluate gradients at the interpolate y = (1−ρ)z + ρx̄ (ρ ≈ 0.8), with stock Muon momentum + Newton-Schulz on the z-update. Final model = x̄ at matched token budget.
+
+**Why it could beat Muon.** Program #16 identified passive tail averaging's precise failure mode: the low-LR anneal makes real valley-floor progress that averaging of hot iterates cannot synthesize because the average is never optimized against. Anchored gradient evaluation closes exactly that gap — descent happens *at* the readout point. A win beats the tuned anneal; even parity deletes decay-shape and decay-length hyperparameters and yields anytime checkpoints (a validated-achievable axis).
+
+**Novelty.** Partially explored. Muon+schedule-free exists full-run (AMUSE, arXiv 2605.22432; SF-NorMuon, 2605.23061); mid-training SF grafts exist (ScheduleFree+, 2605.19095); decay-segment replacement by *open-loop* merging exists and works at LM scale (WSM, 2507.17634 — which partially undercuts the premise that feedback is the missing ingredient). The genuinely untested cell: **closed-loop anchored averaging grafted at decay onset of a speedrun-grade tuned Muon schedule, with a seed-paired open-loop control isolating feedback as the sole difference.** A controlled ablation of a well-mapped family, not a new mechanism — pre-register as such. Mandatory pre-reads: 2605.22432 and 2605.23061 (the proposal miscited one for the other; SF-NorMuon's weight-decay-at-z finding is load-bearing).
+
+**Phase-A kill-test (improved form; feasibility verdict: decisive).** Branch all tail arms from regenerated hot prefixes (~0.69 GPU-h/seed, deterministic) — exact hot-phase pairing, roughly half cost. Dev (seeds 1511+): 3 tail forks sweeping κ∈{0.5,1} × ρ∈{0.7,0.9} + c_t warm-in. Arms: (A) existing n=10 baseline, no new runs; (B) tail-SF κ=1, ρ=0.8, n=4 on seeds 1710-1713; (C) open-loop control at same κ, n=4 near-free from shared prefixes, with *both* readouts (Polyak average = the #16 configuration, and raw last iterate) pre-registered from the same runs. **WIN** if paired mean(B)−A ≤ −0.0025, CI excluding 0. **ANNEAL-REPLACED** if within +0.0025 of A AND B < C_polyak − 0.005 AND x̄ val at steps 1400/1550 within 0.01 of its endpoint. **KILL** if paired delta ≥ +0.0025. **~12-15 GPU-h.**
+
+**Biggest risk.** WSM's LM-scale success suggests arm C may match arm B — the airbench #16 null may simply not transfer, making "feedback" unnecessary and the result a WSM replication with extra machinery. That outcome is still informative (it localizes #16's negative to airbench), but it caps the novelty claim.
+
+---
+
+### #2 — Anneal-Handoff: free-ridden Kronecker curvature, spent only in the cooldown
+
+**Mechanism.** Stock Muon for steps 0-1450 while passively accumulating Kronecker factors L = EMA[GGᵀ], R = EMA[GᵀG] (two matmuls/step, never used). At the cooldown boundary, eigendecompose once; for steps 1450-1750 replace Newton-Schulz with SOAP-style Adam-in-frozen-eigenbasis, refreshed ≤2 times. All arms branch from shared step-1450 checkpoints (trunk-paired, each arm ~17% of a run).
+
+**Why it could beat Muon.** As lr→0 the iterate enters the basin-local quadratic regime where per-eigendirection effective LR provably governs the bias/variance of the final iterate — the one place Shampoo/SOAP's per-step superiority can be harvested at amortized-to-zero cost. Muon's unit-spectrum update is exactly wrong there. This is also the sharpest available test of whether the equivalent-destinations wall extends into the nanogpt anneal.
+
+**Novelty.** Partially explored, and the headline thesis is taken: the River-Valley paper (arXiv 2606.21514) already publishes Muon→AdamW late-phase handoff beating Muon-only baselines; Distributed Shampoo's `start_preconditioning_step` has the accumulate-now/spend-later mechanic; the WSD-cooldown paper (2508.01483) establishes the physics diagonally. Genuinely open: **does a frozen Kronecker eigenbasis beat plain AdamW as the handoff target**, plus the random-basis placebo and trunk-paired evaluation. Per the novelty referee, the experiment is worth running *only* with a Muon→AdamW arm in it.
+
+**Phase-A kill-test (improved form; feasibility verdict: decisive).** 2 dev trunks (seeds 1511+), tune arms (b) and (c) scales on ~6-8 cheap anneal branches. Then 4 eval-protocol trunks run straight to 1750 (arm (a) = stock anneal, built in, free), each branched: (b) Kronecker-basis handoff; (c) random-orthogonal-basis placebo, *independently tuned*; (d) identity-basis diagonal-Adam handoff (≈ the published Muon→AdamW baseline) on 2 trunks. Paired t-test on trunk-paired endpoint diffs (paired σ expected ≪ 0.00125). **PASS** iff b−a ≤ −0.0025 AND b < c AND b < d. Pre-registered distinct outcomes: b≈c (equivalent-destinations wall extends to the anneal — mechanism dead, publishable in-house); b beats a but not d (rediscovery of 2606.21514 — Kronecker ingredient dead, adaptive handoff alive). **~20-21 GPU-h.**
+
+**Biggest risk.** Graveyard #1 / lesson (b): this is update-direction reshaping, and the wall predicts b≈a. The design converts that risk into information (the wall outcome is a pre-registered branch), but the prior on the WIN branch is modest.
+
+---
+
+### #3 — Drift-Completion Readout: tail-mean extrapolation instead of averaging
+
+**Mechanism.** From a constant-LR run, maintain *streaming* half-window mean accumulators (naive iterate snapshots are 75-600 GB on nanogpt — must be implemented as accumulators in `src/nanogpt/train.py`): W1 = mean(1450-1600), W2 = mean(1600-1750), drift v = W2 − W1. Readout family W(α) = W2 + α·v, α selected on a held-out shard by forward passes only. Hypothesis: the anneal's benefit is *bias completion* (remaining drift down the river), not variance reduction — the exact complement of what #16 refuted, with α=0 nesting the refuted method as the null point.
+
+**Why it could beat Muon.** If extrapolation recovers a large fraction of the anneal gap at ~zero compute, the decay phase can be deleted and its tokens re-invested at peak LR; any point of a constant-LR run becomes an anytime "annealed" checkpoint. Even a partial recovery quantifies drift-vs-other in the anneal — feeding the interpretation of every other anneal program on this list (including #1 and #2 above).
+
+**Novelty.** Partially explored. The exact cell (two-half-window drift estimator from a constant-LR pretraining tail, signed val-selected extrapolation, pre-registered as a bias-vs-variance kill test) is unclaimed, but each ingredient exists: RELEX (2605.21468) does rank-1 drift extrapolation for RLVR; LCSC (2404.02241) does any-real-coefficient tail combinations for diffusion; WSM occupies the delete-the-anneal slot with convex merges. WSM's success strains the "averaging = variance only" premise — a decay-shape-weighted convex merge arm is needed or the bias/variance conclusion is confounded.
+
+**Phase-A kill-test (improved form).** 3 constant-LR runs (cooldown_frac=0, fresh dev seeds 1511+) + 1 paired same-seed WSD rerun (shares the trajectory to step ~962, so D = W_WSD_final − W2 directly measures the anneal displacement). Report cos(v, D) and ‖D‖/‖v‖ *before* the α sweep. Global α only, grid {0, 0.5, 1, 2, 4, 8, 16, 32}, selected on seed A/shard 1, frozen. Spike-gated means (exclude z>4 steps). Recovery denominator pre-registered from the averaged null point: (L(W2) − L(W(α*))) / (L(W2) − 3.28888). **PASS** iff frozen α achieves ≥40% recovery on both held-out seeds and both shards. **FAIL** if <40% or argmin α ≤ 0.5. Scope the null correctly: it kills *linear* drift completion, not the bias hypothesis in general (the anneal path may curve over 788 steps). Add a WSM-style weighted-merge readout from the same accumulators at zero extra runs. **~10 GPU-h.**
+
+**Biggest risk.** Equivalent-destinations prior: the landscape tolerates huge displacements at unchanged loss, so translation by α·v may be loss-neutral; and the anneal path may be too curved for a linear extrapolation. Both predict a null — but the cos(v, D) instrumentation means even the null arrives with a mechanism readout.
+
+---
+
+### #4 — Batch-Annealed Muon (BAM): batch ramp at constant LR as the tail
+
+**Mechanism.** Record config to cooldown onset; from there hold LR constant and grow token batch via grad accumulation, B(t) ∝ 1/η_record(t) capped at 8×, fixed total token budget, **no LR compensation** — the Muon-specific prediction licensed by the batch-invariant-LR-band finding. Discriminating physics: Newton-Schulz fixes update norm, so LR decay throttles signal and noise together while batch growth quenches only noise.
+
+**Why it could beat Muon.** If noise quenching is the anneal's causal ingredient, constant-LR batch annealing makes full-length expected-descent steps in the tail — strictly more progress per token — plus systems wins (larger tail batch, ~8× fewer NS invocations/all-reduces per token, anytime-extendable training). It is also the only surviving idea on a *different mechanism axis* (noise/batch) from the weight-space anneal probes above.
+
+**Novelty.** Partially explored, thin: arXiv 2602.14208 (ICLR 2026) does constant-LR late batch switching with no rescaling as "the batch-size analogue of WSD" (note: the proposal's claim that it ramps early is factually wrong); Seesaw (2510.14717) covers the wall-clock exchange with compensation; modded-nanogpt PR #163 already holds a record with a batch schedule. Untested: Muon-specifically dropping all LR compensation, and a controlled replacement of a tuned record cooldown with a no-decay control discriminating noise-quenching vs signal-throttling.
+
+**Phase-A kill-test (improved staged form).** Stage 1 (dev seeds 1511+, ~10 GPU-h): arm C = constant-LR no-decay tail n=2; arm B = ramp rule n=2; A = existing n=10 baseline. Pre-registered endpoint: recovered fraction f = (C−B)/(C−A). **f ≤ 0.2 DEAD** (tail is step-size-limited — puts #16's anneal-irreducibility on nanogpt, a real result); **0.2 < f < 0.9 PARTIAL** (motivates hybrid ramp + short final decay as Phase B, not more BAM seeds); **f ≥ 0.9 promote** to Stage 2: n=4 eval seeds, WIN bar mean(B) ≤ 3.28638. Trajectory readout removes the 8×-cap escape hatch: within the temperature-matched token window, loss_B must track loss_A within paired noise, else noise-annealing is killed regardless of cap. Drop the geometric-doubling variant. **Expected ~10 GPU-h (Stage-1 kill likely), worst case ~20.**
+
+**Biggest risk.** The lab's own findings cut against it twice: #16 concluded the anneal's work is "real progress, not settling," and the batch-invariance finding is itself best explained by already-past-critical-batch at B0 — both predict f ≈ 0. Honest prior: the likely outcome is the pre-registered FAIL branch. It stays in the top 5 because that FAIL is cheap, decisive, and upgrades a load-bearing in-house conclusion from airbench to nanogpt.
+
+---
+
+### #5 — Spectral-SAM Muon (staged): free sharpness perturbation along the cached polar factor, as a causal test of the λ1 dial
+
+**Mechanism.** Before each forward/backward, perturb hidden matrices by ρ·O_{t−1} where O_{t−1} = NS(M_{t−1}) is already computed and cached (zero extra gradient evals, unlike SAM's 2×); un-perturb; apply stock Muon. O = UVᵀ is the maximizer of a linear form over the spectral ball — the SAM ascent direction in Muon's own dual norm.
+
+**Why it could beat Muon.** The lab's only clean positive: endpoint λ1 and CKA are monotone LR dials. LR currently moves step size and flatness *together*; this adds an independent flatness knob at fixed LR. If endpoint flatness mediates part of the LR-loss relationship, decoupling reaches endpoint combinations no LR setting can. More honestly: **Phase A1 is a cheap causal test of the flagship #13 finding** — is λ1 movable at fixed LR at all? — which is worth having regardless of the loss outcome.
+
+**Novelty.** Partially explored — an A+B transplant: Momentum-SAM (2401.12033) supplies the free cached-momentum perturbation including the sign analysis; SAGE (2605.07914) already uses the Newton-Schulz polar factor as the spectral SAM direction (with SAM's extra gradient, in domain generalization). No published Muon+SAM combination (2605.26929 notes the gap). Residual novelty: free, geometry-matched, single-geometry perturbation+update, evaluated on pretraining tokens-to-loss with the λ1 criterion. Cannot be claimed as a new mechanism kind.
+
+**Phase-A kill-test (improved staged form).** A1 (dose-finding, ~4 dev runs, seeds 1511+, ~5 GPU-h): sweep ρ log-spaced 3e-4→3e-2 (+O sign), measure endpoint λ1 (existing `endstate.py` tooling) and endpoint rel-distance (#15 tooling) to classify dose-path vs equivalent-destinations class. **Gate: proceed only if some ρ moves λ1 flat-ward by ≥ one #13 LR-ladder rung at ≤0.005 val cost; else KILL for ~5 GPU-h** with the verdict "λ1 not movable at fixed LR by this perturbation." A2 (~13 GPU-h): winning ρ n=4 seed-paired on 1710-1713; random-orthogonal placebo (matched spectral norm and schedule) n=4; constant-ρ and −O arms at n=1 as probes. **PASS** = mean ≤ 3.28638 AND λ1 shifted flat at matched LR AND beats placebo by ≥0.0025. Pre-registered confound rule: if −O wins, a Nesterov-coefficient retune control must fail to reproduce it before any claim (graveyard-#9 pattern). Note ρ ∝ η turns the knob off during the anneal — where #13 says λ1 is set — hence the constant-ρ probe arm. **~18 GPU-h total; ~5 to a kill.**
+
+**Biggest risk.** First-order, ±ρ·O is a Nesterov-coefficient retune of an already-tuned Nesterov Muon — the TempoMuon pattern predicts "exactly free at record LR." Any real effect must come through the second-order ρ·H·O term, and SAM-family methods typically *cost* train loss, which is the metric here. The staged design confines the downside to ~5 GPU-h.
+
+---
+
+## 2. Bench
+
+**Drift-Clock Cooldown (CKA-progress-parameterized LR schedule).** The best novelty position on the list (no prior uses held-out function-space drift as a schedule's independent variable; closest are CG-ALR 2510.23781 and Defazio's schedule-refinement move) and it builds directly on the lab's two strongest positives — its Stage 1 even doubles as the human-gated LM transfer test of the CKA-superposition law. Benched for three reasons: the registered Stage-1 test was mathematically confounded as written (proportional compression makes lr-vs-D and lr-vs-step-fraction collapse indistinguishable; the fix requires schedule-shape perturbation arms), the payoff ceiling is TempoMuon-shaped (wins only where the step schedule is off-tune — it cannot beat the tuned record on the primary endpoint), and at ~35 GPU-h it is the most expensive survivor. Strong candidate for the next wave, especially if the human wants the CKA-law LM transfer measurement anyway — in which case Stage 1 is nearly free science.
+
+**Shard-Certified Curvature (cross-shard replication-gated Kronecker preconditioning).** The cross-shard certification statistic genuinely evades the t-ceiling (second moments, no sign cancellation) and lesson (a) (data-side disagreement cannot be faked by closed-loop dynamics), and the Phase-A0 headline number — what fraction of Kronecker eigen-mass replicates at nanogpt batch size — is unpublished. Benched because the feasibility referee found the central scientific claim broken: replication certifies "well-estimated," not "curvature rather than noise" — noise covariance is a distribution property and replicates across shards by construction, so the Kunstner-answering framing is false; the original A0 was biased toward a vacuous pass; the intervention phase collides with the equivalent-destinations wall and needs the full graveyard-#1 placebo apparatus; and RMT theory suggests soft shrinkage (already published, arXiv 2605.20756) dominates hard gating. The repaired 12 GPU-h two-stage design is runnable if the measurement number is wanted, but its intervention arm is the weakest bet-per-hour among survivors.
+
+**Spectral-hardness annealing (scheduled partial orthogonalization through the tail).** The central novelty claim is dead: Muon^p (2606.13867, Fig. 5) already runs stock-Muon-then-soften-spectrum-for-the-final-500-steps and sees a val-loss drop. What survives is a controls/attribution study — Muon^p never RMS-matched, so their gain is confounded with an effective-LR drop, and the placebo-controlled shape-vs-dose adjudication is real science but confirmatory. The secondary constant-LR mode near-collides with #16 (the ‖M‖-coupled "emergent anneal" stalls at the noise floor — the same reason readout averaging failed), the placebo as specified was incoherent (an RMS-matched arm has no tail-energy reduction to match), and honest cost is ~45 GPU-h as proposed, ~30 after cuts. Run only if the wall-extension question isn't already answered by program #2 above, whose rel-dist instrumentation covers much of the same ground cheaper.
+
+**A-Metric Muon (activation-covariance operator-norm orthogonalization).** The claimed untested cell is occupied: Newton-Muon (2604.01472) preconditions Muon by the forward-pass activation second moment on this exact benchmark — and its gains fade to ~0.004 loss on recent tuned records, which is direct evidence the kill test fails for the shared mechanism. The residual delta (exact LMO sandwich form à la Mousse with the activation statistic, plus the frozen-A open-loop discriminator) is a legitimate ablation-of-Newton-Muon paper, not a new optimizer, and the "permits larger steps" rationale is already refuted by graveyard #3. The improved kill test (premise gate on cond(A) after RMSNorm; A=I no-op unit test) is well-constructed if anyone wants it at ~18 GPU-h, but the prior is poor.
+
+**Frequency-weighted row-norm LMO for embed/head.** Correct observation (embed/head is the block the Muon revolution left untouched) but pre-empted twice in 2026: the symmetry-compatible paper (2605.18106) covers the β=0 arm beating AdamW, and Ember (2607.01455) implements the β=0.5 frequency-compensation mechanism and reports *parity* with Adam, not wins — direct negative evidence for the beat-Adam hypothesis, plus the observation that Adam's second moment already approximates p^−1/2 compensation. Remaining deltas (static offline unigram; record-tuned n≥4 evaluation) are minor. The 30 GPU-h improved design with per-frequency-bin loss decomposition is clean, but expected effect size is near zero.
+
+---
+
+## 3. Rejected
+
+| Idea | Reason |
+|---|---|
+| Serial-Steps-for-Free (micro-batch splitting, K serial Muon steps) | **already_done** — varunneal's LR×batch sweeps + modded-nanogpt PR #163 measured and cashed in this exact degree of freedom on this exact benchmark; in-house program #7 (results e23c141) already ran the 8× tokens/step variation at fixed budget. Also K serial normalized steps ≈ K× effective LR (schedule rediscovery, #9 pattern). The only salvage — a zero-GPU re-analysis of e23c141's fixed-budget grid — can be done as a desk exercise, not a program. |
+| Gauge-fixed product-space QK LMO (joint attention trust region) | **already_done** — Tilde Research's Compositional Muon (Jan 2026) is essentially the identical method (composed-perturbation constraint, gauge correction, OV analogue), validated on the nanogpt speedrun where it set a record; Hanchi Sun (Jul 2025) published the constraint derivation; and its own ablation shows a scalar approximation recovers nearly all gains, so the "more exact solver" delta has little headroom. |
+
+---
+
+## 4. Portfolio logic
+
+Run in two waves. **Wave 1 (~25 GPU-h, one long weekend on the 5090s): programs #3 (drift-completion) and #1 (SF tail graft) together, then #4 Stage 1 (BAM).** These three share infrastructure — constant-LR tails, hot-prefix forking at T_c ≈ 962, streaming tail accumulators — so the marginal cost of the bundle is well below the sum, and the constant-LR control runs are literally shared between #3, #1's arm C, and #4's arm C. More importantly they are the same question asked three mechanistically independent ways: *what is the anneal actually doing* — bias completion (#3), effective-step contraction with fresh gradients (#1), or noise quenching (#4)? Any pattern of answers is decisive: three nulls upgrade "the anneal is irreducible" from an airbench finding to a nanogpt finding with a mechanism decomposition attached, which then hard-gates the entire anneal-replacement genre; any single positive is the cheapest tokens-to-loss win available and immediately reprioritizes Wave 2. **Wave 2 (~40 GPU-h, contingent): program #2 (anneal-handoff) — informed by Wave 1's decomposition (if #1's feedback arm wins, the handoff's adaptive-scaling arm (d) becomes the incumbent to beat; if everything nulls, #2's b≈c branch is the wall-extension measurement) — then program #5's A1 stage (~5 GPU-h) as the standalone causal test of the λ1 dial, escalating to A2 only on a gate pass.** This ordering puts the cheapest, most decisive, most infrastructure-shared tests first; defers the two programs whose priors are weakest (#4's likely-FAIL is cheap and front-loaded, #5's downside is capped at its gate); and keeps one non-anneal, non-weight-space mechanism (#4, noise axis) and one endpoint-object causal probe (#5) in the mix so the portfolio is not a single bet on the anneal-phase weight-space story. Bench items should be revisited only after Wave 1: a positive anywhere in Wave 1 makes Drift-Clock's transfer claim more valuable (there would finally be a mechanism to schedule against), while a clean triple-null argues for redirecting effort away from the tail entirely.
