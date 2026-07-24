@@ -308,3 +308,64 @@ def test_accumulating_run_writes_artifact_and_survives_resume(tmp_path, monkeypa
     # resumed-at-4 run covered steps 2,3 before the checkpoint; its state
     # was carried, so n1 is still 2 at completion of max_steps=4 (no-op leg).
     assert resumed["tail_accumulators"]["n1"] == 2
+
+
+# ------------------------------------------------------- gauge probe (P7)
+
+
+def test_gauge_probe_excluded_from_fingerprints():
+    a = _cfg()
+    b = NanoGPTConfig(precision_mode="bf16", attention_impl="sdpa", compile=False,
+                      gauge_probe=True)
+    assert a.config_fingerprint() == b.config_fingerprint()
+    assert a.hot_fingerprint() == b.hot_fingerprint()
+    assert "gauge_probe" in b.deviations() and "gauge_probe" not in a.deviations()
+
+
+def test_gauge_probe_block_scalars_consistent():
+    from src.nanogpt.gauge_probe import GaugeProbe
+
+    torch.manual_seed(0)
+    qkv = torch.randn(3, 256, 64)  # 2 heads of dim 128
+    other = torch.randn(64, 64)
+    probe = GaugeProbe([("0.attn.qkv_w", qkv), ("0.mlp.fc_w", other)])
+    v = torch.randn_like(qkv)
+    probe.begin_step()
+    probe.observe(qkv, v, 0.1)
+    probe.observe(other, torch.randn_like(other), 0.2)
+    out = probe.flush()
+    m = out["matrices"]["0.attn.qkv_w"]
+    blocks = out["qk_blocks"]["0.attn.qkv_w"]  # (T=1, 3, 2, heads=2)
+    assert blocks.shape == (1, 3, 2, 2)
+    # block w2 sums over Q+K slices equal the direct slice norms
+    assert torch.allclose(blocks[0, 0].sum(), (qkv[:2] ** 2).sum(), rtol=1e-5)
+    assert torch.allclose(blocks[0, 1].sum(), (qkv[:2] * v[:2]).sum(), rtol=1e-4, atol=1e-3)
+    assert torch.allclose(m["w2"][0], (qkv ** 2).sum(), rtol=1e-5)
+
+
+def test_gauge_probe_end_to_end_norm_identity(tmp_path, monkeypatch):
+    """The logged scalars must satisfy the exact norm-evolution identity
+    ||W_{t+1}||^2 = ||W_t||^2 - 2*eff_lr*<W_t,V_t> + eff_lr^2*||V_t||^2
+    (weight decay 0), which pins the probe's W-pre-update/V-applied contract."""
+    _SingleRankDist.install(monkeypatch)
+    monkeypatch.setattr(torch._dynamo.config, "suppress_errors", True)
+    _write_data(tmp_path)
+    from src.nanogpt.train import run_nanogpt
+
+    cfg = _tiny_config(tmp_path, gauge_probe=True)
+    cfg["nanogpt"]["tail"] = {"artifact_dir": str(tmp_path / "art")}
+    metrics = run_nanogpt(cfg, torch.device("cpu"))
+    assert metrics["gauge_steps_observed"] == 6
+    art = torch.load(tmp_path / "art" / Path(metrics["gauge_artifact"]).name,
+                     weights_only=False)
+    assert art["steps"] == 6
+    checked = 0
+    for name, m in art["matrices"].items():
+        w2, wv, v2, lr = m["w2"], m["wv"], m["v2"], m["eff_lr"]
+        assert len(w2) == 6
+        for t in range(5):
+            pred = w2[t] - 2 * lr[t] * wv[t] + lr[t] ** 2 * v2[t]
+            assert torch.allclose(w2[t + 1], pred, rtol=2e-2, atol=1e-4), (name, t)
+            checked += 1
+    assert checked > 0
+    assert any(k.endswith("qkv_w") for k in art["qk_blocks"])

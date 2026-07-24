@@ -112,6 +112,11 @@ class Muon(torch.optim.Optimizer):
         probe = getattr(self, "tempo_probe", None)
         if probe is not None:
             probe.begin_step()
+        # PORT CHANGE P7 (program #20): optional passive gauge probe, same
+        # contract as P6 — None (default) leaves the step byte-identical.
+        gprobe = getattr(self, "gauge_probe", None)
+        if gprobe is not None:
+            gprobe.begin_step()
         reduce_scatter_futures: list[torch.Future] = []
         all_reduce_futures: list[torch.Future] = []
         for group in self.param_groups:
@@ -149,6 +154,10 @@ class Muon(torch.optim.Optimizer):
                     momentum_buffer.lerp_(grad, 1 - momentum)
                     grad = grad.lerp_(momentum_buffer, momentum)
                     v = zeropower_via_newtonschulz5(grad.bfloat16(), 5)
+                    if gprobe is not None:
+                        # P7: W still pre-update here; V is the applied
+                        # direction. Read-only observation.
+                        gprobe.observe(p, v, eff_lr)
                     p.add_(other=v, alpha=-eff_lr)
                 idx += 1
                 all_reduce_futures.append(dist.all_gather(params_pad[base_i:base_i + self.world_size], params_pad[base_i + self.rank], async_op=True).get_future())

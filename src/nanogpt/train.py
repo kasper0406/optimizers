@@ -329,6 +329,17 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         tail_named = dict(raw_model.named_parameters())
     if tail_cfg.accumulate:
         tail_acc = TailAccumulators(tail_cfg, tail_named)
+    gauge_probe = None
+    if cfg.gauge_probe:
+        # PORT CHANGE P7 (program #20): passive norm-scalar logging in
+        # Muon.step. Same param list + order as _build's hidden_matrix_params.
+        from src.nanogpt.gauge_probe import GaugeProbe
+
+        gauge_probe = GaugeProbe(
+            [(n, p) for n, p in raw_model.blocks.named_parameters()
+             if p.ndim >= 2 and "embed" not in n]
+        )
+        muon.gauge_probe = gauge_probe
 
     @lru_cache(maxsize=None)
     def window_blocks(step: int) -> torch.Tensor:
@@ -668,6 +679,23 @@ def _train(cfg: NanoGPTConfig, device: torch.device, rank: int, world_size: int)
         tail_metrics["tail_sf_t"] = sf.t
         z_vals = [p.get("val_loss_z") for p in val_curve if "val_loss_z" in p]
         tail_metrics["final_val_loss_z"] = z_vals[-1] if z_vals else None
+    if gauge_probe is not None and rank == 0:
+        gdir = Path(tail_cfg.artifact_dir)
+        if not gdir.is_absolute():
+            gdir = REPO_ROOT / gdir
+        gdir.mkdir(parents=True, exist_ok=True)
+        gpath = gdir / f"nanogpt_gauge_seed{cfg.seed}_{cfg.config_fingerprint()}.pt"
+        payload = gauge_probe.flush()
+        payload.update({"seed": cfg.seed, "config_fingerprint": cfg.config_fingerprint(),
+                        "start_step": start_step, "train_steps": train_steps})
+        gtmp = gpath.with_suffix(".tmp")
+        torch.save(payload, gtmp)
+        gtmp.rename(gpath)
+        try:
+            tail_metrics["gauge_artifact"] = str(gpath.relative_to(REPO_ROOT))
+        except ValueError:
+            tail_metrics["gauge_artifact"] = str(gpath)
+        tail_metrics["gauge_steps_observed"] = gauge_probe.steps
     if ramp_ks is not None:
         tail_metrics["tail_ramp_steps"] = len(ramp_ks)
         tail_metrics["tail_ramp_chunks"] = ramp_ks

@@ -255,6 +255,12 @@ class NanoGPTConfig:
     # allowed iff the checkpoint's hot fingerprint, seed, and stable-phase
     # bounds match (train.py validates). None == normal resume semantics.
     fork_from: Optional[str] = None
+    # PORT CHANGE P7 (program #20, reports/gauge-ledger-prereg.md §6):
+    # passive per-step weight/update norm-scalar logging inside Muon.step.
+    # Measurement-only, trajectory-neutral — EXCLUDED from both fingerprints
+    # (see config_fingerprint/hot_fingerprint) so stored prefix checkpoints
+    # remain fork-compatible with probed replays.
+    gauge_probe: bool = False
 
     # ------------------------------------------------------------------ api
     def __post_init__(self) -> None:
@@ -407,6 +413,12 @@ class NanoGPTConfig:
                 "streaming fp32 tail iterate means (W1/W2/Polyak + final), "
                 "spike-gated; measurement only, update path untouched (prereg §0.3)"
             )
+        if self.gauge_probe:
+            out["gauge_probe"] = (
+                "program-#20 passive gauge probe (per-step weight/update norm "
+                "scalars in Muon.step); measurement-only, update path untouched "
+                "(optim.py PORT CHANGE P7)"
+            )
         if self.fork_from is not None:
             out["fork_from"] = (
                 f"trajectory forked from checkpoint {self.fork_from} "
@@ -533,6 +545,9 @@ class NanoGPTConfig:
         d = self.to_dict()
         d.pop("seed", None)
         d.pop("checkpoint", None)
+        # P7: measurement-only, never trajectory-shaping; excluding it keeps
+        # pre-P7 checkpoints resumable and fork-compatible.
+        d.pop("gauge_probe", None)
         blob = json.dumps(d, sort_keys=True, default=str)
         return hashlib.sha1(blob.encode()).hexdigest()[:8]
 
@@ -550,7 +565,7 @@ class NanoGPTConfig:
 
         d = self.to_dict()
         for key in ("seed", "checkpoint", "cooldown_frac", "min_lr_frac",
-                    "max_steps", "tail", "fork_from"):
+                    "max_steps", "tail", "fork_from", "gauge_probe"):
             d.pop(key, None)
         blob = json.dumps(d, sort_keys=True, default=str)
         return hashlib.sha1(blob.encode()).hexdigest()[:8]
