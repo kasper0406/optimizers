@@ -169,6 +169,14 @@ def _run_nanogpt(config, device):
     return run_nanogpt(config, device)
 
 
+def _run_bbp_probe(config, device):
+    """Program #22 frozen-checkpoint msign alignment probe (src/nanogpt/bbp.py,
+    prereg reports/bbp-prereg.md). Lazy import, same reason as nanogpt."""
+    from src.nanogpt.bbp import run_bbp_probe
+
+    return run_bbp_probe(config, device)
+
+
 EXPERIMENT_REGISTRY = {
     "smoke": run_smoke,
     "nanogpt": _run_nanogpt,  # WP0.2 modded-nanogpt record port (2025-07-12_BosAlign)
@@ -176,6 +184,7 @@ EXPERIMENT_REGISTRY = {
     "airbench_smoke": run_airbench_smoke,  # WP0.4 zoo smoke harness
     "airbench_instrumented": run_airbench_instrumented,  # WP1.2 measurement runs
     "probe_divergence": _load_probe_divergence(),  # twin-trajectory probe
+    "bbp_probe": _run_bbp_probe,  # program #22 msign alignment probe
     # Later WPs register nanogpt experiments here.
 }
 
