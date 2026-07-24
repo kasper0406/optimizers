@@ -104,6 +104,46 @@ held-out arm — i.e. the as-registered protocol would have been biased
 *toward* PASS on (S). If the two arms agree, the confound is empirically
 immaterial and both are reportable.
 
+## 3c. AMENDMENT A2 — criterion (S) was vacuous as registered (2026-07-24, before unblinding)
+
+Registered **before any probe curve was read** (found by writing synthetic
+unit tests for the analysis script, per an internal review finding that
+Wave-1-era analysis scripts shipped untested; the test asserting "a still-
+rising curve must FAIL" failed, which is how the defect surfaced).
+
+**Defect.** §1 fixes the b-grid at 1…256 chunks (512 streamed chunks ⇒ top
+merge level b = 256) and §3 evaluates (S) as
+`median_m e_m(8)/e_m(64)` with `e_m(b) = â_m(39b)`. But 39·8 = **312** and
+39·64 = **2496**, both **above the measured grid**. Interpolation clamps
+both to â(256), so the ratio is **identically 1.0 for any input** —
+criterion (S) as written passes unconditionally and measures nothing. It
+could never have produced the registered FAIL branch.
+
+**Why not just extend the grid.** Reaching b = 2496 needs ≈ 5000 streamed
+chunks per probe (≈ 245M tokens, ~10× the current cost per probe, ×8 probes)
+— out of proportion to a Phase-A stage.
+
+**Repaired criterion (S′).** The momentum-corrected training point
+b_eff(8) = 312 sits just above the grid top (256), i.e. within 1.22× — so
+alignment *at* the training point is measurable to good approximation, while
+the "8× beyond training batch" comparison is **not measurable at this probe
+cost** and is withdrawn. (S′) instead tests whether the curve has flattened
+approaching the training point:
+
+> **(S′) PASS iff median over matrices of â(128)/â(256) ≥ 0.9**, on the
+> held-out arm (A1), at the mid checkpoint, on both seeds.
+
+Interpretation is unchanged in kind: under the BBP account, nanogpt's
+measured batch-invariant LR frontier requires alignment to be saturated at
+the batch the optimizer effectively sees. FAIL (curve still rising steeply
+into the training point) kills the noise-side account of that frontier, as
+originally registered.
+
+**Guard.** `scripts/analyze_bbp.py` now refuses to evaluate any criterion at
+an off-grid b and marks clamped readings, so this class of error cannot recur
+silently. The raw â(8)/â(64) ratio and the full curves are reported
+descriptively alongside.
+
 ## 4. What this stage does NOT claim
 
 No RMT comparison, no airbench exponent prediction, no lr*(b) claim — those
