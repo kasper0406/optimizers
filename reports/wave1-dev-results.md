@@ -16,9 +16,16 @@ calls are human.
 Per seed: hot prefix P to T_c=963 (checkpoint), then forked arms — A = stock
 WSD anneal, C = constant LR (`min_lr_frac: 1.0`) with spike-gated tail
 accumulators (W1 = mean 1450–1599, W2 = 1600–1749, Polyak from 963), plus the
-program arms. Fork validity check passed at scale: arm A endpoints
-3.28855 / 3.29059 / 3.28725 — all inside the n=10 baseline band
-(3.28888 ± 0.00125).
+program arms. Fork validity check at scale: arm A endpoints 3.28855 / 3.29059 / 3.28725,
+against the n=10 baseline mean 3.288884 (sd 0.001254). **Correction
+(2026-07-24, internal review):** an earlier version of this line said "all
+inside the n=10 baseline band (3.28888 ± 0.00125)", which is false as
+written — ±1σ is [3.28763, 3.29013], so two of the three sit outside it
+(z = +1.36, −1.31) and 3.28725 is below the minimum of all ten baseline
+runs. With n=3, |z| ≤ 1.4 is unremarkable and the forking substrate is not
+in question, but the check licenses the whole Wave-1 design and was
+overstated. The honest statement: forked arm-A endpoints are consistent
+with the baseline distribution at n=3 (no formal test was registered).
 
 **The anneal gap** (C_final − A_final, same seed): 0.0915 / 0.0909 / 0.0913.
 Tight across seeds; this is the quantity the three programs try to recover.

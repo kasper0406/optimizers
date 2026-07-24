@@ -66,6 +66,44 @@ the median over matrices (record batch vs 8× record batch).
 - Descriptive (no criteria): early-vs-mid-vs-annealed curve evolution;
   per-matrix-class (attn vs MLP) breakdown; raw c distributions.
 
+## 3b. AMENDMENT A1 — held-out-data arm (2026-07-24, before unblinding)
+
+Registered **before any probe result was opened** (5 of 6 as-registered
+probes had completed; none had been read). Raised by an internal adversarial
+review of the harness.
+
+**Defect.** §2 fixes the probe stream at train shard index 3, position 0, on
+the stated intent "identical for every checkpoint/seed — gradient statistics
+at matched data". The *data* is matched, but the **seen/unseen status is
+not**. Reading the loader state out of the stored checkpoints:
+
+- mid (step 963, where the primary criterion (S) is registered):
+  `{file_index: 3, pos: 92,635,277}` — the probe's 512 chunks (25.2M tokens
+  from pos 0) were consumed around training steps 762–826, i.e. **already
+  trained on**;
+- early (step 321): `{file_index: 1, pos: 30.8M}` — shard 3 **unseen**;
+- annealed (step 1750): shard 3 fully consumed.
+
+So criterion (S) would be evaluated on memorized data, and the descriptive
+early→mid→annealed evolution confounds training progress with memorization.
+Gradient noise structure on trained-on data is not the noise structure the
+optimizer actually faced, which is exactly what a(B) is meant to measure.
+
+**Amendment.** Add a **held-out arm** at the mid checkpoint, both seeds,
+identical in every other respect but reading from **train shard index 8**
+(training consumes ~688M tokens ≈ shards 0–6, so shard 8 is unseen at every
+checkpoint). Criterion (S) is evaluated on the **held-out arm**; the
+as-registered shard-3 arm is retained and reported alongside as the
+seen-data comparison. The (S) threshold, the estimator, the b-grid, the
+momentum correction and the vacuity guard (V) are all unchanged.
+
+Registered prediction, made before unblinding either arm: if memorization
+matters, the seen arm should show *higher* alignment at small b (smaller,
+more consistent gradients) and therefore look **more** saturated than the
+held-out arm — i.e. the as-registered protocol would have been biased
+*toward* PASS on (S). If the two arms agree, the confound is empirically
+immaterial and both are reportable.
+
 ## 4. What this stage does NOT claim
 
 No RMT comparison, no airbench exponent prediction, no lr*(b) claim — those

@@ -131,11 +131,35 @@ def integrate_naive_flow(
     return torch.stack(out)
 
 
-def trajectory_error(traj_a: Tensor, traj_b: Tensor) -> float:
+def causal_ema(traj: Tensor, half_life: float) -> Tensor:
+    """Causal EMA over the leading (time) axis, matching simulate_muon's."""
+    rho = 0.5 ** (1.0 / half_life)
+    out = torch.empty_like(traj)
+    acc = traj[0].clone()
+    for t in range(len(traj)):
+        acc = rho * acc + (1 - rho) * traj[t]
+        out[t] = acc
+    return out
+
+
+def trajectory_error(traj_a: Tensor, traj_b: Tensor,
+                     match_filter_half_life: Optional[float] = None) -> float:
     """Registered metric: time-averaged Frobenius error over trajectory norm
-    (both trajectories measured relative to the shared start point)."""
+    (both trajectories measured relative to the shared start point).
+
+    ``match_filter_half_life`` applies the SAME causal EMA to ``traj_b`` that
+    ``simulate_muon`` applied to ``traj_a``. AMENDMENT A1 (2026-07-24, before
+    any Stage-1 derivation was scored — see reports/central-flow-prereg.md
+    §Amendments): without it the metric compares an EMA-lagged discrete
+    trajectory against an unlagged flow, so a *perfect* flow scores ~0.21 on
+    the harness's own sub-EoS consistency case and would fail the registered
+    10% kill-switch on lag alone. Matched filtering removes the artifact
+    (same case: 0.001).
+    """
     T = min(len(traj_a), len(traj_b))
     a, b = traj_a[:T], traj_b[:T]
+    if match_filter_half_life is not None:
+        b = causal_ema(b, match_filter_half_life)
     err = (a - b).flatten(1).norm(dim=1).mean()
     scale = (a - a[0]).flatten(1).norm(dim=1).mean().clamp_min(1e-9)
     return float(err / scale)
@@ -143,27 +167,40 @@ def trajectory_error(traj_a: Tensor, traj_b: Tensor) -> float:
 
 def stability_and_floor_vs_curvature(
     eta: float = 0.5, sigma: float = 0.0, steps: int = 4000, seed: int = 0,
-    scales=(0.13, 4.0, 130.0),
+    conds=((3.0, 3.0), (10.0, 100.0), (100.0, 1000.0)),
+    etas=(0.05, 0.5, 5.0),
 ) -> Dict[str, list]:
-    """Registered first Stage-1 measurement. For msign dynamics the per-step
-    norm is definitionally eta*sqrt(rank); the non-trivial regime structure is
-    (i) boundedness at eta*lam far beyond GD's 2 (the lab measured stability
-    at eta*lam ~ 65 on airbench) and (ii) how the late-time loss floor scales
-    with curvature at fixed eta — a quantity any candidate central flow must
-    reproduce. Scales chosen so eta*lam spans ~0.065 to ~65."""
-    rows = {"lam_max": [], "eta_lam": [], "bounded": [], "late_loss": [],
-            "floor_ratio": []}
-    for k, s in enumerate(scales):
-        prob = MatrixQuadratic.make(scale=s, seed=seed + k)
-        sim = simulate_muon(prob, eta=eta, sigma=sigma, steps=steps, seed=seed + k)
+    """Registered first Stage-1 measurement (CORRECTED 2026-07-24, see below).
+
+    Sweeps the two axes msign dynamics are actually sensitive to — the
+    CONDITIONING of the curvature operators and the step size eta — and
+    reports the late-time loss floor relative to the naive oscillation-band
+    prediction 0.5*lam_max*(eta*sqrt(r))^2, plus boundedness.
+
+    WHY NOT AN OVERALL SCALE SWEEP. The first version of this function varied
+    an overall multiplier s on A and reported a "floor ratio constant across
+    1000x curvature". That was vacuous: msign(s*M) = msign(M), so scaling A
+    leaves the entire iterate sequence invariant (up to chaos in the
+    oscillatory regime) and the floor ratio is s-invariant BY CONSTRUCTION.
+    The sweep measured the scale-invariance of the polar factor, not physics.
+    Conditioning and eta are the axes that change the dynamics.
+    """
+    rows = {"cond": [], "eta": [], "lam_max": [], "eta_lam": [], "bounded": [],
+            "late_loss": [], "floor_ratio": []}
+    for k, (ca, cb) in enumerate(conds):
+        prob = MatrixQuadratic.make(cond_a=ca, cond_b=cb, seed=seed + k)
         lam = prob.lam_max
-        late = float(sim["losses"][-500:].mean())
         band = eta * (min(prob.Wstar.shape) ** 0.5)
-        rows["lam_max"].append(lam)
-        rows["eta_lam"].append(eta * lam)
-        rows["bounded"].append(bool(torch.isfinite(sim["losses"]).all())
-                               and late < 10 * float(sim["losses"][0]))
-        rows["late_loss"].append(late)
-        # floor relative to the naive band prediction 0.5*lam*(eta*sqrt(r))^2
-        rows["floor_ratio"].append(late / (0.5 * lam * band ** 2))
+        for e in etas:
+            sim = simulate_muon(prob, eta=e, sigma=sigma, steps=steps, seed=seed + k)
+            late = float(sim["losses"][-500:].mean())
+            band_e = e * (min(prob.Wstar.shape) ** 0.5)
+            rows["cond"].append((ca, cb))
+            rows["eta"].append(e)
+            rows["lam_max"].append(lam)
+            rows["eta_lam"].append(e * lam)
+            rows["bounded"].append(bool(torch.isfinite(sim["losses"]).all())
+                                   and late < 10 * float(sim["losses"][0]))
+            rows["late_loss"].append(late)
+            rows["floor_ratio"].append(late / (0.5 * lam * band_e ** 2))
     return rows

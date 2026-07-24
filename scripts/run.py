@@ -264,6 +264,14 @@ def main(argv=None) -> int:
     set_seed(seed)
 
     started_at = results_io.utc_now_iso()
+    # Provenance is captured BEFORE the experiment runs. It used to be
+    # evaluated at write time, after the run returned, so `git_sha` and
+    # especially `git_dirty` described the tree at run *end* — a run launched
+    # from an uncommitted tree and committed mid-run recorded
+    # `git_dirty: false` against a SHA that did not exist when it started
+    # (found in an internal review of the 2026-07-24 gauge runs). The point of
+    # the field is "what code produced this", so it must be read at launch.
+    provenance = results_io.git_provenance()
     t0 = time.perf_counter()
     metrics = EXPERIMENT_REGISTRY[experiment](config, device)
     wall_time_s = time.perf_counter() - t0
@@ -293,7 +301,7 @@ def main(argv=None) -> int:
         "schema_version": results_io.SCHEMA_VERSION,
         "experiment": experiment,
         "config": results_io.config_record(args.config, config),
-        **results_io.git_provenance(),
+        **provenance,
         "seed": seed,
         "gpu_type": gpu_type_string(device),
         "wall_time_s": wall_time_s,

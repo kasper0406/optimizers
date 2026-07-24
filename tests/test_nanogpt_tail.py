@@ -369,3 +369,96 @@ def test_gauge_probe_end_to_end_norm_identity(tmp_path, monkeypatch):
             checked += 1
     assert checked > 0
     assert any(k.endswith("qkv_w") for k in art["qk_blocks"])
+
+
+# ------------------------------------------- schedule-free tail semantics
+# Added 2026-07-24 after an internal review mutation-tested the suite and
+# found that deleting ScheduleFreeTail.to_z, or replacing the Polyak average
+# with the last iterate, left every test green — because the only end-to-end
+# SF test runs at rho=0.0 where both operations are provable no-ops. The
+# production configs run rho in {0.7, 0.9}. These tests pin the semantics at
+# a rho where they bite.
+
+
+def _sf_at(rho: float, shape=(4, 3), seed=0):
+    from src.nanogpt.tail import ScheduleFreeTail
+
+    torch.manual_seed(seed)
+    p = torch.randn(*shape)
+    sf = ScheduleFreeTail(TailConfig(mode="schedule_free", rho=rho), {"p": p})
+    return p, sf
+
+
+def test_schedule_free_to_y_is_the_interpolate_and_to_z_restores_exactly():
+    rho = 0.7
+    p, sf = _sf_at(rho)
+    assert torch.allclose(sf.xbar["p"], p), "xbar must initialize at z0"
+    for i in range(4):
+        z = p.clone()
+        xbar_before = sf.xbar["p"].clone()
+        sf.to_y()
+        assert torch.allclose(p, (1 - rho) * z + rho * xbar_before, atol=1e-6), (
+            "gradients must be evaluated at y = (1-rho)z + rho*xbar")
+        if i >= 2:
+            # steps 0-1 legitimately have y == z: xbar starts at z0, and after
+            # one update_average the equal-weight mean IS that single sample.
+            # From the third tail step the average lags and y must bite.
+            assert not torch.allclose(p, z), "at rho=0.7 y must differ from z"
+        sf.to_z()
+        assert torch.equal(p, z), "to_z must restore the iterate bitwise"
+        p.add_(torch.randn_like(p) * 0.1)  # the optimizer steps z
+        sf.update_average()
+
+
+def test_schedule_free_average_is_the_equal_weight_polyak_mean():
+    p, sf = _sf_at(0.7, seed=1)
+    post_step = []
+    for _ in range(6):
+        sf.to_y()
+        sf.to_z()
+        p.add_(torch.randn_like(p) * 0.1)
+        post_step.append(p.clone())
+        sf.update_average()
+        assert torch.allclose(sf.xbar["p"], torch.stack(post_step).mean(0), atol=1e-6), (
+            "xbar must be the equal-weight mean of post-update iterates, "
+            "not an EMA and not the last iterate")
+    assert sf.t == 6
+
+
+def test_schedule_free_validation_swap_round_trips():
+    p, sf = _sf_at(0.9, seed=2)
+    for _ in range(3):
+        p.add_(torch.randn_like(p) * 0.1)
+        sf.update_average()
+    z = p.clone()
+    sf.swap_in_xbar()
+    assert torch.allclose(p, sf.xbar["p"]), "validation must run at xbar"
+    assert not torch.allclose(p, z)
+    sf.swap_back()
+    assert torch.equal(p, z), "swap_back must restore z bitwise"
+
+
+def test_tail_accumulator_state_returns_to_cpu_on_load():
+    """Regression: train.py loads checkpoints with map_location=device, which
+    relocates the accumulators' CPU fp32 buffers onto the GPU; the next
+    observe() then mixes devices and raises. Simulated here by handing
+    load_state_dict a state whose tensors are on a non-default device-like
+    placement — on a CPU box we can at least pin the contract that whatever
+    comes in, the buffers used for accumulation are CPU afterwards."""
+    tail = TailConfig(accumulate=True, start_step=1, w1_window=(1, 3),
+                      w2_window=(3, 5))
+    p = torch.zeros(2)
+    acc = TailAccumulators(tail, {"p": p})
+    for step in (1, 2):
+        p.fill_(float(step))
+        acc.observe(step, 1.0)
+    state = acc.state_dict()
+    acc2 = TailAccumulators(tail, {"p": p})
+    acc2.load_state_dict(state)
+    for buf in (acc2.w1, acc2.w2, acc2.polyak):
+        for name, t in buf.items():
+            assert t.device.type == "cpu", f"{name} must accumulate on CPU"
+    # and accumulation still works after the round trip
+    p.fill_(3.0)
+    acc2.observe(3, 1.0)
+    assert acc2.n2 == 1

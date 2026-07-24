@@ -183,6 +183,23 @@ def stage_ab(out: Dict) -> None:
     out["criteria"]["b_parts"] = {"cos_2of3": b_cos, "dtan_ge_03_all": b_dtan, "ci_excl_m04_all": b_ci}
 
 
+def _gauge_artifact(seed: int, config_tag: str):
+    """Newest gauge-probe artifact for (config_tag, seed), or None."""
+    import glob as globmod
+
+    hits = []
+    for f in sorted(globmod.glob(str(REPO_ROOT / "results" / f"nanogpt_seed{seed}_*.json"))):
+        d = json.load(open(f))
+        if Path(str(d["config"].get("path", ""))).name != config_tag + ".yaml":
+            continue
+        if "gauge_artifact" in (d.get("metrics") or {}):
+            hits.append(d)
+    if not hits:
+        return None
+    return torch.load(REPO_ROOT / hits[-1]["metrics"]["gauge_artifact"],
+                      map_location="cpu", weights_only=False)
+
+
 def stage_c(out: Dict) -> None:
     import glob as globmod
     res = {}
@@ -219,7 +236,44 @@ def stage_c(out: Dict) -> None:
                     growth_ok.append(rel <= 0.05)
         res[str(seed)] = seed_res
         print(f"seed {seed}: {seed_res}", flush=True)
-    out["c"] = res
+    # Registered-exploratory secondary findings (prereg §4 "Exploratory"):
+    # emitted here so every number quoted in the report is reproducible from
+    # committed code, with the averaging window stated rather than implied.
+    # Window: mean over the FIRST 20 and LAST 20 tail steps.
+    sec: Dict = {"window": 20, "arms": {}}
+    for tag, seeds in (("constlr", (1511, 1512)), ("wsd", (1511,))):
+        for seed in seeds:
+            art = _gauge_artifact(seed, f"gauge_replay_{tag}")
+            if art is None:
+                continue
+            growth, eff_ratio, perp_mat, perp_blk = [], [], [], []
+            for name, m in art["matrices"].items():
+                w2, v2, lr, wv = (m["w2"].double(), m["v2"].double(),
+                                  m["eff_lr"].double(), m["wv"].double())
+                growth.append(float((w2[-1] / w2[0]).sqrt()))
+                eff = lr * v2.sqrt() / w2.sqrt()
+                eff_ratio.append(float(eff[-20:].mean() / eff[:20].mean()))
+                perp_mat.append(float((2 * wv.abs() / v2).median()))
+            for name, scal in art["qk_blocks"].items():
+                for s in range(2):
+                    for h in range(scal.shape[3]):
+                        perp_blk.append(float((2 * scal[:, 1, s, h].double().abs()
+                                               / scal[:, 2, s, h].double()).median()))
+            med = lambda xs: sorted(xs)[len(xs) // 2]
+            sec["arms"][f"{tag}_{seed}"] = {
+                "n_matrices": len(growth), "n_blocks": len(perp_blk),
+                "norm_growth_median": med(growth),
+                "norm_growth_range": [min(growth), max(growth)],
+                "eta_eff_ratio_median": med(eff_ratio),
+                "perp_ratio_median_per_matrix": med(perp_mat),
+                "perp_ratio_median_per_block": med(perp_blk),
+                "perp_ratio_block_range": [min(perp_blk), max(perp_blk)],
+            }
+            print(f"  secondary {tag} seed {seed}: growth {med(growth):.3f}, "
+                  f"eta_eff ratio {med(eff_ratio):.3f}, perp/matrix {med(perp_mat):.3f}, "
+                  f"perp/block {med(perp_blk):.3f}", flush=True)
+    out["secondary"] = sec
+
     frac_perp = sum(per_block_ok) / len(per_block_ok)
     frac_growth = sum(growth_ok) / len(growth_ok)
     out["criteria"] = out.get("criteria", {})

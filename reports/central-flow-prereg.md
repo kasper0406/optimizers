@@ -63,6 +63,41 @@ predictions vs the held-out frontier tables) gets its own registration after
 Costs: Stage 1 is CPU/GPU-light (minutes of simulation); the cost is analyst
 time on the derivation (budgeted 1–2 weeks; kill-switch caps it).
 
+## Amendments
+
+Both made 2026-07-24, **before any candidate flow was derived or scored**
+(no Stage-1 result existed at amendment time), on findings from an internal
+adversarial review of the harness. Disclosed here rather than silently
+applied.
+
+**A1 — kill-switch metric was defective (matched filtering added).** As
+originally registered, the 10% criterion compared the EMA-averaged simulated
+trajectory (half-life 20) against an *unfiltered* flow trajectory. The EMA
+has a ~29-step time constant that is never de-lagged, so lag alone produces
+~0.21 error: a **perfect** flow would have failed the kill-switch on the
+harness's own sub-EoS consistency case. `trajectory_error` now applies the
+same causal EMA to the flow before comparison (`match_filter_half_life`),
+which takes that case to 0.0017. The 10% bar and all other Stage-1 terms are
+unchanged. Rationale for amending rather than accepting: the criterion as
+written could only produce false negatives, and a false kill would have
+retired the program on an artifact.
+
+**A2 — the "first Stage-1 measurement" was vacuous and has been replaced.**
+The originally-committed `stability_and_floor_vs_curvature` varied an overall
+scale multiplier on the curvature operator A and reported a loss-floor ratio
+"constant to three decimals across 1000x curvature" (commit `890650e`). That
+constancy is an **identity, not a measurement**: msign(s·M) = msign(M), so an
+overall scale leaves the entire iterate sequence invariant and the ratio is
+s-invariant by construction; the sweep measured the scale-invariance of the
+polar factor. It is retracted. The corrected sweep varies the axes the
+dynamics are actually sensitive to — curvature **conditioning** and **eta** —
+and yields a non-trivial target: the floor ratio
+L_floor / (0.5*lam_max*(eta*sqrt(r))^2) is **invariant in eta across 100x**
+(0.419/0.421/0.423) but varies **7.4x with conditioning** (0.42 at cond
+(3,3); 0.093 at (10,100); 0.057 at (100,1000)). A candidate flow must
+reproduce both the eta-invariance and the conditioning dependence; this
+replaces the retracted claim as the registered first measurement.
+
 ## Relation to standing results
 
 The flow, if it survives, must be consistent with (and would explain):

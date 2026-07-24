@@ -142,7 +142,17 @@ class TailAccumulators:
     def load_state_dict(self, state: Optional[Dict[str, Any]]) -> None:
         if state is None:
             return
-        self.w1, self.w2, self.polyak = state["w1"], state["w2"], state["polyak"]
+        # Force the buffers back to CPU. train.py loads the checkpoint with
+        # map_location=device, which relocates EVERY storage in it — including
+        # these model-sized fp32 CPU means — onto the GPU. The next observe()
+        # would then hit `cuda_buf.lerp_(pinned_cpu_stage)` and raise, failing
+        # every babysitter retry identically; and ~2 GB of fp32 buffers on a
+        # 32 GB card would OOM anyway (see the __init__ note). Found by an
+        # internal review 2026-07-24; no completed run resumed, so no result
+        # is affected.
+        cpu = lambda buf: {n: t.to("cpu") for n, t in buf.items()}
+        self.w1, self.w2, self.polyak = (
+            cpu(state["w1"]), cpu(state["w2"]), cpu(state["polyak"]))
         self.n1, self.n2, self.n_polyak = state["n1"], state["n2"], state["n_polyak"]
         self.steps_seen = state["steps_seen"]
         self._ema_mean, self._ema_sq = state["ema_mean"], state["ema_sq"]
