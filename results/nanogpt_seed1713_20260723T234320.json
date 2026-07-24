@@ -1,0 +1,266 @@
+{
+  "config": {
+    "contents": {
+      "device": "auto",
+      "experiment": "nanogpt",
+      "nanogpt": {
+        "adam_betas": [
+          0.8,
+          0.95
+        ],
+        "adam_eps": 1e-10,
+        "adam_lr": 0.008,
+        "adam_weight_decay": 0.0,
+        "attention_impl": "flex",
+        "checkpoint": {
+          "dir": "checkpoints",
+          "every_steps": 0,
+          "keep_on_success": false,
+          "resume": true
+        },
+        "compile": true,
+        "cooldown_frac": 0.45,
+        "device_count": 1,
+        "fork_from": "checkpoints/nanogpt_seed{seed}_it1750_d1_4fa43038_rank0.pt",
+        "fp32_embed_grad_accum": true,
+        "head_chunk_rows": 8192,
+        "min_lr_frac": 1.0,
+        "muon_lr": 0.05,
+        "muon_momentum": 0.95,
+        "muon_weight_decay": 0.0,
+        "num_iterations": 1750,
+        "precision_mode": "fp8",
+        "tail": {
+          "kappa": 1.0,
+          "mode": "schedule_free",
+          "rho": 0.7,
+          "start_step": 963
+        },
+        "target_val_loss": 3.28,
+        "train_seq_len": 49152,
+        "val_loss_every": 125,
+        "val_seq_len": 262144,
+        "val_tokens": 10485760,
+        "warmup_steps": 10
+      },
+      "seed": 1713
+    },
+    "path": "configs/dev/wave1_sf_k10_r07.yaml",
+    "sha256": "6f83701f108e18cbc30985fa1160f33e6f646b9742b0c9e14c7a96846fbadae2"
+  },
+  "cost_usd": null,
+  "experiment": "nanogpt",
+  "finished_at": "2026-07-24T00:17:50.478586+00:00",
+  "git_dirty": false,
+  "git_sha": "0778022e2dc5d670a65c9406e7ec8692b6f349ef",
+  "gpu_type": "NVIDIA GeForce RTX 5090",
+  "metrics": {
+    "accumulation_factor": 8,
+    "attention_impl": "flex",
+    "compiled": true,
+    "deviations": {
+      "fork_from": "trajectory forked from checkpoint checkpoints/nanogpt_seed{seed}_it1750_d1_4fa43038_rank0.pt (hot-fingerprint + stable-plateau guarded; prereg \u00a70.2)",
+      "fp32_embed_grad_accum": "embedding gradients accumulate across micro-batches in an fp32 master buffer, cast back to bf16 once per step (record: bf16 throughout, one backward per step). NOT RECORD-FAITHFUL: diagnostic probe for docs/nanogpt-port.md \u00a76.1.",
+      "grad_accumulation": "1 device(s) x 8 micro-batches = 8 record chunks per optimizer step; tokens/step 393216 (record 393216)",
+      "head_chunk_rows": "lm_head + soft-cap + cross-entropy computed over row chunks of 8192 (train chunks gradient-checkpointed; record: one full-width head GEMM). Same math up to fp32 summation order. NOT RECORD-FAITHFUL: 32 GB-GPU memory path (model.py PORT CHANGE P5).",
+      "min_lr_frac": "1.0 (record 0.05)",
+      "tail_mode": "Wave-1 tail mode 'schedule_free' from step 963 (kappa 1.0, rho 0.7). NOT RECORD-FAITHFUL: replaces the record's LR decay (prereg reports/wave1-anneal-decomposition-prereg.md \u00a70)."
+    },
+    "device_count": 1,
+    "final_val_loss": 3.286945104598999,
+    "final_val_loss_z": 4.027937412261963,
+    "forked_from": "/home/knielsen/ml/optimizers/checkpoints/nanogpt_seed1713_it1750_d1_4fa43038_rank0.pt",
+    "fp32_embed_grad_accum": true,
+    "nanogpt_config": {
+      "adam_betas": [
+        0.8,
+        0.95
+      ],
+      "adam_eps": 1e-10,
+      "adam_lr": 0.008,
+      "adam_weight_decay": 0.0,
+      "attention_impl": "flex",
+      "checkpoint": {
+        "dir": "checkpoints",
+        "every_steps": 0,
+        "keep_on_success": false,
+        "resume": true
+      },
+      "chunks_per_step": null,
+      "compile": true,
+      "cooldown_frac": 0.45,
+      "device_count": 1,
+      "fork_from": "checkpoints/nanogpt_seed{seed}_it1750_d1_4fa43038_rank0.pt",
+      "fp32_embed_grad_accum": true,
+      "head_chunk_rows": 8192,
+      "max_steps": null,
+      "min_lr_frac": 1.0,
+      "model_dim": 768,
+      "momentum_end": 0.95,
+      "momentum_start": 0.85,
+      "momentum_warmup_steps": 300,
+      "muon_lr": 0.05,
+      "muon_momentum": 0.95,
+      "muon_weight_decay": 0.0,
+      "num_heads": 6,
+      "num_iterations": 1750,
+      "num_layers": 12,
+      "precision_mode": "fp8",
+      "record_world_size": 8,
+      "seed": 1713,
+      "tail": {
+        "accumulate": false,
+        "artifact_dir": "results/tail_artifacts",
+        "kappa": 1.0,
+        "mode": "schedule_free",
+        "rho": 0.7,
+        "spike_beta": 0.9,
+        "spike_warmup": 20,
+        "spike_z": 4.0,
+        "start_step": 963,
+        "w1_window": [
+          1450,
+          1600
+        ],
+        "w2_window": [
+          1600,
+          1750
+        ]
+      },
+      "target_val_loss": 3.28,
+      "tempo_probe": false,
+      "tempo_probe_flush_every": 10,
+      "tempo_probe_subset": 2,
+      "train_align_to_bos": true,
+      "train_files": "data/fineweb10B/fineweb_train_*.bin",
+      "train_seq_len": 49152,
+      "val_align_to_bos": false,
+      "val_files": "data/fineweb10B/fineweb_val_*.bin",
+      "val_loss_every": 125,
+      "val_seq_len": 262144,
+      "val_tokens": 10485760,
+      "vocab_size": 50257,
+      "warmup_steps": 10,
+      "window_warmup_max": 1728
+    },
+    "num_iterations": 1750,
+    "peak_memory_mib": 30078,
+    "precision_mode": "fp8",
+    "record": "2025-07-12_BosAlign",
+    "record_faithful": false,
+    "record_log": "0c5449cc-0b01-4ecc-bec3-f46a09741d60.txt",
+    "record_world_size": 8,
+    "resumed_from_checkpoint": false,
+    "steps_to_target_loss": null,
+    "tail_artifact": "results/tail_artifacts/nanogpt_tail_seed1713_179539d5_schedule_free.pt",
+    "tail_sf_t": 787,
+    "target_val_loss": 3.28,
+    "tokens_per_step": 393216,
+    "tokens_to_target_loss": null,
+    "train_steps_run": 1750,
+    "train_time_s": 3858.6576271792874,
+    "val_curve": [
+      {
+        "step": 0,
+        "tokens": 0,
+        "train_time_ms": 0.008229981176555157,
+        "val_loss": 10.825837135314941
+      },
+      {
+        "step": 125,
+        "tokens": 49152000,
+        "train_time_ms": 260554.79572794866,
+        "val_loss": 4.640322208404541
+      },
+      {
+        "step": 250,
+        "tokens": 98304000,
+        "train_time_ms": 522068.20731796324,
+        "val_loss": 4.101631164550781
+      },
+      {
+        "step": 375,
+        "tokens": 147456000,
+        "train_time_ms": 785724.8545930488,
+        "val_loss": 3.8951175212860107
+      },
+      {
+        "step": 500,
+        "tokens": 196608000,
+        "train_time_ms": 1053678.6895710975,
+        "val_loss": 3.750286817550659
+      },
+      {
+        "step": 625,
+        "tokens": 245760000,
+        "train_time_ms": 1322843.1819380494,
+        "val_loss": 3.663245916366577
+      },
+      {
+        "step": 750,
+        "tokens": 294912000,
+        "train_time_ms": 1597506.9476660574,
+        "val_loss": 3.601404905319214
+      },
+      {
+        "step": 875,
+        "tokens": 344064000,
+        "train_time_ms": 1872315.1065281127,
+        "val_loss": 3.5543594360351562
+      },
+      {
+        "step": 1000,
+        "tokens": 393216000,
+        "train_time_ms": 2154829.5993031934,
+        "val_loss": 3.4809117317199707,
+        "val_loss_z": 3.6635994911193848
+      },
+      {
+        "step": 1125,
+        "tokens": 442368000,
+        "train_time_ms": 2434591.322179185,
+        "val_loss": 3.4098384380340576,
+        "val_loss_z": 3.78021502494812
+      },
+      {
+        "step": 1250,
+        "tokens": 491520000,
+        "train_time_ms": 2716688.06603516,
+        "val_loss": 3.371701955795288,
+        "val_loss_z": 3.8469197750091553
+      },
+      {
+        "step": 1375,
+        "tokens": 540672000,
+        "train_time_ms": 2999894.2998481216,
+        "val_loss": 3.3437066078186035,
+        "val_loss_z": 3.928506851196289
+      },
+      {
+        "step": 1500,
+        "tokens": 589824000,
+        "train_time_ms": 3284758.8138171704,
+        "val_loss": 3.321751356124878,
+        "val_loss_z": 3.9468307495117188
+      },
+      {
+        "step": 1625,
+        "tokens": 638976000,
+        "train_time_ms": 3571156.356664258,
+        "val_loss": 3.3028335571289062,
+        "val_loss_z": 3.9706838130950928
+      },
+      {
+        "step": 1750,
+        "tokens": 688128000,
+        "train_time_ms": 3858657.6271792874,
+        "val_loss": 3.286945104598999,
+        "val_loss_z": 4.027937412261963
+      }
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1713,
+  "started_at": "2026-07-23T23:43:20.723420+00:00",
+  "wall_time_s": 2069.7551508150063
+}
