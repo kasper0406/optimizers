@@ -248,7 +248,7 @@ recontextualize T3 before any measurement:
 
 | Theme | Finding | Repo asset today | Concrete next step | Status |
 |---|---|---|---|---|
-| T1 EMA-as-anneal | F1, F6 | `run_airbench_smoke` harness + hooks (`src/optim/airbench_zoo.py`); stock schedule is linear-decay-to-zero (the Defazio-optimal shape — clean comparison arm) | `airbench_ema` experiment: weight-EMA (multi-γ) + per-epoch EMA eval; arms stock-schedule vs constant-LR; dev seeds | **running this pass** |
+| T1 EMA-as-anneal | F1, F6 | `run_airbench_smoke` harness + hooks (`src/optim/airbench_zoo.py`); stock schedule is linear-decay-to-zero (the Defazio-optimal shape — clean comparison arm) | `airbench_ema` experiment: weight-EMA (multi-γ) + per-epoch EMA eval; arms stock-schedule vs constant-LR; dev seeds | **REFUTED at airbench scale** (2026-08-02, n=20 paired: best EMA −4.6pp TTA vs annealed, 0/20 harvest crossings, EMA-on-anneal adds 0.0 — `reports/wpj-t1-ema.md`; nanogpt regime untested) |
 | T2 stability law (2(1±β)/η) | F2, F3 | β is probe-overridable (`PROBE_OVERRIDE_KEYS`); HVP machinery `src/instrument/hvp.py`; mom0 + LR-ladder configs in `configs/dev/` | β-sweep + minibatch-HVP along realized polar update ("batch spectral sharpness") — new instrument mode | follow-up (next cheap cloud batch) |
 | T3 bounded limit cycles | F2, F3 | airbench: structural (renorm, above); per-direction λ_hvp series in HVP-enabled sidecars; LR ladder ½×–6× results | η²·Σ_occupied λ penalty-scaling analysis from existing HVP + stress-test JSONs (offline); nanogpt ‖W‖_F logging | analysis follow-up; partially structural |
 | T4 occupancy trigger | F1, F6 | occupancy machinery `src/stats/` (WP0.5-validated); `criteria/occupancy_cooldown_preregistration.md`; nanogpt harness lacks occupancy port | multi-power-law fit on existing wp02 loss curves (free, offline); Yaida-FDR residual on momentum buffers = new cheap instrument | follow-up; pre-reg already exists |
@@ -260,3 +260,10 @@ Decision (delegation, this pass): T1 first — cheapest, clearest prediction,
 directly convergence-time-relevant; its constant-LR arm also produces the
 stable-phase EMA data T4's "un-cashed progress meter" needs. T2 is the next
 cloud batch. T3/T4/T5 offline analyses queue behind T1's run.
+
+Outcome (2026-08-02): T1 refuted in the airbench regime — the anneal's
+contribution is not recoverable by iterate averaging (details and
+interpretation in `reports/wpj-t1-ema.md`). Sharpens rather than weakens T4:
+the occupancy trigger must drive a real anneal, and "anneal as mechanism, not
+noise-removal" is now supported by a direct instrument. T2 (β-sweep + batch
+spectral sharpness) is promoted to the next experiment.

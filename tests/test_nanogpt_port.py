@@ -1033,10 +1033,9 @@ def test_real_results_dir_cost_totals():
     analyze = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(analyze)
     costs = analyze.project_costs(REPO_ROOT / "results")
-    # Reconciled 2026-08-02 against reports/project-state.md §2 ($13.60 total):
-    # the WP0.2 bf16-embed diagnostic runs were ingested after the previous
-    # pin ($12.00 / $3.20) was written.
-    assert costs["total_usd"] == pytest.approx(13.60, abs=0.01)
+    # Reconciled 2026-08-02: project-state.md §2 baseline $13.60 plus the T1
+    # airbench_ema episode ($0.05 x 41 runs = $2.05, reports/wpj-t1-ema.md).
+    assert costs["total_usd"] == pytest.approx(15.65, abs=0.01)
     assert costs["nanogpt_usd"] == pytest.approx(4.80, abs=0.01)
 
 
