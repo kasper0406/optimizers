@@ -32,7 +32,7 @@ RUN curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu22
     && apt-get update \
     && apt-get install -y --no-install-recommends cuda-compat-13-0 \
     && rm -rf /var/lib/apt/lists/*
-ENV LD_LIBRARY_PATH=/usr/local/cuda/compat:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=/usr/local/cuda-13.0/compat:${LD_LIBRARY_PATH}
 
 # uv (static binary)
 COPY --from=ghcr.io/astral-sh/uv:0.7.13 /uv /uvx /usr/local/bin/
