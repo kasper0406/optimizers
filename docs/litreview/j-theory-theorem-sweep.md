@@ -265,5 +265,33 @@ Outcome (2026-08-02): T1 refuted in the airbench regime — the anneal's
 contribution is not recoverable by iterate averaging (details and
 interpretation in `reports/wpj-t1-ema.md`). Sharpens rather than weakens T4:
 the occupancy trigger must drive a real anneal, and "anneal as mechanism, not
-noise-removal" is now supported by a direct instrument. T2 (β-sweep + batch
-spectral sharpness) is promoted to the next experiment.
+noise-removal" is now supported by a direct instrument.
+
+## 6. Direction pivot (2026-08-02, user steer — memory `flow-insight-over-laws`)
+
+Law-measurement (T2's 2(1±β)/η constant, T3's penalty-scaling fit) is
+deprioritized: constants describe the regime but don't provide a lever.
+Re-ranked program — interventional flow-mechanism experiments, each with a
+convergence-speed payoff:
+
+1. **Anneal dissection ("how short is the last mile?")** — direct follow-up
+   to the T1 null. From a constant-LR trajectory, branch anneals of length
+   k ∈ {0, 5, 10, 25, 50} at several branch points (shared batch stream and
+   snapshot per branch point). The accuracy-vs-k saturation point k* measures
+   how much of the anneal is fast dynamical relaxation vs slow walking. If
+   k* is small, "constant LR + short anneal" beats the tuned schedule at
+   matched accuracy with fewer steps — a direct, mechanistically-grounded
+   speed recipe. Experiment: `airbench_anneal_branch`.
+2. **Progress decomposition** — attribute per-window loss decrease to motion
+   along tracked oscillating directions vs the bulk complement, phase by
+   phase (the measurable aggregate form of the river coordinate; the
+   per-direction SNR ceiling does not apply to the aggregate). Existing
+   tracker + new analysis; answers "where does progress live in the flow?"
+3. **Twin-trajectory flow-structure probes** — perturbation growth/decay
+   transverse vs longitudinal along training (local stability structure of
+   the flow; extends the program-#1 twin machinery).
+4. **Teleportation go/no-go (T6)** — ‖∇L‖ variation along closed-form
+   symmetry orbits at fixed loss; funds or kills the only intervention class
+   the Phase-2 null doesn't cover.
+5. Occupancy-triggered anneal (T4) — unchanged, but now framed as: the
+   trigger decides when the (short, per #1) real anneal starts.

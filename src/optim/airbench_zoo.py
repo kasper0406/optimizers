@@ -658,6 +658,238 @@ def run_airbench_ema(config: Dict[str, Any], device: torch.device) -> Dict[str, 
     return run_airbench_smoke(merged, device)
 
 
+def _resolve_branch(config: Dict[str, Any], total_train_steps: int = None):
+    """Validate the ``branch:`` block of an anneal-dissection config.
+
+    Returns (branch_steps, anneal_lengths). CPU-safe. When total_train_steps
+    is given, branch points must lie in (0, total]."""
+    branch = config.get("branch")
+    if not isinstance(branch, dict) or set(branch) != {"branch_steps", "anneal_lengths"}:
+        raise SystemExit(
+            "experiment 'airbench_anneal_branch' needs a branch: block with "
+            "exactly the keys branch_steps and anneal_lengths"
+        )
+    steps = branch["branch_steps"]
+    lengths = branch["anneal_lengths"]
+    for name, values in (("branch_steps", steps), ("anneal_lengths", lengths)):
+        if (
+            not isinstance(values, list)
+            or not values
+            or not all(isinstance(v, int) and not isinstance(v, bool) for v in values)
+            or sorted(set(values)) != values
+        ):
+            raise SystemExit(
+                f"branch.{name} must be a non-empty strictly-increasing list "
+                f"of ints, got {values!r}"
+            )
+    if steps[0] < 1:
+        raise SystemExit("branch.branch_steps must be >= 1")
+    if lengths[0] < 0:
+        raise SystemExit("branch.anneal_lengths must be >= 0")
+    if total_train_steps is not None and steps[-1] > total_train_steps:
+        raise SystemExit(
+            f"branch.branch_steps beyond the run: {steps[-1]} > {total_train_steps}"
+        )
+    return steps, lengths
+
+
+def run_airbench_anneal_branch(
+    config: Dict[str, Any], device: torch.device
+) -> Dict[str, Any]:
+    """Anneal dissection ("how short is the last mile?") — flow-first program
+    item 1, docs/litreview/j-theory-theorem-sweep.md §6.
+
+    Stock airbench94 recipe (vendored Muon at record hyperparameters) trained
+    at CONSTANT LR (the T1 constant-arm schedule: every group pinned at its
+    initial LR; the whiten bias keeps its stock early decay and is
+    grad-disabled after 3 epochs). At each configured branch step the live
+    training state is snapshotted and, for each anneal length k, a branch
+    anneals the LR linearly to zero over k steps — all branches at one branch
+    point share the snapshot AND the identical cached continuation batches,
+    so accuracy differences are attributable to the anneal length alone. The
+    base trajectory then resumes from the snapshot through those same cached
+    batches, unperturbed by the branches (bit-exact restore).
+
+    Readout: accuracy vs k per branch point. The saturation k* measures how
+    much of the anneal is fast dynamical relaxation; paired stock-schedule
+    finals for the same dev seeds live in the T1 results
+    (`results/airbench_ema_*`, lr_schedule=linear).
+
+    Dev-seed measurement experiment; never a comparison-table entry.
+    """
+    from src.optim.train_snapshot import (
+        restore_training_state,
+        snapshot_training_state,
+    )
+
+    if "optimizer" in config:
+        raise SystemExit(
+            "experiment 'airbench_anneal_branch' pins the stock recipe; it "
+            "does not accept an optimizer override"
+        )
+    branch_steps, anneal_lengths = _resolve_branch(config)
+    sampling = _resolve_sampling(config.get("recipe", {}))
+    if sampling is not None:
+        raise SystemExit("airbench_anneal_branch supports vendored sampling only")
+
+    if device.type != "cuda":
+        raise SystemExit("airbench_anneal_branch requires a CUDA device")
+
+    ab = load_vendor_airbench()
+
+    train_cfg = config.get("train", {})
+    recipe_cfg = config.get("recipe", {})
+    data_root = str(config.get("data", {}).get("root", "data/cifar10"))
+    epochs = float(train_cfg.get("epochs", 8))
+    batch_size = int(train_cfg.get("batch_size", 2000))
+    bias_lr = float(recipe_cfg.get("bias_lr", 0.053))
+    head_lr = float(recipe_cfg.get("head_lr", 0.67))
+    wd = float(recipe_cfg.get("sgd_weight_decay", 2e-6)) * batch_size
+    tta_level = int(recipe_cfg.get("tta_level", 2))
+
+    model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
+    if bool(recipe_cfg.get("compile", True)):
+        model.compile()
+
+    test_loader = ab.CifarLoader(data_root, train=False, batch_size=2000)
+    train_loader = ab.CifarLoader(
+        data_root, train=True, batch_size=batch_size, aug=dict(flip=True, translate=2)
+    )
+    total_train_steps = math.ceil(epochs * len(train_loader))
+    whiten_bias_train_steps = min(math.ceil(3 * len(train_loader)), total_train_steps)
+    _resolve_branch(config, total_train_steps)  # now with the bound known
+
+    # Parameter split + optimizers exactly as the stock harness
+    filter_params = [
+        p for p in model.parameters() if len(p.shape) == 4 and p.requires_grad
+    ]
+    norm_biases = [
+        p for n, p in model.named_parameters() if "norm" in n and p.requires_grad
+    ]
+    param_configs = [
+        dict(params=[model.whiten.bias], lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=norm_biases, lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=[model.head.weight], lr=head_lr, weight_decay=wd / head_lr),
+    ]
+    optimizer1 = torch.optim.SGD(
+        param_configs, momentum=0.85, nesterov=True, fused=True
+    )
+    optimizer2 = ab.Muon(filter_params, lr=0.24, momentum=0.6, nesterov=True)
+    optimizers = [optimizer1, optimizer2]
+    for opt in optimizers:
+        for group in opt.param_groups:
+            group["initial_lr"] = group["lr"]
+
+    starter = torch.cuda.Event(enable_timing=True)
+    ender = torch.cuda.Event(enable_timing=True)
+    time_seconds = 0.0
+
+    def start_timer():
+        starter.record()
+
+    def stop_timer():
+        nonlocal time_seconds
+        ender.record()
+        torch.cuda.synchronize()
+        time_seconds += 1e-3 * starter.elapsed_time(ender)
+
+    model.reset()
+
+    start_timer()
+    train_images = train_loader.normalize(train_loader.images[:5000])
+    model.init_whiten(train_images)
+    stop_timer()
+
+    def batch_stream():
+        while True:
+            for batch in train_loader:
+                yield batch
+
+    stream = batch_stream()
+
+    def train_step(inputs, labels, step_index, lr_scale):
+        """One training step at global step_index; lr_scale multiplies every
+        non-whiten group's initial LR (1.0 = the constant base schedule)."""
+        outputs = model(
+            inputs, whiten_bias_grad=(step_index < whiten_bias_train_steps)
+        )
+        torch.nn.functional.cross_entropy(
+            outputs, labels, label_smoothing=0.2, reduction="sum"
+        ).backward()
+        for group in optimizer1.param_groups[:1]:
+            group["lr"] = group["initial_lr"] * (
+                1 - step_index / whiten_bias_train_steps
+            )
+        for group in optimizer1.param_groups[1:] + optimizer2.param_groups:
+            group["lr"] = group["initial_lr"] * lr_scale
+        for opt in optimizers:
+            opt.step()
+        model.zero_grad(set_to_none=True)
+
+    k_max = anneal_lengths[-1]
+    base_val_accs: Dict[str, float] = {}
+    branches: Dict[str, Dict[str, Dict[str, float]]] = {}
+    pending: list = []  # cached continuation batches the base must consume
+    remaining_branches = list(branch_steps)
+
+    step = 0
+    start_timer()
+    while True:
+        if remaining_branches and step == remaining_branches[0]:
+            t_b = remaining_branches.pop(0)
+            stop_timer()
+            # Cache the continuation batches once; branches and the resumed
+            # base all consume this identical stream.
+            cache = [
+                pending.pop(0) if pending else next(stream) for _ in range(k_max)
+            ]
+            snap = snapshot_training_state(model, optimizers)
+            base_val_accs[str(t_b)] = ab.evaluate(model, test_loader, tta_level=0)
+            branches[str(t_b)] = {}
+            start_timer()
+            for k in anneal_lengths:
+                restore_training_state(model, optimizers, snap)
+                for i in range(k):
+                    inputs, labels = cache[i]
+                    train_step(inputs, labels, t_b + i, (k - i) / k)
+                stop_timer()
+                entry = {"val_acc": ab.evaluate(model, test_loader, tta_level=0)}
+                entry["tta_val_acc"] = (
+                    ab.evaluate(model, test_loader, tta_level=tta_level)
+                    if tta_level
+                    else None
+                )
+                branches[str(t_b)][str(k)] = entry
+                start_timer()
+            restore_training_state(model, optimizers, snap)
+            pending = cache  # base resumes through the same batches
+        if step >= total_train_steps:
+            break
+        inputs, labels = pending.pop(0) if pending else next(stream)
+        train_step(inputs, labels, step, 1.0)
+        step += 1
+    stop_timer()
+
+    final_val_acc = ab.evaluate(model, test_loader, tta_level=0)
+    final_tta_val_acc = (
+        ab.evaluate(model, test_loader, tta_level=tta_level) if tta_level else None
+    )
+
+    return {
+        "optimizer": "vendor_muon",
+        "epochs": epochs,
+        "steps": step,
+        "lr_schedule": "constant",
+        "branch_steps": branch_steps,
+        "anneal_lengths": anneal_lengths,
+        "base_val_accs": base_val_accs,
+        "branches": branches,
+        "final_val_acc": final_val_acc,
+        "final_tta_val_acc": final_tta_val_acc,
+        "time_seconds": time_seconds,
+    }
+
+
 AIRBENCH_STOCK_LR = 0.24  # vendored record hyperparameter (airbench94_muon.py:362)
 
 # Gate-1 amendment A4 (mechanism probes): the ONLY optimizer keys a
