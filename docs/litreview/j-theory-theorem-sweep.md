@@ -282,6 +282,13 @@ convergence-speed payoff:
    k* is small, "constant LR + short anneal" beats the tuned schedule at
    matched accuracy with fewer steps — a direct, mechanistically-grounded
    speed recipe. Experiment: `airbench_anneal_branch`.
+   **RUN 2026-08-03 (n=21, `reports/wpj-flow-anneal-branch.md`): no small k*
+   — accuracy ∝ anneal length (gap ∝ k^−0.7, unsaturated at 50) and nearly
+   independent of branch point (hot phase past step ~100 is inert: +0.33pp
+   per 100 extra hot steps at k=50). The anneal IS the optimization; the
+   cash-out reading of river-valley is refuted here; explains why the tuned
+   recipe decays from step 0. Next: sub-100 branch points to find the phase
+   boundary where the essential buildup ends.**
 2. **Progress decomposition** — attribute per-window loss decrease to motion
    along tracked oscillating directions vs the bulk complement, phase by
    phase (the measurable aggregate form of the river coordinate; the
