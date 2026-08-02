@@ -169,6 +169,42 @@ def load_vendor_airbench():
 
 VALID_SAMPLING = (None, "with_replacement")
 
+# T1 EMA-as-anneal experiment (docs/litreview/j-theory-theorem-sweep.md §5):
+# 'linear' is the vendored schedule (LR decays linearly to zero over the run,
+# airbench94_muon.py:377-379); 'constant' holds every group except the
+# whiten bias at its initial LR for the whole run (the whiten bias keeps its
+# stock 3-epoch decay in both arms — it is grad-disabled afterwards and is
+# not part of the schedule comparison).
+VALID_LR_SCHEDULES = ("linear", "constant")
+
+
+def _resolve_lr_schedule(recipe_cfg: Dict[str, Any]) -> str:
+    schedule = recipe_cfg.get("lr_schedule", "linear")
+    if schedule not in VALID_LR_SCHEDULES:
+        raise SystemExit(
+            f"recipe.lr_schedule must be one of {VALID_LR_SCHEDULES}, "
+            f"got {schedule!r}"
+        )
+    return schedule
+
+
+def _resolve_ema(recipe_cfg: Dict[str, Any]):
+    """Validate the optional recipe.ema block; returns the gamma list or None.
+
+    CPU-safe (config validation only). Shape: ``ema: {gammas: [0.9, ...]}``.
+    """
+    ema_cfg = recipe_cfg.get("ema", None)
+    if ema_cfg is None:
+        return None
+    from src.optim.ema_weights import validate_gammas
+
+    if not isinstance(ema_cfg, dict) or set(ema_cfg) != {"gammas"}:
+        raise SystemExit(
+            "recipe.ema must be a mapping with exactly the key 'gammas', "
+            f"got {ema_cfg!r}"
+        )
+    return validate_gammas(ema_cfg["gammas"])
+
 
 def _resolve_sampling(recipe_cfg: Dict[str, Any]):
     """Validate recipe.sampling.
@@ -314,7 +350,11 @@ def run_airbench_smoke(
 
     # Config validation first (CPU-safe): recipe.sampling gates the Phase-1
     # with-replacement ablation; absent = vendored behavior, bit-identical.
+    # recipe.lr_schedule / recipe.ema gate the T1 EMA-as-anneal arms; defaults
+    # (linear, no EMA) keep the vendored behavior bit-identical.
     sampling = _resolve_sampling(config.get("recipe", {}))
+    lr_schedule = _resolve_lr_schedule(config.get("recipe", {}))
+    ema_gammas = _resolve_ema(config.get("recipe", {}))
 
     if device.type != "cuda":
         raise SystemExit(
@@ -420,6 +460,22 @@ def run_airbench_smoke(
     model.init_whiten(train_images)
     stop_timer()
 
+    ema = None
+    ema_val_accs: Dict[str, list] = {}
+    if ema_gammas is not None:
+        from src.optim.ema_weights import WeightEMA
+
+        # Track every parameter plus the float buffers (BatchNorm running
+        # stats) so an EMA checkpoint is a complete, evaluable model state.
+        # Constructed after init_whiten so shadows start from the real init.
+        tracked = list(model.named_parameters()) + [
+            (name, buf)
+            for name, buf in model.named_buffers()
+            if buf.is_floating_point()
+        ]
+        ema = WeightEMA(tracked, ema_gammas)
+        ema_val_accs = {str(g): [] for g in ema.gammas}
+
     val_accs = []
     train_acc = float("nan")
     for _epoch in range(math.ceil(total_train_steps / len(train_loader))):
@@ -435,7 +491,12 @@ def run_airbench_smoke(
                     1 - step / whiten_bias_train_steps
                 )
             for group in optimizer1.param_groups[1:] + optimizer2.param_groups:
-                group["lr"] = group["initial_lr"] * (1 - step / total_train_steps)
+                if lr_schedule == "constant":
+                    group["lr"] = group["initial_lr"]
+                else:
+                    group["lr"] = group["initial_lr"] * (
+                        1 - step / total_train_steps
+                    )
             if normalize_filter_weights:
                 # airbench94_muon.py:83 (recipe step, applied uniformly)
                 for p in filter_params:
@@ -453,6 +514,8 @@ def run_airbench_smoke(
                 _post_step_hook(step + 1, step_lr)
             if hub is not None:
                 hub.after_step()  # reads captured G + post-step momentum
+            if ema is not None:
+                ema.update()  # post-step, post-renorm weights
             model.zero_grad(set_to_none=True)
             step += 1
             if track_routing and step % ROUTING_TS_EVERY == 0:
@@ -477,6 +540,15 @@ def run_airbench_smoke(
 
         train_acc = (outputs.detach().argmax(1) == labels).float().mean().item()
         val_accs.append(ab.evaluate(model, test_loader, tta_level=0))
+        if ema is not None:
+            # Per-epoch EMA readout (outside the timed region, like val_accs):
+            # swap each shadow in, evaluate, restore the live training state
+            # bit-exactly. TTA off here for speed; final TTA per gamma below.
+            for g in ema.gammas:
+                with ema.applied(g):
+                    ema_val_accs[str(g)].append(
+                        ab.evaluate(model, test_loader, tta_level=0)
+                    )
         if step >= total_train_steps:
             break
 
@@ -485,6 +557,17 @@ def run_airbench_smoke(
         ab.evaluate(model, test_loader, tta_level=tta_level) if tta_level else None
     )
     stop_timer()
+
+    ema_tta_val_accs = None
+    if ema is not None:
+        ema_tta_val_accs = {}
+        for g in ema.gammas:
+            with ema.applied(g):
+                ema_tta_val_accs[str(g)] = (
+                    ab.evaluate(model, test_loader, tta_level=tta_level)
+                    if tta_level
+                    else None
+                )
 
     metrics = {
         "optimizer": opt_name,
@@ -498,6 +581,14 @@ def run_airbench_smoke(
     }
     if sampling is not None:
         metrics["sampling"] = sampling  # ablation provenance; absent = vendor
+    if lr_schedule != "linear" or ema is not None:
+        # T1 arm provenance; keys absent on stock runs so pre-T1 outputs are
+        # byte-identical.
+        metrics["lr_schedule"] = lr_schedule
+    if ema is not None:
+        metrics["ema_gammas"] = list(ema.gammas)
+        metrics["ema_val_accs"] = ema_val_accs
+        metrics["ema_tta_val_accs"] = ema_tta_val_accs
     if track_routing:
         # Gate-1 amendment A5: end-of-run routing telemetry + coarse series.
         metrics["routing_stats"] = optimizer2.routing_stats()
@@ -518,6 +609,43 @@ def run_airbench(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]
         raise SystemExit(
             "experiment 'airbench' is the stock WP0.1 baseline; it does not "
             "accept an optimizer override (use experiment 'airbench_smoke')."
+        )
+    merged = dict(config)
+    merged["optimizer"] = dict(
+        name="vendor_muon", lr=0.24, momentum=0.6, nesterov=True
+    )
+    recipe = dict(config.get("recipe", {}))
+    recipe["normalize_filter_weights"] = False  # vendored Muon.step does it
+    recipe.setdefault("compile", True)  # the reference compiles the model
+    merged["recipe"] = recipe
+    return run_airbench_smoke(merged, device)
+
+
+def run_airbench_ema(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]:
+    """T1 EMA-as-anytime-anneal arms (docs/litreview/j-theory-theorem-sweep.md §5).
+
+    The stock WP0.1 recipe (vendored Muon at record hyperparameters, compile
+    on — identical pinning to :func:`run_airbench`) plus a mandatory
+    ``recipe.ema`` block (weight-EMA readouts per epoch and at final TTA) and
+    an optional ``recipe.lr_schedule`` arm switch (``linear`` = vendored
+    baseline arm, ``constant`` = schedule-free arm whose EMA readout is the
+    anneal substitute). Training trajectories are unaffected by the EMA
+    machinery: shadows are read-only observers and eval swaps restore the
+    live state bit-exactly, so the ``linear`` arm's trajectory is the stock
+    baseline trajectory.
+
+    Dev-seed measurement experiment; never a comparison-table entry.
+    """
+    if "optimizer" in config:
+        raise SystemExit(
+            "experiment 'airbench_ema' pins the stock WP0.1 recipe; it does "
+            "not accept an optimizer override (use experiment 'airbench_smoke')."
+        )
+    if _resolve_ema(config.get("recipe", {})) is None:
+        raise SystemExit(
+            "experiment 'airbench_ema' requires a recipe.ema block "
+            "(e.g. ema: {gammas: [0.9, 0.96, 0.99]}); for stock runs without "
+            "EMA use experiment 'airbench'."
         )
     merged = dict(config)
     merged["optimizer"] = dict(

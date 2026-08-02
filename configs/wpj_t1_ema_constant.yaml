@@ -1,0 +1,38 @@
+# T1 EMA-as-anytime-anneal, arm B (docs/litreview/j-theory-theorem-sweep.md §5):
+# CONSTANT learning rate (no anneal; whiten-bias keeps its stock 3-epoch
+# decay) with weight-EMA readouts. The EMA readout substitutes for the
+# anneal per the averaging<->decay equivalence theorems (Sandler et al.
+# arXiv:2301.02312; Defazio et al. arXiv:2405.15682).
+#
+# Predictions under test:
+# (i)  final EMA acc here ~= arm A's final annealed acc (schedule-free Muon);
+# (ii) EMA acc crosses arm A's final acc at some epoch < 8 -- the
+#      convergence-time harvest: everything after that crossing is compute
+#      the schedule spends that averaging gets for free;
+# (iii) raw (non-EMA) final acc here < arm A's (the anneal's contribution,
+#      now carried entirely by the average).
+#
+# Dev-seed measurement run; never a comparison-table entry.
+# Launch: uv run python scripts/sweep.py configs/wpj_t1_ema_constant.yaml
+experiment: airbench_ema
+seed: 3001
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  compile: true
+  tta_level: 2
+  lr_schedule: constant
+  ema:
+    gammas: [0.9, 0.96, 0.98, 0.99]
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 20

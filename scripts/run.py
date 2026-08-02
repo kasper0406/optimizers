@@ -143,6 +143,7 @@ def run_smoke(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]:
 
 from src.optim.airbench_zoo import (  # noqa: E402
     run_airbench,
+    run_airbench_ema,
     run_airbench_instrumented,
     run_airbench_smoke,
 )
@@ -175,6 +176,7 @@ EXPERIMENT_REGISTRY = {
     "airbench": run_airbench,  # WP0.1 stock baseline (vendored Muon, compile on)
     "airbench_smoke": run_airbench_smoke,  # WP0.4 zoo smoke harness
     "airbench_instrumented": run_airbench_instrumented,  # WP1.2 measurement runs
+    "airbench_ema": run_airbench_ema,  # T1 EMA-as-anneal arms (litreview j §5)
     "probe_divergence": _load_probe_divergence(),  # twin-trajectory probe
     # Later WPs register nanogpt experiments here.
 }
