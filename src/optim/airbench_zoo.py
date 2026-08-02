@@ -810,6 +810,10 @@ def run_airbench_anneal_branch(
     def train_step(inputs, labels, step_index, lr_scale):
         """One training step at global step_index; lr_scale multiplies every
         non-whiten group's initial LR (1.0 = the constant base schedule)."""
+        # ab.evaluate() leaves the model in eval mode; the stock loop restores
+        # train mode once per epoch, but here evals happen mid-stream at every
+        # branch, so re-assert it per step (BatchNorm must train in train mode).
+        model.train()
         outputs = model(
             inputs, whiten_bias_grad=(step_index < whiten_bias_train_steps)
         )
