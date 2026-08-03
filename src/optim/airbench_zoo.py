@@ -1354,9 +1354,16 @@ def momentum_topk_directions(momentum: torch.Tensor, k: int):
     F3/T3, docs/litreview/j-theory-theorem-sweep.md); the central-flow v0
     penalizes directional curvature exactly there.
     """
-    m = momentum.detach().float().reshape(momentum.shape[0], -1)
+    # SVD on CPU: cuSOLVER's gesvd fails to converge on the ill-conditioned
+    # early-training momentum buffers (observed on the first GPU smoke);
+    # LAPACK is robust and these matrices are small. sharpgrad moves the
+    # directions to the parameter device itself.
+    m = momentum.detach().float().reshape(momentum.shape[0], -1).cpu()
     k = min(k, min(m.shape))
-    u, _s, vh = torch.linalg.svd(m, full_matrices=False)
+    try:
+        u, _s, vh = torch.linalg.svd(m, full_matrices=False)
+    except torch.linalg.LinAlgError:
+        return []  # degenerate buffer: skip this matrix for this refresh
     return [
         torch.outer(u[:, i], vh[i, :]).reshape(momentum.shape) for i in range(k)
     ]
