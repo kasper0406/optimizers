@@ -1,0 +1,66 @@
+{
+  "config": {
+    "contents": {
+      "cf": {
+        "beta_scale": 1.0,
+        "enabled": false,
+        "k_directions": 4,
+        "lr_scale": 0.25,
+        "refresh_every": 10
+      },
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_centralflow",
+      "recipe": {
+        "compile": false,
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/wpj_cf_cold.yaml",
+    "sha256": "92a9ebca8fadfa5e16f5ea39966db9c0d1efe27f2d2ffe9c3cfcd8b2d44b9f89"
+  },
+  "cost_usd": 0.165,
+  "experiment": "airbench_centralflow",
+  "finished_at": "2026-08-03T17:01:09.894773+00:00",
+  "git_dirty": false,
+  "git_sha": "8e1d2a9c0c6baed1087f44f1131ce9297765f5c9",
+  "gpu_type": "NVIDIA L40",
+  "metrics": {
+    "cf": {
+      "beta_scale": 1.0,
+      "enabled": false,
+      "k_directions": 4,
+      "lr_scale": 0.25,
+      "refresh_every": 10
+    },
+    "cf_timeseries": [],
+    "epochs": 8.0,
+    "optimizer": "vendor_muon",
+    "steps": 200,
+    "time_seconds": 6.565599639892578,
+    "train_acc_last": 0.9580000638961792,
+    "tta_val_acc": 0.9217999577522278,
+    "val_acc": 0.9124999642372131,
+    "val_accs": [
+      0.699400007724762,
+      0.7968999743461609,
+      0.8520999550819397,
+      0.8823999762535095,
+      0.8944000005722046,
+      0.9045999646186829,
+      0.9078999757766724,
+      0.9124999642372131
+    ],
+    "weight_mode": "eta_sq_half_topk_momentum"
+  },
+  "schema_version": 1,
+  "seed": 1009,
+  "started_at": "2026-08-03T17:01:00.841130+00:00",
+  "wall_time_s": 9.053565580004943
+}

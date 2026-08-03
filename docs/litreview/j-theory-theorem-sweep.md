@@ -300,6 +300,15 @@ Frobenius AND nuclear grad-norm heterogeneity along per-channel conv→BN
 scale orbits at fixed train-mode loss; kill if O(1%)). Dropped by user:
 terminal-process replacement suite (batch-ramp / second-order finishers).
 
+**Round-1 outcomes 2026-08-03 (`reports/wpj-mech-round1.md`):**
+teleport gate **GO** — +21–23% nuclear-norm (Muon descent potential) at
+fixed loss along the orbit, n=6, every training state; next build is actual
+teleport moves + an analytic orbit ascent. Central-flow v0 **negative** —
+term inert at cold LR (C−B = −0.10pp ± 0.17, recovery −5%), open-loop
+unstable at stock LR; fourth independent oscillation-channel intervention
+with a null/negative. The Euclidean central-flow form does not transplant
+to Muon; a spectral central flow remains open theory.
+
 2. **Progress decomposition** — attribute per-window loss decrease to motion
    along tracked oscillating directions vs the bulk complement, phase by
    phase (the measurable aggregate form of the river coordinate; the

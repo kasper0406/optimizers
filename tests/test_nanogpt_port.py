@@ -1034,9 +1034,9 @@ def test_real_results_dir_cost_totals():
     spec.loader.exec_module(analyze)
     costs = analyze.project_costs(REPO_ROOT / "results")
     # Reconciled 2026-08-03: $13.60 baseline (project-state.md §2) + $2.05 T1
-    # airbench_ema episode + $6.72 anneal-dissection episode ($0.32 x 21,
-    # reports/wpj-flow-anneal-branch.md).
-    assert costs["total_usd"] == pytest.approx(22.37, abs=0.01)
+    # EMA episode + $6.72 anneal-dissection episode + $7.76 mechanistic
+    # round-1 episode ($0.165 x 47, reports/wpj-mech-round1.md).
+    assert costs["total_usd"] == pytest.approx(30.13, abs=0.01)
     assert costs["nanogpt_usd"] == pytest.approx(4.80, abs=0.01)
 
 
