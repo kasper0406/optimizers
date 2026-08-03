@@ -130,3 +130,12 @@ def test_cf_arm_configs(name, expected):
     assert (cf["lr_scale"], cf["enabled"]) == expected
     # shared knobs identical across arms (only lr_scale/enabled vary)
     assert (cf["refresh_every"], cf["k_directions"], cf["beta_scale"]) == (10, 4, 1.0)
+
+
+def test_momentum_topk_directions_skips_nonfinite_buffers():
+    m = torch.randn(4, 6)
+    m[1, 2] = float("inf")
+    assert momentum_topk_directions(m, 2) == []
+    m2 = torch.randn(4, 6)
+    m2[0, 0] = float("nan")
+    assert momentum_topk_directions(m2, 2) == []

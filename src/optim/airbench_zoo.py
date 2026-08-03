@@ -1359,6 +1359,8 @@ def momentum_topk_directions(momentum: torch.Tensor, k: int):
     # LAPACK is robust and these matrices are small. sharpgrad moves the
     # directions to the parameter device itself.
     m = momentum.detach().float().reshape(momentum.shape[0], -1).cpu()
+    if not torch.isfinite(m).all():
+        return []  # fp16 overflow in an early buffer: skip this refresh
     k = min(k, min(m.shape))
     try:
         u, _s, vh = torch.linalg.svd(m, full_matrices=False)
@@ -1544,6 +1546,8 @@ def run_airbench_centralflow(
                                 buf, cf["k_directions"]
                             )
                         ]
+                        if not dirs:
+                            continue  # degenerate/non-finite buffer this step
                         weights = [0.5 * muon_lr**2] * len(dirs)
                         chunks.append(
                             (make_loss_fn(), filter_params, dirs, weights)
