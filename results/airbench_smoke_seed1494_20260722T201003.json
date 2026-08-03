@@ -1,0 +1,68 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_smoke",
+      "optimizer": {
+        "lr": 0.48,
+        "momentum": 0.6,
+        "name": "muon",
+        "nesterov": true,
+        "ns_steps": 3,
+        "weight_decay": 0.0
+      },
+      "recipe": {
+        "compile": true,
+        "normalize_filter_weights": true,
+        "save_test_logits": {
+          "dir": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_ckpts"
+        },
+        "tail_phase": {
+          "hard_frac": 0.5,
+          "tail_epochs": 2
+        },
+        "tta_level": 2
+      },
+      "seed": 1494,
+      "train": {
+        "batch_size": 1000,
+        "epochs": 8
+      }
+    },
+    "path": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_C.yaml",
+    "sha256": "f723c53d5961105a19ab841dfcfcbfb592f04b643894e545f8e5dc51db0c8e05"
+  },
+  "cost_usd": null,
+  "experiment": "airbench_smoke",
+  "finished_at": "2026-07-22T20:10:10.567283+00:00",
+  "git_dirty": false,
+  "git_sha": "12288db2fe70bc841022f937ae1e3a6c29027b87",
+  "gpu_type": "NVIDIA GeForce RTX 5090",
+  "metrics": {
+    "epochs": 8.0,
+    "logits_path": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_ckpts/logits_9a275f10dd78.pt",
+    "optimizer": "muon",
+    "steps": 400,
+    "time_seconds": 5.4069787063598636,
+    "train_acc_last": 0.9250000715255737,
+    "tta_val_acc": 0.9282999634742737,
+    "val_acc": 0.9208999872207642,
+    "val_accs": [
+      0.45479997992515564,
+      0.503600001335144,
+      0.5848999619483948,
+      0.6297999620437622,
+      0.7591999769210815,
+      0.8138999938964844,
+      0.885699987411499,
+      0.9208999872207642
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1494,
+  "started_at": "2026-07-22T20:10:03.489468+00:00",
+  "wall_time_s": 7.0777997489785776
+}

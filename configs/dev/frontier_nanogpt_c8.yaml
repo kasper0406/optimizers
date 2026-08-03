@@ -1,0 +1,42 @@
+# Program #7 -- nanogpt frontier transfer, batch arm chunks_per_step=8.
+# Pre-registration: reports/frontier-nanogpt-preregistration.md (committed
+# BEFORE any run; grid, budget, estimator, and predictions live there).
+# Fixed token budget 346,030,080 = 880 steps x 8 x 49,152 tokens.
+# Harness-standard local deviations (fp32_embed + chunked head); Adam side
+# stock -- Muon spectral-lr axis only. Endpoint: final val loss at budget.
+experiment: nanogpt
+device: auto
+seed: 1720
+nanogpt:
+  chunks_per_step: 8
+  num_iterations: 880
+  val_loss_every: 110
+  momentum_warmup_steps: 151
+  head_chunk_rows: 8192
+  fp32_embed_grad_accum: true
+  device_count: 1
+  precision_mode: fp8
+  attention_impl: flex
+  compile: true
+  warmup_steps: 10
+  cooldown_frac: 0.45
+  min_lr_frac: 0.05
+  val_tokens: 10485760
+  train_seq_len: 49152
+  val_seq_len: 262144
+  muon_lr: 0.05          # overridden per rung by the sweep grid below
+  muon_momentum: 0.95
+  muon_weight_decay: 0.0
+  adam_lr: 0.008
+  adam_betas: [0.8, 0.95]
+  adam_eps: 1.0e-10
+  adam_weight_decay: 0.0
+  target_val_loss: 3.28
+  checkpoint:
+    dir: checkpoints
+    every_steps: 250
+    resume: true
+sweep:
+  seeds: [1720, 1721]
+  grid:
+    nanogpt.muon_lr: [0.025, 0.035355, 0.05, 0.070711, 0.1, 0.141421]

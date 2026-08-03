@@ -1,0 +1,41 @@
+# Program #8 eval-seed confirmation, arm 2/2: TempoMuon global-pool,
+# Phase-B' frozen config (configs/dev/tempo_bprime_global.yaml verbatim:
+# kappa -0.25, rho_star -0.48, window [25, 60], gain in [0.2, 1]).
+# See configs/tempo_eval_muon.yaml header for seed policy notes.
+experiment: airbench_smoke
+seed: 1440
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: tempomuon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+  rho_beta: 0.9
+  kappa: -0.25
+  rho_star: -0.48
+  gain_min: 0.2
+  gain_max: 1.0
+  warmup_steps: 25
+  ctrl_end_step: 60
+  scope: global
+  history_every: 10
+
+sweep:
+  seeds: eval
+  grid:
+    optimizer.lr: [0.24, 0.48, 0.72, 0.96]

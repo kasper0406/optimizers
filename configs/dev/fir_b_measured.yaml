@@ -1,0 +1,44 @@
+# Program #9 Phase B arm (pre-registration: reports/fir-phase-a.md
+# section 2, committed before any run). Seeds 1442-1451 (fresh).
+experiment: airbench_smoke
+seed: 1442
+device: cuda
+data:
+  root: data/cifar10
+train:
+  epochs: 8
+  batch_size: 2000
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+optimizer:
+  name: firmuon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+  n_taps: 12
+  tau: 1.5
+  ridge: 0.05
+  rho_beta: 0.9
+  warmup_steps: 15
+  force_rho: null
+  history_every: 5
+sweep:
+  seeds:
+  - 1442
+  - 1443
+  - 1444
+  - 1445
+  - 1446
+  - 1447
+  - 1448
+  - 1449
+  - 1450
+  - 1451
+  grid:
+    optimizer.lr:
+    - 0.24
+    - 0.48

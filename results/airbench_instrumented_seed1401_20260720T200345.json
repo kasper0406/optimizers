@@ -1,0 +1,95 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_instrumented",
+      "instrumentation": {
+        "align_min": 0.9,
+        "betas": [
+          0.9,
+          0.99
+        ],
+        "classifier": {
+          "innov_needed": 2,
+          "innov_window": 4,
+          "n_min": 50,
+          "rho_osc": 0.5,
+          "tau_noise": 2.0,
+          "tau_sig": 4.0,
+          "z_reset": 6.0
+        },
+        "frozen_probes": {
+          "enabled": false
+        },
+        "hvp": true,
+        "k1": 16,
+        "k2": 16,
+        "min_dim": 8,
+        "momentum_key": "momentum_buffer",
+        "seed": 4242,
+        "smoothness": {
+          "enabled": true,
+          "grad_source": "recompute",
+          "t_meas": 5
+        },
+        "snapshot_every": 5,
+        "subspace_iters": 2,
+        "t_refresh": 50
+      },
+      "probe_overrides": {
+        "lr": 0.96
+      },
+      "recipe": {
+        "compile": false,
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 1000,
+        "epochs": 8
+      }
+    },
+    "path": "sweeps/frontier_lrxbatch/frontier_lrxbatch__lr0.96_batch_size1000.yaml",
+    "sha256": "cac0f8247bab57e5fc0a895aee71239f3da44e5de34ae9e17c2f1194b41e6556"
+  },
+  "cost_usd": null,
+  "experiment": "airbench_instrumented",
+  "finished_at": "2026-07-20T20:04:26.323351+00:00",
+  "git_dirty": false,
+  "git_sha": "3395c9937246c5dcc0c2c76eb9b6f6bd28883019",
+  "gpu_type": "NVIDIA GeForce RTX 5090",
+  "metrics": {
+    "epochs": 8.0,
+    "hvp_graph_builds": 8,
+    "instrumentation_sidecar": "airbench_instrumented_seed1401_20260720T200345.instrumentation.json",
+    "instrumented": true,
+    "optimizer": "vendor_muon",
+    "optimizer_lr": 0.96,
+    "probe_overrides": {
+      "lr": 0.96
+    },
+    "smoothness_backward_passes": 80,
+    "smoothness_forward_passes": 560,
+    "steps": 400,
+    "time_seconds": 39.00770329284668,
+    "train_acc_last": 0.906000018119812,
+    "tta_val_acc": 0.9080999493598938,
+    "val_acc": 0.8996999859809875,
+    "val_accs": [
+      0.11809999495744705,
+      0.3199999928474426,
+      0.3357999920845032,
+      0.3856000006198883,
+      0.6176999807357788,
+      0.6958000063896179,
+      0.7839999794960022,
+      0.8996999859809875
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1401,
+  "started_at": "2026-07-20T20:03:45.865064+00:00",
+  "wall_time_s": 40.45827093801927
+}

@@ -1,0 +1,64 @@
+# Program #6, B=8000 rung rerun -- HVP OFF (infrastructure amendment A1).
+#
+# All 16 B=8000 cells of configs/dev/frontier_lrxbatch.yaml OOM'd on the
+# 32 GB RTX 5090: the HVP probe's fp32 functional re-forward + create-graph
+# backward does not fit at batch 8000 (~30 GiB resident at the refresh).
+# The probe is read-only w.r.t. training (detached fp32 copies; training
+# state, dtypes, RNG untouched -- src/instrument/hvp.py), so disabling it
+# changes no training trajectory. Pre-registration impact: NONE of the
+# pre-registered endpoints touch B=8000 sidecars -- P2 excluded B=8000 in
+# advance; P1/P3 use accuracy only. Amendment recorded in
+# reports/stability-frontier-preregistration.md (dated, post-launch).
+#
+# Smoothness stays ON (its recompute path runs in training precision and
+# fits); everything else identical to the parent config.
+
+experiment: airbench_instrumented
+seed: 1400
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 8000
+
+recipe:
+  tta_level: 2
+  compile: false
+
+probe_overrides:
+  lr: 0.24             # overridden per rung by the sweep grid below
+
+instrumentation:
+  k1: 16
+  k2: 16
+  t_refresh: 50
+  subspace_iters: 2
+  betas: [0.9, 0.99]
+  align_min: 0.9
+  snapshot_every: 5
+  seed: 4242
+  min_dim: 8
+  momentum_key: momentum_buffer
+  hvp: false           # AMENDMENT A1: OOM at B=8000 on 32 GB (see header)
+  smoothness:
+    enabled: true
+    t_meas: 5
+    grad_source: recompute
+  frozen_probes:
+    enabled: false
+  classifier:
+    tau_sig: 4.0
+    tau_noise: 2.0
+    rho_osc: 0.5
+    n_min: 50
+    z_reset: 6.0
+    innov_needed: 2
+    innov_window: 4
+
+sweep:
+  seeds: [1400, 1401]
+  grid:
+    probe_overrides.lr: [0.12, 0.24, 0.36, 0.48, 0.60, 0.72, 0.96, 1.44]

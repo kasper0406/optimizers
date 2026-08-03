@@ -1,0 +1,68 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_smoke",
+      "optimizer": {
+        "lr": 0.24,
+        "momentum": 0.6,
+        "name": "muon",
+        "nesterov": true,
+        "ns_steps": 3,
+        "weight_decay": 0.0
+      },
+      "recipe": {
+        "compile": true,
+        "normalize_filter_weights": true,
+        "save_test_logits": {
+          "dir": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_ckpts"
+        },
+        "tail_phase": {
+          "hard_frac": 0.5,
+          "tail_epochs": 2
+        },
+        "tta_level": 2
+      },
+      "seed": 1487,
+      "train": {
+        "batch_size": 1000,
+        "epochs": 8
+      }
+    },
+    "path": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_D.yaml",
+    "sha256": "d5f48962a25fd7e7cd2baa654f3e5ee7377bc213674a79fcc9e2731cdf8e9ac9"
+  },
+  "cost_usd": null,
+  "experiment": "airbench_smoke",
+  "finished_at": "2026-07-22T20:10:36.789779+00:00",
+  "git_dirty": false,
+  "git_sha": "12288db2fe70bc841022f937ae1e3a6c29027b87",
+  "gpu_type": "NVIDIA GeForce RTX 5090",
+  "metrics": {
+    "epochs": 8.0,
+    "logits_path": "/tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/tail_ckpts/logits_c38f40b038de.pt",
+    "optimizer": "muon",
+    "steps": 400,
+    "time_seconds": 5.410239646911621,
+    "train_acc_last": 0.9600000381469727,
+    "tta_val_acc": 0.9368999600410461,
+    "val_acc": 0.9291999936103821,
+    "val_accs": [
+      0.6893999576568604,
+      0.7479999661445618,
+      0.7922999858856201,
+      0.796999990940094,
+      0.8743000030517578,
+      0.8986999988555908,
+      0.9174000024795532,
+      0.9291999936103821
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1487,
+  "started_at": "2026-07-22T20:10:29.714310+00:00",
+  "wall_time_s": 7.0754534230800346
+}

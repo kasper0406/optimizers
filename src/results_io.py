@@ -90,7 +90,19 @@ def git_provenance(repo_root: Optional[Path] = None) -> Dict[str, Any]:
             text=True,
             stderr=subprocess.DEVNULL,
         )
-        return {"git_sha": sha, "git_dirty": bool(dirty_out.strip())}
+        # Untracked files under results/ and data/ are data products (results
+        # accumulate during local sequential sweeps; data/ is the dataset
+        # cache), not code drift — they must not flag every later run of a
+        # sweep dirty.  Anything else, including MODIFIED tracked files under
+        # results/ (append-only violations), still counts.
+        def _is_code_drift(line: str) -> bool:
+            if line.startswith("?? "):
+                path = line[3:].strip().strip('"')
+                return not path.startswith(("results/", "data/"))
+            return bool(line.strip())
+
+        dirty = any(_is_code_drift(l) for l in dirty_out.splitlines())
+        return {"git_sha": sha, "git_dirty": dirty}
     except (subprocess.CalledProcessError, FileNotFoundError):
         env_sha = os.environ.get("RM_GIT_SHA")
         if env_sha:

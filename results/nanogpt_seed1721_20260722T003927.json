@@ -1,0 +1,188 @@
+{
+  "config": {
+    "contents": {
+      "device": "auto",
+      "experiment": "nanogpt",
+      "nanogpt": {
+        "adam_betas": [
+          0.8,
+          0.95
+        ],
+        "adam_eps": 1e-10,
+        "adam_lr": 0.008,
+        "adam_weight_decay": 0.0,
+        "attention_impl": "flex",
+        "checkpoint": {
+          "dir": "checkpoints",
+          "every_steps": 250,
+          "resume": true
+        },
+        "chunks_per_step": 8,
+        "compile": true,
+        "cooldown_frac": 0.45,
+        "device_count": 1,
+        "fp32_embed_grad_accum": true,
+        "head_chunk_rows": 8192,
+        "min_lr_frac": 0.05,
+        "momentum_warmup_steps": 151,
+        "muon_lr": 0.025,
+        "muon_momentum": 0.95,
+        "muon_weight_decay": 0.0,
+        "num_iterations": 880,
+        "precision_mode": "fp8",
+        "target_val_loss": 3.28,
+        "train_seq_len": 49152,
+        "val_loss_every": 110,
+        "val_seq_len": 262144,
+        "val_tokens": 10485760,
+        "warmup_steps": 10
+      },
+      "seed": 1721
+    },
+    "path": "sweeps/frontier_nanogpt_c8/frontier_nanogpt_c8__muon_lr0.025.yaml",
+    "sha256": "5efaa9ddd0ae4a121e5ee7e2919afe5b3ef2698164e559dfd9cead8c05bd6a3c"
+  },
+  "cost_usd": null,
+  "experiment": "nanogpt",
+  "finished_at": "2026-07-22T01:17:05.956207+00:00",
+  "git_dirty": false,
+  "git_sha": "f8fed157c9c8c27484b5f85af2f15b3cabf5aa26",
+  "gpu_type": "NVIDIA GeForce RTX 5090",
+  "metrics": {
+    "accumulation_factor": 8,
+    "attention_impl": "flex",
+    "compiled": true,
+    "deviations": {
+      "fp32_embed_grad_accum": "embedding gradients accumulate across micro-batches in an fp32 master buffer, cast back to bf16 once per step (record: bf16 throughout, one backward per step). NOT RECORD-FAITHFUL: diagnostic probe for docs/nanogpt-port.md \u00a76.1.",
+      "grad_accumulation": "1 device(s) x 8 micro-batches = 8 record chunks per optimizer step; tokens/step 393216 (record 393216)",
+      "head_chunk_rows": "lm_head + soft-cap + cross-entropy computed over row chunks of 8192 (train chunks gradient-checkpointed; record: one full-width head GEMM). Same math up to fp32 summation order. NOT RECORD-FAITHFUL: 32 GB-GPU memory path (model.py PORT CHANGE P5).",
+      "num_iterations": "880 (record 1750)"
+    },
+    "device_count": 1,
+    "final_val_loss": 3.4453976154327393,
+    "fp32_embed_grad_accum": true,
+    "nanogpt_config": {
+      "adam_betas": [
+        0.8,
+        0.95
+      ],
+      "adam_eps": 1e-10,
+      "adam_lr": 0.008,
+      "adam_weight_decay": 0.0,
+      "attention_impl": "flex",
+      "checkpoint": {
+        "dir": "checkpoints",
+        "every_steps": 250,
+        "keep_on_success": false,
+        "resume": true
+      },
+      "chunks_per_step": 8,
+      "compile": true,
+      "cooldown_frac": 0.45,
+      "device_count": 1,
+      "fp32_embed_grad_accum": true,
+      "head_chunk_rows": 8192,
+      "max_steps": null,
+      "min_lr_frac": 0.05,
+      "model_dim": 768,
+      "momentum_end": 0.95,
+      "momentum_start": 0.85,
+      "momentum_warmup_steps": 151,
+      "muon_lr": 0.025,
+      "muon_momentum": 0.95,
+      "muon_weight_decay": 0.0,
+      "num_heads": 6,
+      "num_iterations": 880,
+      "num_layers": 12,
+      "precision_mode": "fp8",
+      "record_world_size": 8,
+      "seed": 1721,
+      "target_val_loss": 3.28,
+      "train_align_to_bos": true,
+      "train_files": "data/fineweb10B/fineweb_train_*.bin",
+      "train_seq_len": 49152,
+      "val_align_to_bos": false,
+      "val_files": "data/fineweb10B/fineweb_val_*.bin",
+      "val_loss_every": 110,
+      "val_seq_len": 262144,
+      "val_tokens": 10485760,
+      "vocab_size": 50257,
+      "warmup_steps": 10,
+      "window_warmup_max": 1728
+    },
+    "num_iterations": 880,
+    "peak_memory_mib": 28563,
+    "precision_mode": "fp8",
+    "record": "2025-07-12_BosAlign",
+    "record_faithful": false,
+    "record_log": "0c5449cc-0b01-4ecc-bec3-f46a09741d60.txt",
+    "record_world_size": 8,
+    "resumed_from_checkpoint": false,
+    "steps_to_target_loss": null,
+    "target_val_loss": 3.28,
+    "tokens_per_step": 393216,
+    "tokens_to_target_loss": null,
+    "train_steps_run": 880,
+    "train_time_s": 2045.1462084308732,
+    "val_curve": [
+      {
+        "step": 0,
+        "tokens": 0,
+        "train_time_ms": 0.009169918484985828,
+        "val_loss": 10.825837135314941
+      },
+      {
+        "step": 110,
+        "tokens": 43253760,
+        "train_time_ms": 241668.81467599887,
+        "val_loss": 4.5336995124816895
+      },
+      {
+        "step": 220,
+        "tokens": 86507520,
+        "train_time_ms": 486657.683686004,
+        "val_loss": 4.055968284606934
+      },
+      {
+        "step": 330,
+        "tokens": 129761280,
+        "train_time_ms": 737632.7525220113,
+        "val_loss": 3.864096164703369
+      },
+      {
+        "step": 440,
+        "tokens": 173015040,
+        "train_time_ms": 992585.803213995,
+        "val_loss": 3.7534656524658203
+      },
+      {
+        "step": 550,
+        "tokens": 216268800,
+        "train_time_ms": 1252542.051017983,
+        "val_loss": 3.65388560295105
+      },
+      {
+        "step": 660,
+        "tokens": 259522560,
+        "train_time_ms": 1513924.7552609304,
+        "val_loss": 3.5633904933929443
+      },
+      {
+        "step": 770,
+        "tokens": 302776320,
+        "train_time_ms": 1779262.84905395,
+        "val_loss": 3.492849826812744
+      },
+      {
+        "step": 880,
+        "tokens": 346030080,
+        "train_time_ms": 2045146.2084308732,
+        "val_loss": 3.4453976154327393
+      }
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1721,
+  "started_at": "2026-07-22T00:39:27.807179+00:00",
+  "wall_time_s": 2258.1490127169527
+}

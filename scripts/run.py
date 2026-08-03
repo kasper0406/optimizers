@@ -174,6 +174,14 @@ def _run_nanogpt(config, device):
     return run_nanogpt(config, device)
 
 
+def _run_bbp_probe(config, device):
+    """Program #22 frozen-checkpoint msign alignment probe (src/nanogpt/bbp.py,
+    prereg reports/bbp-prereg.md). Lazy import, same reason as nanogpt."""
+    from src.nanogpt.bbp import run_bbp_probe
+
+    return run_bbp_probe(config, device)
+
+
 EXPERIMENT_REGISTRY = {
     "smoke": run_smoke,
     "nanogpt": _run_nanogpt,  # WP0.2 modded-nanogpt record port (2025-07-12_BosAlign)
@@ -192,6 +200,7 @@ EXPERIMENT_REGISTRY = {
     # ascent + gauge transport between backward and step
     "airbench_teleport": run_airbench_teleport,
     "probe_divergence": _load_probe_divergence(),  # twin-trajectory probe
+    "bbp_probe": _run_bbp_probe,  # program #22 msign alignment probe
     # Later WPs register nanogpt experiments here.
 }
 
@@ -261,9 +270,24 @@ def main(argv=None) -> int:
         seed = args.seed
 
     device = resolve_device(str(config.get("device", "cpu")))
+    # The resolved seed must travel IN the config too: experiments that read
+    # config["seed"] (NanoGPTConfig.from_config — trainer re-seed and the
+    # seed-keyed checkpoint path) would otherwise silently fall back to their
+    # defaults on sweep-materialized configs, which carry no seed key. Found
+    # the hard way: a --seed'd nanogpt sweep trained every run with the
+    # dataclass default (1000) and collided all checkpoints on one path.
+    config["seed"] = seed
     set_seed(seed)
 
     started_at = results_io.utc_now_iso()
+    # Provenance is captured BEFORE the experiment runs. It used to be
+    # evaluated at write time, after the run returned, so `git_sha` and
+    # especially `git_dirty` described the tree at run *end* — a run launched
+    # from an uncommitted tree and committed mid-run recorded
+    # `git_dirty: false` against a SHA that did not exist when it started
+    # (found in an internal review of the 2026-07-24 gauge runs). The point of
+    # the field is "what code produced this", so it must be read at launch.
+    provenance = results_io.git_provenance()
     t0 = time.perf_counter()
     metrics = EXPERIMENT_REGISTRY[experiment](config, device)
     wall_time_s = time.perf_counter() - t0
@@ -293,7 +317,7 @@ def main(argv=None) -> int:
         "schema_version": results_io.SCHEMA_VERSION,
         "experiment": experiment,
         "config": results_io.config_record(args.config, config),
-        **results_io.git_provenance(),
+        **provenance,
         "seed": seed,
         "gpu_type": gpu_type_string(device),
         "wall_time_s": wall_time_s,

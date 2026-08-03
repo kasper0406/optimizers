@@ -11,6 +11,7 @@ These tests protect the two things that make the port worth having:
 
 from __future__ import annotations
 
+import copy
 import importlib.util
 import math
 import json
@@ -619,7 +620,11 @@ def test_training_loop_end_to_end_on_cpu(tmp_path, monkeypatch):
             "train_seq_len": 256, "val_seq_len": 256, "val_tokens": 2048,
             "num_iterations": 2, "val_loss_every": 1, "warmup_steps": 1,
             "compile": False, "precision_mode": "bf16", "attention_impl": "sdpa",
-            "checkpoint": {"dir": str(tmp_path / "ckpt"), "every_steps": 1, "resume": False},
+            # keep_on_success: the resume leg below needs the completed
+            # checkpoint to survive (default now deletes it — see the
+            # dedicated checkpoint-lifecycle tests).
+            "checkpoint": {"dir": str(tmp_path / "ckpt"), "every_steps": 1,
+                           "resume": False, "keep_on_success": True},
         },
     }
     metrics = run_nanogpt(config, torch.device("cpu"))
@@ -637,6 +642,26 @@ def test_training_loop_end_to_end_on_cpu(tmp_path, monkeypatch):
     config["nanogpt"]["checkpoint"]["resume"] = True
     resumed = run_nanogpt(config, torch.device("cpu"))
     assert resumed["resumed_from_checkpoint"] is True
+
+    # PROGRAM-#7 COLLISION GUARD: a variant differing in a trajectory-shaping
+    # knob (muon_lr) must NOT resume this run's checkpoint — the fingerprint
+    # keys it to a different file, so the variant starts fresh.
+    variant = copy.deepcopy(config)
+    variant["nanogpt"]["muon_lr"] = 0.033
+    variant["nanogpt"]["checkpoint"]["keep_on_success"] = False
+    fresh = run_nanogpt(variant, torch.device("cpu"))
+    assert fresh["resumed_from_checkpoint"] is False
+    # ...and its own completed checkpoint is deleted (default lifecycle)
+    from src.nanogpt.config import NanoGPTConfig
+    from src.nanogpt.train import _checkpoint_path
+    vcfg = NanoGPTConfig.from_config(variant)
+    assert not _checkpoint_path(vcfg, 0).exists()
+    # the keep_on_success run's checkpoint is still there, fingerprinted
+    ocfg = NanoGPTConfig.from_config(config)
+    kept = _checkpoint_path(ocfg, 0)
+    assert kept.exists()
+    assert ocfg.config_fingerprint() in kept.name
+    assert ocfg.config_fingerprint() != vcfg.config_fingerprint()
 
 
 @pytest.mark.slow
@@ -1026,16 +1051,19 @@ def test_project_cost_reconciliation_sums_the_results_dir(tmp_path):
 
 
 def test_real_results_dir_cost_totals():
-    """Pins the reconciled spend the WP0.2 report publishes."""
+    """Pins the reconciled spend the project-state report publishes ($13.60,
+    reports/project-state.md §2; superseded the WP0.2-era $12.00 pin when the
+    fp32-embed diagnostic runs landed)."""
     spec = importlib.util.spec_from_file_location(
         "rm_analyze_nanogpt_costs2", REPO_ROOT / "scripts" / "analyze_nanogpt.py"
     )
     analyze = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(analyze)
     costs = analyze.project_costs(REPO_ROOT / "results")
-    # Reconciled 2026-08-03: $13.60 baseline (project-state.md §2) + $2.05 T1
-    # EMA + $6.72 anneal-dissection + $7.76 mech round-1 + $1.11 teleport
-    # round-2 ($0.027 x 41, reports/wpj-teleport-round2.md).
+    # Reconciled 2026-08-03 post-merge over the UNION of both sessions'
+    # results: $13.60 baseline + $2.05 T1 EMA + $6.72 anneal-dissection +
+    # $7.76 mech round-1 + $1.11 teleport round-2; the parallel session's
+    # program #20-22 runs carry no additional billed cost in results/.
     assert costs["total_usd"] == pytest.approx(31.24, abs=0.01)
     assert costs["nanogpt_usd"] == pytest.approx(4.80, abs=0.01)
 

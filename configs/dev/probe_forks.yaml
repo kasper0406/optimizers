@@ -1,0 +1,35 @@
+# Program #10 Phase A: same-seed LR-fork pairs (reports/probe-phase-a.md,
+# committed first). mult=1.0 cells are no-op forks retained as replicate
+# noise calibrations. Seeds 1452-1461 (fresh).
+experiment: airbench_smoke
+seed: 1452
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+  lr_fork:
+    step: 100
+    mult: 1.0
+
+optimizer:
+  name: muon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+
+sweep:
+  seeds: [1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461]
+  grid:
+    recipe.lr_fork.step: [25, 50, 100, 150]
+    recipe.lr_fork.mult: [0.7, 0.85, 1.0, 1.15, 1.4]

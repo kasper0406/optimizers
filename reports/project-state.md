@@ -35,8 +35,9 @@ independent adversarial agent, then amended or overturned on the record. Two
 of the biggest course-corrections (Gate 2 secondary criterion; the nanogpt
 amend-and-proceed) came from those reviews overturning the primary draft.
 
-Total cloud spend: **$13.60**. 621 tests. ~2,600 result JSONs with full
-provenance. All committed.
+Total cloud spend: **$13.60**. 639 tests. ~2,700 result JSONs with full
+provenance. All committed. (2026-07-21: program #6 ran locally on the new
+2× RTX 5090 box — the first non-cloud GPU capacity in the project.)
 
 ## 3. Findings
 
@@ -101,7 +102,44 @@ intervention buys anything — is probably task/headroom-dependent.
   Muon's stable-LR ceiling is not a smoothness plateau in either norm.
 - **No hidden persistent signal at long integration** (program #4, above).
 
-### 3.5 Infrastructure findings (nanogpt, WP0.2)
+### 3.5 Stability frontier in (lr × batch) (program #6, 2026-07-21, local 2×RTX 5090)
+
+Pre-registered before any run (`reports/stability-frontier-preregistration.md`);
+80-cell grid (5 batch × 8 lr rungs × 2 dev seeds), full report
+`reports/stability-frontier.md`.
+
+- **The useful-lr frontier is batch-coupled at lr\* ∝ B^0.35, CI95
+  [0.30, 0.42]** (program #6b dense-ladder sharpening, n=5, interpolated
+  crossings, 2026-07-21): the deterministic (batch-independent) account is
+  decisively excluded, and so is the √B point prediction — program #6's
+  coarse α = 0.50 was rung-quantization luck, as #6b was pre-registered to
+  adjudicate. At B ≥ 4000 low lr becomes the losing side (acc non-monotone
+  in lr), a signature that survives step-matching.
+- **The B=8000 trend-break was undertraining** (program #6b Part 2):
+  step-matched (epochs 32, ~200 steps) B=8000 recovers 93.75% and its
+  peak-referenced shoulder lands at 0.96 ≥ B=4000's 0.72 — the rightward
+  shift continues, it does not saturate.
+- **The law does NOT transfer to the nanogpt record recipe** (program #7,
+  2026-07-22, pre-registered, 48 cells on the validated local testbed):
+  across an 8× token-batch range (98K–786K tokens/step, fixed 346M-token
+  budget) the useful Muon-lr band is batch-invariant — α = −0.29, CI95
+  [−0.35, +0.30]; the airbench point 0.35 is excluded; valley pinned at
+  ~0.7× record lr at every batch; no cliff anywhere. Domain-bounding
+  result: batch-coupled at CNN-scale batches, batch-invariant at LM-scale
+  token batches — consistent with (untested) critical-batch-size
+  saturation. `reports/frontier-nanogpt.md`.
+- **No instrumented quantity is the frontier invariant**: occupancy, spectral
+  and Euclidean directional smoothness, and HVP η·λ q90 all fail the
+  pre-registered tracking signature; curvature is the *least* equalized
+  (~5–6× across batch) — extending "curvature does not govern" to the batch
+  axis.
+- **Cliff-free degradation persists across a 16× batch range** (no collapse
+  to random anywhere on the ladder).
+- Infrastructure: the new local 5090/torch-2.13 stack reproduces the historic
+  baseline at the bridge cell (94.14% + P2 quantities inside prior ranges);
+  HVP probe OOMs at B=8000 on 32 GB (amendment A1, endpoint-neutral).
+
+### 3.6 Infrastructure findings (nanogpt, WP0.2)
 
 A 1×H100 port of the pinned modded-nanogpt record (2025-07-12_BosAlign) with
 exact token-batch matching (8× grad accumulation, 393,216 tokens/step). Two
@@ -121,20 +159,22 @@ methodological findings fell out:
 
 A measurement paper (`reports/paper-draft.md`) whose contributions are the
 §3.1 measurements, the §3.2 placebo-controlled null, the §3.3 equivalent-
-destinations mechanism, the §3.4 negative results, and the §3.5
-methodology notes — none of which required the routing method to work, and
+destinations mechanism, the §3.4 negative results, the §3.5 frontier
+measurement, and the §3.6 methodology notes — none of which required the
+routing method to work, and
 all of which are absent from the 2024–2026 literature we swept. The paper's
 differentiator from the "yet another Muon variant" pile is precisely that it
 is measurement-first with a clean null, not a method claim.
 
 ## 5. Open questions the data raises
 
-1. **What actually sets Muon's maximum stable LR?** §3.2 shows no divergence
-   cliff to 6×; §3.4 rules out directional-smoothness plateaus; the ICML'26
-   theory covers only full-batch momentum-free. The instrument to answer this
-   (simultaneous Euclidean-ηλ HVP + spectral directional smoothness along the
-   trajectory) is built and validated (`src/instrument/smoothness.py`,
-   `src/instrument/hvp.py`).
+1. **What actually sets Muon's maximum stable LR?** Now sharpened by §3.5:
+   the frontier is batch-coupled at ≈ √B (noise-side), but none of the four
+   instrumented quantities (occupancy, either smoothness norm, HVP η·λ) is
+   the equalized invariant along it — the frontier-setting quantity remains
+   unidentified. Tightening α past the rung-quantization envelope needs a
+   denser ladder with more seeds (see the follow-ups in
+   `reports/stability-frontier.md`).
 2. **Does the negative-ρ population's "equivalent destinations" property break
    at higher headroom / larger batch / longer horizon?** The consequence
    (nothing to gain) is the part most likely to be task-specific.
@@ -148,31 +188,77 @@ is measurement-first with a clean null, not a method claim.
 
 ## 6. Next steps (ranked by expected payoff)
 
-1. **Muon stability-frontier measurement (LR × batch size, instrument
-   attached).** Directly attacks open question #1 and the ICML'26 open problem;
-   uses already-built, already-validated instrumentation; the most robust
-   positive finding (§3.2) is the seed. Best science-per-effort. Deliverable:
-   the momentum+minibatch stability law the field lacks, plus a mechanistic
-   link to the large-batch advantage.
+1. ~~Muon stability-frontier measurement~~ **DONE 2026-07-21 (§3.5,
+   programs #6 + #6b; sharpening pass also done — α = 0.35 [0.30, 0.42],
+   step-matched B=8000 confirms the shift continues).** What remains open
+   from this line: the frontier-setting invariant (all four instrumented
+   scalars ruled out) and why the exponent is ~B^1/3 rather than √B —
+   both are analysis/theory questions before they are new-compute
+   questions.
 2. **Occupancy-triggered cooldown** (`criteria/occupancy_cooldown_preregistration.md`,
    pre-registered). Requires first: (a) the occupancy instrumentation ported to
    the nanogpt harness — unwritten, with a real torch.compile/FP8 graph-break
    risk; (b) our own harness seed-variance estimate (the record's cannot serve,
-   §3.5); (c) accounting for the cooldown-phase confound (§3.5) since the
+   §3.6); (c) accounting for the cooldown-phase confound (§3.6) since the
    intervention manipulates exactly that phase; (d) the pre-registered metric
    repaired away from the censored steps-to-target. The path to a "removed a
    hyperparameter" result, but gated on real setup work.
 3. **Per-direction SNR vs batch size** (open question #4): test whether
    per-direction signal becomes measurable at large batch; the frozen-probe
    tier (program #4) is the instrument.
-4. **Full nanogpt validation**: fp32-embed-fixed harness + a seed set to
-   establish σ and confirm a self-consistent testbed. Prerequisite for any
-   nanogpt method claim (the value is a self-consistent A/B testbed, not
-   matching the record — record-faithfulness off native hardware is not
-   attainable and is now a documented finding, not a goal).
+4. ~~Full nanogpt validation~~ **DONE 2026-07-21
+   (`reports/nanogpt-local-baseline.md`).** The port runs locally on the
+   2×5090 box (chunked-head memory path, PORT CHANGE P5; fp8+flex+compile
+   intact); n=10 baseline: final val 3.28888 ± 0.00125 — seed noise equal
+   to the record's native sd (0.0013), no variance inflation. Endpoint
+   settled: final-val-at-1750 (steps-to-3.28 censored 10/10 here). Power:
+   the plan's 3–5% effects need 2 seeds/arm; 0.0025-loss effects need 4.
+   Controls (seeds 1710–1719) are in `results/`; babysitter supervision
+   (`scripts/babysit_nanogpt.sh`) handles the box's flaky-card risk. The
+   run.py seed-injection bug this surfaced is fixed (ecd48f1) with
+   regression tests.
 5. **Finish and submit the measurement paper** (§4) — the actual deliverable
    to the field; the flag-plant the plan's risk analysis calls for while the
    niche's ~6-month idea half-life runs.
+
+### Added 2026-07-22 (program #8 + intermittency scan)
+
+6. **Program #8 (TempoMuon temporal trust ratio) — active.** Eval-seed
+   table done (`reports/tempo-eval.md`: controller exactly free at record
+   LR, +1.54pp at 4×, n=100 paired; placebo decomposition in
+   `reports/tempo-phase-b.md`). Open, in order:
+   (a) **HUMAN: gate judgment** on the eval table (no `criteria/` file
+   exists for it); decide whether this becomes a method section of the
+   paper or a separate note.
+   (b) **nanogpt transfer, Phase A passive — DONE 2026-07-22, largely
+   negative** (`reports/tempo-nanogpt-phase-a.md`): the airbench cos_gg
+   dial does not transfer (lr-flat, per-matrix orderings split); the
+   zero-memory cos_gm variant shows an airbench-sign dial in steps
+   25–100 only (median per-matrix Spearman +0.80, n=2 seeds).
+   **HUMAN: decide** whether to chase it — the cheap confirm is 4 lr ×
+   6 seeds at 150-step truncation (~3 GPU-h) before any controller-on
+   run (which would use cos_gm, early window, spike-gated, global pool).
+   (c) **Spike-gate for the controller** before any nanogpt controller
+   run: don't advance the gain on spike steps (motivated by
+   `reports/intermittency-scan.md` §3 — LM training has loss spikes at
+   normal LR; a spike pushes cos toward 0 and would cause spurious
+   shrink).
+   (d) 2×-LR under-rescue and a self-calibrating setpoint (short
+   known-safe probe → own reference band) — Phase B″ material, dev seeds
+   1440+ (1440–1441 consumed by (b)).
+7. ~~Spike-rate as a frontier-invariant candidate~~ **TESTED 2026-07-22
+   and failed, along with the entire pair span** (program #11,
+   `reports/invariant-search-results.md`): held-out, permutation-
+   controlled search over 8 features × 40 log-linear pairs — zero
+   passes; every instrumented trajectory scalar is nearly flat along lr
+   within the frontier region. The invariant is not in the instrumented
+   span; successor candidates are end-state / anneal-phase / non-scalar
+   objects.
+8. **Paper §3.1 addition candidate**: the anchoring-artifact methodology
+   note (93% of naive top-direction kurtosis spikes are the subspace
+   re-anchoring transient; burn-in ≥5 required) + the corrected
+   LR-dependent intermittency measurement. Cheap to fold in; guards
+   future instrumentation work against the same trap.
 
 ## 7. Reproducibility / repo state
 

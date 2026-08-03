@@ -378,6 +378,39 @@ def run_airbench_smoke(
     wd = float(recipe_cfg.get("sgd_weight_decay", 2e-6)) * batch_size
     normalize_filter_weights = bool(recipe_cfg.get("normalize_filter_weights", True))
     tta_level = int(recipe_cfg.get("tta_level", 2))
+    # Program #10 (branched-probe meta-control) Phase A: mid-run LR fork.
+    # Two runs with the same seed are bitwise-identical until ``step``; a
+    # multiplier applied from ``step`` onward makes them a perfectly
+    # common-randomness-paired branch pair at full-run cost (~15 s here).
+    lr_fork = recipe_cfg.get("lr_fork") or None  # {"step": int, "mult": float}
+    if lr_fork is not None:
+        lr_fork = {"step": int(lr_fork["step"]), "mult": float(lr_fork["mult"])}
+    # Program #12 Phase A (reports/data-selection-prereg.md): per-example
+    # momentum-alignment probe. Measurement-only; eval-mode forwards (BN
+    # running stats untouched); grads computed in a separate autograd pass
+    # between optimizer steps. {"n_fixed": int, "n_fresh": int, "every": int,
+    # "topk": int}.
+    example_probe = recipe_cfg.get("example_probe") or None
+    # Program #13 (reports/endstate-prereg.md §2): endpoint hooks.
+    # Measurement-only, run once after training; checkpoints go to a
+    # scratch dir (never results/), paths recorded in metrics.
+    save_endpoint = recipe_cfg.get("save_endpoint") or None      # {"dir": str}
+    save_test_logits = recipe_cfg.get("save_test_logits") or None  # {"dir": str}
+    # Program #14 (reports/tailrepair-prereg.md): in the final tail_epochs
+    # epochs, keep only the hardest hard_frac of each batch's per-example
+    # losses, rescaled by 1/hard_frac (expectation-preserving selection).
+    # Absent => the stock sum-reduction path, bit-identical.
+    tail_phase = recipe_cfg.get("tail_phase") or None  # {"tail_epochs": int, "hard_frac": float}
+    if tail_phase is not None:
+        tail_phase = {"tail_epochs": int(tail_phase["tail_epochs"]),
+                      "hard_frac": float(tail_phase.get("hard_frac", 0.5))}
+    # Program #16 (reports/readout-prereg.md): per-step weight snapshots for
+    # offline readout-averaging analysis. Measurement-only; scratch dir.
+    save_iterates = recipe_cfg.get("save_iterates") or None  # {"dir": str, "from_step": int}
+    if save_iterates is not None:
+        save_iterates = {"dir": save_iterates["dir"],
+                         "from_step": int(save_iterates.get("from_step", 0))}
+        Path(save_iterates["dir"]).mkdir(parents=True, exist_ok=True)
 
     model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
     if bool(recipe_cfg.get("compile", False)):
@@ -438,6 +471,56 @@ def run_airbench_smoke(
     # coarse aggregate time series every ROUTING_TS_EVERY steps. Read-only.
     track_routing = hasattr(optimizer2, "routing_stats")
     routing_timeseries = []
+    train_loss_series: list = []  # P10: populated only when lr_fork is set
+    probe_rows: list = []  # P12: per-example momentum-alignment records
+
+    def _run_example_probe(step_now: int, batch_inputs, batch_labels) -> None:
+        n_fixed = int(example_probe.get("n_fixed", 64))
+        n_fresh = int(example_probe.get("n_fresh", 64))
+        topk = int(example_probe.get("topk", 8))
+        was_training = model.training
+        model.eval()
+        model.zero_grad(set_to_none=True)
+        # momentum buffers + their top-k singular pairs, fixed for this probe
+        bufs, bases = {}, {}
+        for p in filter_params:
+            st = optimizer2.state.get(p, {})
+            m = st.get("momentum_buffer")
+            if m is None:
+                continue
+            m2 = m.reshape(len(m), -1).float()
+            bufs[p] = m2
+            u, s, v = torch.svd_lowrank(m2, q=min(topk, min(m2.shape)))
+            bases[p] = (u, v)
+        fixed_x = train_loader.images[:n_fixed]
+        fixed_y = train_loader.labels[:n_fixed]
+        sets = [("fixed", fixed_x, fixed_y),
+                ("fresh", batch_inputs[:n_fresh], batch_labels[:n_fresh])]
+        for which, xs, ys in sets:
+            for i in range(len(xs)):
+                model.zero_grad(set_to_none=True)
+                out = model(xs[i:i + 1])
+                li = torch.nn.functional.cross_entropy(
+                    out.float(), ys[i:i + 1], label_smoothing=0.2
+                )
+                li.backward()
+                row = {"step": step_now, "which": which, "idx": i,
+                       "loss": float(li.detach()), "m": []}
+                for p in filter_params:
+                    if p.grad is None or p not in bufs:
+                        continue
+                    g2 = p.grad.reshape(len(p.grad), -1).float()
+                    m2 = bufs[p]
+                    gn = g2.norm().clamp_min(1e-30)
+                    cos = float((g2 * m2).sum() / (gn * m2.norm().clamp_min(1e-30)))
+                    u, v = bases[p]
+                    coef = (u.T @ g2 @ v).diagonal()
+                    frac = float((coef ** 2).sum() / gn ** 2)
+                    row["m"].append({"cos": round(cos, 5), "topk_frac": round(frac, 5)})
+                probe_rows.append(row)
+        model.zero_grad(set_to_none=True)
+        if was_training:
+            model.train()
 
     starter = torch.cuda.Event(enable_timing=True)
     ender = torch.cuda.Event(enable_timing=True)
@@ -483,9 +566,34 @@ def run_airbench_smoke(
         model.train()
         for inputs, labels in train_loader:
             outputs = model(inputs, whiten_bias_grad=(step < whiten_bias_train_steps))
-            torch.nn.functional.cross_entropy(
-                outputs, labels, label_smoothing=0.2, reduction="sum"
-            ).backward()
+            in_tail = (
+                tail_phase is not None
+                and step >= total_train_steps
+                - tail_phase["tail_epochs"] * len(train_loader)
+            )
+            if in_tail:
+                per_ex = torch.nn.functional.cross_entropy(
+                    outputs, labels, label_smoothing=0.2, reduction="none"
+                )
+                k = max(1, int(len(per_ex) * tail_phase["hard_frac"]))
+                loss = per_ex.topk(k).values.sum() / tail_phase["hard_frac"]
+            else:
+                loss = torch.nn.functional.cross_entropy(
+                    outputs, labels, label_smoothing=0.2, reduction="sum"
+                )
+            loss.backward()
+            if lr_fork is not None:
+                # P10: per-step loss series (GPU-resident; synced once at end).
+                # Recomputed in fp32: the recipe's fp16 sum-reduction loss
+                # overflows to inf mid-run (harmless to training — CE backward
+                # never uses the forward value — but useless as telemetry).
+                with torch.no_grad():
+                    train_loss_series.append(
+                        torch.nn.functional.cross_entropy(
+                            outputs.detach().float(), labels,
+                            label_smoothing=0.2, reduction="sum",
+                        )
+                    )
             for group in optimizer1.param_groups[:1]:
                 group["lr"] = group["initial_lr"] * (
                     1 - step / whiten_bias_train_steps
@@ -497,6 +605,11 @@ def run_airbench_smoke(
                     group["lr"] = group["initial_lr"] * (
                         1 - step / total_train_steps
                     )
+            if lr_fork is not None and step >= lr_fork["step"]:
+                # P10: scale ALL optimizer LRs from the fork step on (the
+                # branch differs from its same-seed twin only in this).
+                for group in optimizer1.param_groups + optimizer2.param_groups:
+                    group["lr"] = group["lr"] * lr_fork["mult"]
             if normalize_filter_weights:
                 # airbench94_muon.py:83 (recipe step, applied uniformly)
                 for p in filter_params:
@@ -518,6 +631,11 @@ def run_airbench_smoke(
                 ema.update()  # post-step, post-renorm weights
             model.zero_grad(set_to_none=True)
             step += 1
+            if example_probe is not None and step % int(example_probe.get("every", 10)) == 0:
+                _run_example_probe(step, inputs, labels)
+            if save_iterates is not None and step >= save_iterates["from_step"]:
+                torch.save({k: v.clone() for k, v in model.state_dict().items()},
+                           Path(save_iterates["dir"]) / f"iter_{step:04d}.pt")
             if track_routing and step % ROUTING_TS_EVERY == 0:
                 agg = optimizer2.routing_stats()["aggregate"]["last"]
                 if agg is not None:
@@ -593,6 +711,44 @@ def run_airbench_smoke(
         # Gate-1 amendment A5: end-of-run routing telemetry + coarse series.
         metrics["routing_stats"] = optimizer2.routing_stats()
         metrics["routing_timeseries"] = routing_timeseries
+    if hasattr(optimizer2, "tempo_stats"):
+        # Program #8: TempoMuon rho/gain telemetry (self-recorded per step).
+        metrics["tempo_stats"] = optimizer2.tempo_stats()
+    if lr_fork is not None:
+        metrics["lr_fork"] = lr_fork
+        metrics["train_loss_series"] = [
+            float(v) for v in torch.stack(train_loss_series).cpu()
+        ]
+    if example_probe is not None:
+        metrics["example_probe"] = {"config": example_probe, "rows": probe_rows}
+    if save_endpoint is not None or save_test_logits is not None:
+        import os as _os
+        run_uid = _os.urandom(6).hex()
+        if save_endpoint is not None:
+            d = Path(save_endpoint["dir"])
+            d.mkdir(parents=True, exist_ok=True)
+            p = d / f"endpoint_{run_uid}.pt"
+            torch.save(model.state_dict(), p)
+            metrics["endpoint_path"] = str(p)
+        if save_test_logits is not None:
+            d = Path(save_test_logits["dir"])
+            d.mkdir(parents=True, exist_ok=True)
+            slab = types.SimpleNamespace(
+                images=train_loader.images[:2000],
+                labels=train_loader.labels[:2000],
+                normalize=train_loader.normalize,
+            )
+            bundle = {
+                "test_tta": ab.infer(model, test_loader, tta_level=tta_level).float().cpu(),
+                "test_plain": ab.infer(model, test_loader, tta_level=0).float().cpu(),
+                "train_tta": ab.infer(model, slab, tta_level=tta_level).float().cpu(),
+                "train_plain": ab.infer(model, slab, tta_level=0).float().cpu(),
+                "test_labels": test_loader.labels.cpu(),
+                "train_labels": slab.labels.cpu(),
+            }
+            p = d / f"logits_{run_uid}.pt"
+            torch.save(bundle, p)
+            metrics["logits_path"] = str(p)
     return metrics
 
 

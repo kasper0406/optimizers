@@ -1,0 +1,48 @@
+# Program #13 Stage 2 (endstate-prereg.md sections 1,3): launched on explicit
+# human direction 2026-07-22 ('go with the route with highest potential')
+# with P3 in the pre-committed middle band — disclosed deviation from the
+# mechanical full-P3-pass rule; branch adjudication remains human.
+experiment: airbench_smoke
+seed: 1466
+device: cuda
+data:
+  root: data/cifar10
+train:
+  epochs: 8
+  batch_size: 4000
+recipe:
+  normalize_filter_weights: true
+  compile: true
+  tta_level: 2
+  save_endpoint:
+    dir: /tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/endstate_ckpts
+  save_test_logits:
+    dir: /tmp/claude-1000/-home-knielsen-ml-optimizers/76f68abe-7cfa-4de7-a4dd-44e121874caa/scratchpad/endstate_ckpts
+optimizer:
+  name: muon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+sweep:
+  seeds:
+  - 1466
+  - 1467
+  - 1468
+  - 1469
+  - 1470
+  - 1471
+  - 1472
+  - 1473
+  - 1474
+  - 1475
+  grid:
+    optimizer.lr:
+    - 0.36
+    - 0.55
+    - 0.64
+    - 0.73
+    - 0.84
+    - 0.97
+    - 1.11

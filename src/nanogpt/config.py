@@ -43,6 +43,7 @@ bit-comparable — see docs/nanogpt-port.md, deviation list).
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -117,6 +118,57 @@ class CheckpointConfig:
     dir: str = "checkpoints"
     every_steps: int = 0
     resume: bool = True
+    # A successfully COMPLETED run deletes its checkpoint (2 GB each; and a
+    # surviving completed checkpoint is a resume trap — see the program-#7
+    # incident where sweep variants sharing (seed, iterations) replayed a
+    # sibling's finished trajectory). Set true to keep the final checkpoint.
+    keep_on_success: bool = False
+
+
+@dataclass
+class TailConfig:
+    """Wave-1 tail-phase machinery (programs #17/#18/#19; pre-registered in
+    reports/wave1-anneal-decomposition-prereg.md §0). All fields are PORT-only
+    and deviation-flagged. ``mode: none`` with ``accumulate: false`` (the
+    default) leaves the training loop byte-identical to the pre-Wave-1 port.
+
+    Modes (active from ``start_step``):
+      schedule_free  LR factor pinned to ``kappa``; gradients evaluated at
+                     y = (1-rho)*z + rho*xbar (xbar = equal-weight Polyak mean
+                     of the post-update iterate z over the tail); the stock
+                     optimizer updates z. Primary val readout is at xbar.
+      batch_ramp     LR factor pinned to ``kappa``; token batch grows with
+                     record-equivalent progress u as B(u) = B0/max(w(u), 1/8),
+                     w(u) = 1 - (1 - min_lr_frac_record)*u, in whole
+                     49,152-token chunks, until the record's tail token budget
+                     is consumed. No LR compensation (the registered
+                     Muon-specific prediction).
+
+    ``accumulate: true`` (any mode) maintains streaming fp32 means of the
+    post-update iterate — W1 over ``w1_window``, W2 over ``w2_window``
+    (half-open step ranges), Polyak from ``start_step`` — spike-gated on the
+    step train-loss z-score, and saves them plus the raw final iterate to an
+    fp32 artifact under ``artifact_dir``. Measurement only; the update path is
+    never touched by the accumulators.
+    """
+
+    mode: str = "none"  # none | schedule_free | batch_ramp
+    start_step: int = 963  # T_c: first decayed step of the record schedule
+    kappa: float = 1.0  # tail LR factor (modes schedule_free / batch_ramp)
+    rho: float = 0.8  # schedule_free interpolation weight on xbar
+    accumulate: bool = False
+    w1_window: Tuple[int, int] = (1450, 1600)  # [start, end) post-update steps
+    w2_window: Tuple[int, int] = (1600, 1750)
+    spike_z: float = 4.0  # exclude steps with train-loss z-score > this
+    spike_warmup: int = 20  # first N tail steps always included (EMA warm-in)
+    spike_beta: float = 0.9  # EMA decay for the spike gate's mean/var
+    artifact_dir: str = "results/tail_artifacts"
+
+    def __post_init__(self) -> None:
+        if isinstance(self.w1_window, list):
+            self.w1_window = tuple(self.w1_window)
+        if isinstance(self.w2_window, list):
+            self.w2_window = tuple(self.w2_window)
 
 
 @dataclass
@@ -169,30 +221,89 @@ class NanoGPTConfig:
     precision_mode: str = "fp8"  # "fp8" == record. "bf16" == NOT record-faithful
     attention_impl: str = "flex"  # "flex" == record. "sdpa" == NOT record-faithful
     max_steps: Optional[int] = None  # PORT: early stop for smoke runs (not a run of record)
+    # PORT CHANGE P6 (program #8): passive per-matrix serial-alignment probe
+    # inside Muon.step (src/nanogpt/tempo_probe.py). Measurement only; the
+    # update path is untouched. Costs ~85 MB (subset=2, bf16 prev-grad) +
+    # a CPU sync every tempo_probe_flush_every steps.
+    tempo_probe: bool = False
+    tempo_probe_subset: int = 2
+    tempo_probe_flush_every: int = 10
     # PORT: docs/nanogpt-port.md §6.1 diagnostic probe. Accumulate embedding
     # gradients across micro-batches in an fp32 master buffer instead of in the
     # bf16 `p.grad`, casting back once at the end of the step. Isolates the
     # bf16-accumulation suspect at D < 8. NOT RECORD-FAITHFUL: the record does
     # one backward per step, so it never accumulates at all.
     fp32_embed_grad_accum: bool = False
+    # PORT: compute lm_head + soft-cap + cross-entropy over row chunks of this
+    # size (model.py PORT CHANGE P5). Same math as the record's full-width
+    # head up to fp32 summation order; required to fit the record's train
+    # chunk (49,152 tokens) and val sequences (262,144 tokens) on 32 GB GPUs.
+    # NOT RECORD-FAITHFUL when set.
+    head_chunk_rows: Optional[int] = None
+    # PORT: token-batch axis for the frontier transfer test (program #7).
+    # Number of 49,152-token record chunks consumed per optimizer step;
+    # None == record_world_size (8) == the record's 393,216-token batch.
+    # The data generator is generic in this count, so chunks_per_step: 4
+    # yields a 196,608-token step with the same BOS-aligned chunking. NOT
+    # RECORD-FAITHFUL when set to anything but None/8: changes the token
+    # batch AND the data order.
+    chunks_per_step: Optional[int] = None
     checkpoint: CheckpointConfig = field(default_factory=CheckpointConfig)
+    # PORT (Wave 1, prereg §0): tail-phase machinery. See TailConfig.
+    tail: TailConfig = field(default_factory=TailConfig)
+    # PORT (Wave 1, prereg §0.2): resume from ANOTHER config's checkpoint,
+    # allowed iff the checkpoint's hot fingerprint, seed, and stable-phase
+    # bounds match (train.py validates). None == normal resume semantics.
+    fork_from: Optional[str] = None
+    # PORT CHANGE P7 (program #20, reports/gauge-ledger-prereg.md §6):
+    # passive per-step weight/update norm-scalar logging inside Muon.step.
+    # Measurement-only, trajectory-neutral — EXCLUDED from both fingerprints
+    # (see config_fingerprint/hot_fingerprint) so stored prefix checkpoints
+    # remain fork-compatible with probed replays.
+    gauge_probe: bool = False
 
     # ------------------------------------------------------------------ api
     def __post_init__(self) -> None:
         if isinstance(self.checkpoint, dict):
             self.checkpoint = CheckpointConfig(**self.checkpoint)
+        if isinstance(self.tail, dict):
+            self.tail = TailConfig(**self.tail)
         if isinstance(self.adam_betas, list):
             self.adam_betas = tuple(self.adam_betas)
         self.validate()
 
     @property
+    def stable_through_step(self) -> int:
+        """Last training step at LR factor exactly 1.0 under this config.
+
+        ``get_lr`` gives w = 1 iff step <= num_iterations*(1-cooldown_frac);
+        with ``min_lr_frac == 1.0`` the factor is 1.0 at every step. Used by
+        the fork guard: a fork at step s is legal only when steps < s were all
+        on the shared stable plateau (prereg §0.2).
+        """
+        if self.min_lr_frac == 1.0:
+            return self.num_iterations
+        import math
+
+        return int(math.floor(self.num_iterations * (1 - self.cooldown_frac) + 1e-9))
+
+    @property
+    def effective_chunks(self) -> int:
+        """Record chunks per optimizer step (record: record_world_size)."""
+        return self.chunks_per_step if self.chunks_per_step is not None else self.record_world_size
+
+    @property
     def accum_factor(self) -> int:
         """G — micro-batches per device per optimizer step."""
-        return accumulation_factor(self.device_count, self.record_world_size)
+        if self.chunks_per_step is None:
+            return accumulation_factor(self.device_count, self.record_world_size)
+        return self.chunks_per_step // self.device_count
 
     @property
     def tokens_per_step(self) -> int:
-        return tokens_per_step(self.device_count, self.train_seq_len, self.record_world_size)
+        if self.chunks_per_step is None:
+            return tokens_per_step(self.device_count, self.train_seq_len, self.record_world_size)
+        return self.chunks_per_step * self.train_seq_len
 
     @property
     def val_chunks(self) -> int:
@@ -217,6 +328,8 @@ class NanoGPTConfig:
         return (
             self.device_count == self.record_world_size
             and not self.fp32_embed_grad_accum
+            and self.head_chunk_rows is None
+            and self.chunks_per_step in (None, self.record_world_size)
             and self.precision_mode == "fp8"
             and self.attention_impl == "flex"
             and self.min_lr_frac == 0.05
@@ -224,6 +337,9 @@ class NanoGPTConfig:
             and self.train_seq_len == RECORD_TRAIN_SEQ_LEN
             and self.tokens_per_step == RECORD_TOKENS_PER_STEP
             and self.max_steps is None
+            and self.tail.mode == "none"
+            and not self.tail.accumulate
+            and self.fork_from is None
         )
 
     def deviations(self) -> Dict[str, str]:
@@ -255,14 +371,59 @@ class NanoGPTConfig:
                 "throughout, one backward per step). NOT RECORD-FAITHFUL: "
                 "diagnostic probe for docs/nanogpt-port.md §6.1."
             )
+        if self.chunks_per_step is not None and self.chunks_per_step != self.record_world_size:
+            out["chunks_per_step"] = (
+                f"{self.chunks_per_step} record chunks per optimizer step = "
+                f"{self.tokens_per_step} tokens/step (record: "
+                f"{self.record_world_size} chunks = {RECORD_TOKENS_PER_STEP}). "
+                "NOT RECORD-FAITHFUL: changes the token batch and data order. "
+                "Program #7 frontier-transfer axis."
+            )
+        if self.head_chunk_rows is not None:
+            out["head_chunk_rows"] = (
+                f"lm_head + soft-cap + cross-entropy computed over row chunks "
+                f"of {self.head_chunk_rows} (train chunks gradient-checkpointed; "
+                "record: one full-width head GEMM). Same math up to fp32 "
+                "summation order. NOT RECORD-FAITHFUL: 32 GB-GPU memory path "
+                "(model.py PORT CHANGE P5)."
+            )
         if self.num_iterations != RECORD_NUM_ITERATIONS:
             out["num_iterations"] = f"{self.num_iterations} (record {RECORD_NUM_ITERATIONS})"
         if self.min_lr_frac != 0.05:
             out["min_lr_frac"] = f"{self.min_lr_frac} (record 0.05)"
         if self.max_steps is not None:
             out["max_steps"] = f"truncated at {self.max_steps} steps — smoke run, not a record run"
+        if self.tempo_probe:
+            out["tempo_probe"] = (
+                f"program-#8 passive tempo probe on (subset {self.tempo_probe_subset}); "
+                "measurement-only, update path untouched (optim.py PORT CHANGE P6)"
+            )
         if not self.compile:
             out["compile"] = "torch.compile disabled (record compiles); slower, ML-neutral"
+        if self.tail.mode != "none":
+            out["tail_mode"] = (
+                f"Wave-1 tail mode {self.tail.mode!r} from step "
+                f"{self.tail.start_step} (kappa {self.tail.kappa}"
+                + (f", rho {self.tail.rho}" if self.tail.mode == "schedule_free" else "")
+                + "). NOT RECORD-FAITHFUL: replaces the record's LR decay "
+                "(prereg reports/wave1-anneal-decomposition-prereg.md §0)."
+            )
+        if self.tail.accumulate:
+            out["tail_accumulate"] = (
+                "streaming fp32 tail iterate means (W1/W2/Polyak + final), "
+                "spike-gated; measurement only, update path untouched (prereg §0.3)"
+            )
+        if self.gauge_probe:
+            out["gauge_probe"] = (
+                "program-#20 passive gauge probe (per-step weight/update norm "
+                "scalars in Muon.step); measurement-only, update path untouched "
+                "(optim.py PORT CHANGE P7)"
+            )
+        if self.fork_from is not None:
+            out["fork_from"] = (
+                f"trajectory forked from checkpoint {self.fork_from} "
+                "(hot-fingerprint + stable-plateau guarded; prereg §0.2)"
+            )
         return out
 
     def validate(self) -> None:
@@ -270,9 +431,18 @@ class NanoGPTConfig:
             raise ConfigError(f"precision_mode must be 'fp8' or 'bf16', got {self.precision_mode!r}")
         if self.attention_impl not in ("flex", "sdpa"):
             raise ConfigError(f"attention_impl must be 'flex' or 'sdpa', got {self.attention_impl!r}")
-        accumulation_factor(self.device_count, self.record_world_size)  # raises
-        if self.tokens_per_step != self.record_world_size * self.train_seq_len:
-            raise ConfigError("token batch per optimizer step does not match the record")
+        if self.chunks_per_step is None:
+            accumulation_factor(self.device_count, self.record_world_size)  # raises
+            if self.tokens_per_step != self.record_world_size * self.train_seq_len:
+                raise ConfigError("token batch per optimizer step does not match the record")
+        else:
+            if self.chunks_per_step < 1:
+                raise ConfigError(f"chunks_per_step must be >= 1, got {self.chunks_per_step}")
+            if self.chunks_per_step % self.device_count != 0:
+                raise ConfigError(
+                    f"device_count {self.device_count} does not divide "
+                    f"chunks_per_step {self.chunks_per_step}"
+                )
         if self.val_tokens % self.val_seq_len != 0:
             raise ConfigError(
                 f"val_tokens {self.val_tokens} not divisible by val_seq_len {self.val_seq_len} "
@@ -285,15 +455,120 @@ class NanoGPTConfig:
             )
         if self.train_seq_len % 128 != 0:
             raise ConfigError("train_seq_len must be a multiple of the 128-token block size")
+        if self.head_chunk_rows is not None:
+            if self.head_chunk_rows <= 0:
+                raise ConfigError("head_chunk_rows must be positive")
+            if self.train_seq_len % self.head_chunk_rows != 0:
+                raise ConfigError(
+                    f"train_seq_len {self.train_seq_len} not divisible by "
+                    f"head_chunk_rows {self.head_chunk_rows}"
+                )
+            if self.val_seq_len % self.head_chunk_rows != 0:
+                raise ConfigError(
+                    f"val_seq_len {self.val_seq_len} not divisible by "
+                    f"head_chunk_rows {self.head_chunk_rows}"
+                )
         if self.num_layers % 2 != 0:
             raise ConfigError("num_layers must be even (RECORD:419 asserts this)")
         if self.max_steps is not None and self.max_steps < 0:
             raise ConfigError("max_steps must be >= 0")
+        if self.tempo_probe_subset < 1:
+            raise ConfigError("tempo_probe_subset must be >= 1")
+        if self.tempo_probe_flush_every < 1:
+            raise ConfigError("tempo_probe_flush_every must be >= 1")
+        # ---- Wave-1 tail block (prereg §0) --------------------------------
+        t = self.tail
+        if t.mode not in ("none", "schedule_free", "batch_ramp"):
+            raise ConfigError(f"tail.mode must be none|schedule_free|batch_ramp, got {t.mode!r}")
+        if t.mode != "none" or t.accumulate:
+            if not (1 <= t.start_step <= self.num_iterations):
+                raise ConfigError(
+                    f"tail.start_step {t.start_step} outside [1, {self.num_iterations}]"
+                )
+        if t.mode == "schedule_free" and not (0.0 <= t.rho < 1.0):
+            raise ConfigError(f"tail.rho must be in [0, 1), got {t.rho}")
+        if t.mode == "schedule_free" and self.checkpoint.every_steps:
+            raise ConfigError(
+                "tail.mode schedule_free does not support periodic checkpoints "
+                "(the xbar/stash state is not checkpointed; a resume would "
+                "silently reset the Polyak average). Set checkpoint.every_steps: "
+                "0 — retries restart the tail from the fork prefix."
+            )
+        if t.mode != "none" and t.kappa <= 0:
+            raise ConfigError(f"tail.kappa must be > 0, got {t.kappa}")
+        if t.mode == "batch_ramp":
+            if self.device_count != 1:
+                raise ConfigError(
+                    "tail.mode batch_ramp requires device_count == 1 (the ramp "
+                    "varies micro-batch count per step; multi-rank splitting of "
+                    "a variable chunk count is not implemented)"
+                )
+            if self.checkpoint.every_steps:
+                raise ConfigError(
+                    "tail.mode batch_ramp does not support periodic checkpoints "
+                    "(mid-ramp loader buffer state is not checkpointable); set "
+                    "checkpoint.every_steps: 0 and rely on the fork prefix"
+                )
+            if self.max_steps is not None:
+                raise ConfigError("tail.mode batch_ramp is incompatible with max_steps")
+        if t.accumulate:
+            for name, (lo, hi) in (("w1_window", t.w1_window), ("w2_window", t.w2_window)):
+                if not (t.start_step <= lo < hi <= self.num_iterations):
+                    raise ConfigError(
+                        f"tail.{name} {lo, hi} must satisfy start_step <= lo < hi <= "
+                        f"num_iterations ({t.start_step}, {self.num_iterations})"
+                    )
+            if t.mode == "batch_ramp":
+                raise ConfigError(
+                    "tail.accumulate with batch_ramp is not supported: window "
+                    "steps are record-step-indexed and the ramp compresses the "
+                    "step axis (prereg registers no ramp accumulators)"
+                )
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
         d["adam_betas"] = list(self.adam_betas)
         return d
+
+    def config_fingerprint(self) -> str:
+        """8-hex identity of everything that shapes the trajectory.
+
+        Excludes ``seed`` (already in the checkpoint tag) and the
+        ``checkpoint`` block (operational, not trajectory-shaping). Two runs
+        may share a checkpoint file ONLY if this matches — the program-#7
+        incident (sweep variants over muon_lr colliding on one
+        seed+iterations-keyed file and replaying each other's finished
+        trajectories) is the reason this exists.
+        """
+        import hashlib
+
+        d = self.to_dict()
+        d.pop("seed", None)
+        d.pop("checkpoint", None)
+        # P7: measurement-only, never trajectory-shaping; excluding it keeps
+        # pre-P7 checkpoints resumable and fork-compatible.
+        d.pop("gauge_probe", None)
+        blob = json.dumps(d, sort_keys=True, default=str)
+        return hashlib.sha1(blob.encode()).hexdigest()[:8]
+
+    def hot_fingerprint(self) -> str:
+        """8-hex identity of everything shaping the STABLE-PHASE trajectory.
+
+        Excludes, beyond ``config_fingerprint``'s exclusions, the fields that
+        only act at or after decay onset — cooldown_frac, min_lr_frac (both
+        inert while w == 1), max_steps, the tail block, and fork_from itself.
+        Two configs sharing this fingerprint produce identical trajectories
+        through any step on both configs' stable plateaus; the fork guard in
+        train.py additionally checks the plateau bounds (prereg §0.2).
+        """
+        import hashlib
+
+        d = self.to_dict()
+        for key in ("seed", "checkpoint", "cooldown_frac", "min_lr_frac",
+                    "max_steps", "tail", "fork_from", "gauge_probe"):
+            d.pop(key, None)
+        blob = json.dumps(d, sort_keys=True, default=str)
+        return hashlib.sha1(blob.encode()).hexdigest()[:8]
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "NanoGPTConfig":

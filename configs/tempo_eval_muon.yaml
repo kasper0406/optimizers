@@ -1,0 +1,35 @@
+# Program #8 eval-seed confirmation, arm 1/2: stock Muon at the record
+# airbench_smoke recipe across the LR ladder. Comparison-table run: eval
+# seed policy (seeds 0-99 resolved by sweep.py at launch; never written
+# here -- CLAUDE.md rule 2). Counterpart: configs/tempo_eval_global.yaml.
+# The tempo arm's controller constants were frozen on dev seeds 1420-1439
+# (reports/tempo-phase-b.md section 3) BEFORE this launch; no tuning on
+# eval seeds. Top-level seed is a dev seed for single debug runs only.
+experiment: airbench_smoke
+seed: 1440
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  normalize_filter_weights: true
+  compile: false
+  tta_level: 2
+
+optimizer:
+  name: muon
+  lr: 0.24
+  momentum: 0.6
+  nesterov: true
+  ns_steps: 3
+  weight_decay: 0.0
+
+sweep:
+  seeds: eval
+  grid:
+    optimizer.lr: [0.24, 0.48, 0.72, 0.96]

@@ -16,6 +16,8 @@ from src.optim.interface import MatrixOptimizer, NoOpOptimizer
 from src.optim.muon import Muon
 from src.optim.normuon import NorMuon
 from src.optim.routed import RoutedMuon
+from src.optim.firmuon import FIRMuon
+from src.optim.tempomuon import TempoMuon
 
 OPTIMIZER_REGISTRY: Dict[str, Type[MatrixOptimizer]] = {
     "noop": NoOpOptimizer,
@@ -25,6 +27,8 @@ OPTIMIZER_REGISTRY: Dict[str, Type[MatrixOptimizer]] = {
     "adamuon": AdaMuon,
     "normuon": NorMuon,
     "routed": RoutedMuon,  # WP2.1
+    "tempomuon": TempoMuon,  # program #8
+    "firmuon": FIRMuon,  # program #9
 }
 
 

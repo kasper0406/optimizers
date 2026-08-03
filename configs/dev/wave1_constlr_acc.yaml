@@ -1,0 +1,37 @@
+# Wave-1 (prereg reports/wave1-anneal-decomposition-prereg.md). Arm C (17/18/19 shared control): constant LR (min_lr_frac 1.0) forked from P + accumulators (W1/W2/Polyak/final). ~34 min.
+experiment: nanogpt
+device: auto
+seed: 1511
+nanogpt:
+  head_chunk_rows: 8192
+  fp32_embed_grad_accum: true
+  device_count: 1
+  precision_mode: fp8
+  attention_impl: flex
+  compile: true
+  warmup_steps: 10
+  num_iterations: 1750
+  cooldown_frac: 0.45
+  min_lr_frac: 1.0
+  val_loss_every: 125
+  val_tokens: 10485760
+  train_seq_len: 49152
+  val_seq_len: 262144
+  muon_lr: 0.05
+  muon_momentum: 0.95
+  muon_weight_decay: 0.0
+  adam_lr: 0.008
+  adam_betas:
+  - 0.8
+  - 0.95
+  adam_eps: 1.0e-10
+  adam_weight_decay: 0.0
+  target_val_loss: 3.28
+  fork_from: checkpoints/nanogpt_seed{seed}_it1750_d1_4fa43038_rank0.pt
+  tail:
+    accumulate: true
+  checkpoint:
+    dir: checkpoints
+    every_steps: 250
+    resume: true
+    keep_on_success: false

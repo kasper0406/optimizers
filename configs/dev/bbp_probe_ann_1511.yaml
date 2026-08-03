@@ -1,0 +1,18 @@
+# Program 22 BBP probe (prereg reports/bbp-prereg.md). Frozen-point msign alignment; no training.
+experiment: bbp_probe
+device: auto
+seed: 1511
+nanogpt:
+  head_chunk_rows: 8192
+  fp32_embed_grad_accum: true
+  device_count: 1
+  precision_mode: fp8
+  attention_impl: flex
+  compile: true
+  train_files: data/fineweb10B/fineweb_train_*.bin
+  val_files: data/fineweb10B/fineweb_val_*.bin
+bbp:
+  artifact: results/tail_artifacts/nanogpt_tail_seed1511_aacc5947_none.pt
+  window_step: 1750
+  n_chunks: 512
+  data_file_index: 3
