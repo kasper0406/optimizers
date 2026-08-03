@@ -147,6 +147,7 @@ from src.optim.airbench_zoo import (  # noqa: E402
     run_airbench_ema,
     run_airbench_instrumented,
     run_airbench_smoke,
+    run_airbench_teleport_gate,
 )
 
 
@@ -179,6 +180,9 @@ EXPERIMENT_REGISTRY = {
     "airbench_instrumented": run_airbench_instrumented,  # WP1.2 measurement runs
     "airbench_ema": run_airbench_ema,  # T1 EMA-as-anneal arms (litreview j §5)
     "airbench_anneal_branch": run_airbench_anneal_branch,  # anneal dissection (j §6.1)
+    # teleportation go/no-go gate (litreview j §6 item 4 / T6): grad-norm
+    # variation along conv->BN symmetry orbits at fixed loss
+    "airbench_teleport_gate": run_airbench_teleport_gate,
     "probe_divergence": _load_probe_divergence(),  # twin-trajectory probe
     # Later WPs register nanogpt experiments here.
 }

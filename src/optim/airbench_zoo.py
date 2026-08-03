@@ -894,6 +894,423 @@ def run_airbench_anneal_branch(
     }
 
 
+# ------------------------------------------------- teleportation go/no-go gate
+
+# Keys the ``gate:`` block must carry, exactly.
+GATE_KEYS = ("snapshot_steps", "n_samples", "spread", "refine_iters", "probe_batches")
+
+# A proposal counts as ON the loss level set iff |(L - L0) / L0| is below this.
+# Not a science threshold: it is the numerical definition of "same loss" for
+# the constrained search, and every draw's realized rel_dloss is reported so
+# the invariance itself is auditable from the results JSON.
+TELEPORT_INVARIANCE_TOL = 1e-3
+
+# Log-scale proposal standard deviation for the refinement random search.
+TELEPORT_REFINE_STEP = 0.25
+
+
+def _resolve_gate(config: Dict[str, Any], total_train_steps: int = None):
+    """Validate the ``gate:`` block of a teleportation-gate config.
+
+    Returns the normalized gate dict. CPU-safe (runs before any CUDA work).
+    When ``total_train_steps`` is given, snapshot points must lie in
+    (0, total].
+    """
+    gate = config.get("gate")
+    if not isinstance(gate, dict) or set(gate) != set(GATE_KEYS):
+        raise SystemExit(
+            "experiment 'airbench_teleport_gate' needs a gate: block with "
+            f"exactly the keys {', '.join(GATE_KEYS)}"
+        )
+    steps = gate["snapshot_steps"]
+    if (
+        not isinstance(steps, list)
+        or not steps
+        or not all(isinstance(v, int) and not isinstance(v, bool) for v in steps)
+        or sorted(set(steps)) != steps
+    ):
+        raise SystemExit(
+            "gate.snapshot_steps must be a non-empty strictly-increasing list "
+            f"of ints, got {steps!r}"
+        )
+    if steps[0] < 1:
+        raise SystemExit("gate.snapshot_steps must be >= 1")
+    counts = {}
+    for name, minimum in (
+        ("n_samples", 1),
+        ("refine_iters", 0),
+        ("probe_batches", 1),
+    ):
+        value = gate[name]
+        if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+            raise SystemExit(f"gate.{name} must be an int >= {minimum}, got {value!r}")
+        counts[name] = value
+    spread = gate["spread"]
+    if isinstance(spread, bool) or not isinstance(spread, (int, float)):
+        raise SystemExit(f"gate.spread must be a number > 1, got {spread!r}")
+    spread = float(spread)
+    if not spread > 1.0:
+        raise SystemExit(f"gate.spread must be > 1, got {spread}")
+    if total_train_steps is not None and steps[-1] > total_train_steps:
+        raise SystemExit(
+            f"gate.snapshot_steps beyond the run: {steps[-1]} > {total_train_steps}"
+        )
+    return {"snapshot_steps": list(steps), "spread": spread, **counts}
+
+
+def _ratio(value: float, base: float) -> float:
+    """value/base, or NaN when the base is zero (kept out of the JSON math)."""
+    return float(value / base) if base else float("nan")
+
+
+def run_airbench_teleport_gate(
+    config: Dict[str, Any], device: torch.device
+) -> Dict[str, Any]:
+    """Teleportation go/no-go gate — flow-first program item 4,
+    docs/litreview/j-theory-theorem-sweep.md section 6 (T6).
+
+    Symmetry teleportation provably accelerates iff the gradient norm VARIES
+    along the loss level set.  The conv->BatchNorm channel rescalings are a
+    closed-form, loss-invariant symmetry orbit of this network
+    (:mod:`src.instrument.orbit`), so the variation is directly measurable.
+    This experiment measures it at representative training states.
+
+    Stock airbench94 recipe (vendored Muon at the record hyperparameters
+    lr=0.24 momentum=0.6 nesterov, compile per recipe) trained under the STOCK
+    LINEAR LR decay -- unlike the anneal-dissection experiment, this one wants
+    the states the real recipe actually visits.  At each configured snapshot
+    step the live training state is snapshotted, ``probe_batches`` batches are
+    cached off the stream, and on that fixed probe loss (cross entropy,
+    label_smoothing 0.2, reduction sum -- the training loss) the harness:
+
+      1. records the base loss L0 and base gradient norms;
+      2. draws ``n_samples`` log-uniform channel rescalings in
+         [1/spread, spread], and for each records the realized relative loss
+         change and the Euclidean / Frobenius / NUCLEAR gradient-norm ratios;
+      3. runs a ``refine_iters``-iteration random search that MAXIMIZES the
+         nuclear-norm sum subject to |rel_dloss| < TELEPORT_INVARIANCE_TOL,
+         starting from the best feasible random draw.
+
+    Every probe evaluation is undone by a bit-exact restore from
+    ``src.optim.train_snapshot`` (multiplicative inversion is lossy in half
+    precision), and the cached probe batches are fed back to the base
+    trajectory afterwards, so the base run is unperturbed.
+
+    Reports BOTH Euclidean (Frobenius) and nuclear norms: the nuclear norm is
+    the Muon-relevant one (a Muon step's first-order loss decrease is
+    ``<G, polar(G)> = ||G||_*``), the Euclidean one is what the teleportation
+    literature states its conditions in.
+
+    The experiment measures and reports only.  It evaluates no gate and
+    carries no success threshold; the kill criterion (O(1%) heterogeneity)
+    lives in the config header and is judged by a human.
+
+    Dev-seed measurement experiment; never a comparison-table entry.
+    """
+    from src.instrument.orbit import (
+        apply_channel_scales,
+        find_conv_bn_pairs,
+        grad_norms,
+        pair_names,
+        refine_scales,
+        sample_log_uniform_scales,
+    )
+    from src.optim.train_snapshot import (
+        restore_training_state,
+        snapshot_training_state,
+    )
+
+    if "optimizer" in config:
+        raise SystemExit(
+            "experiment 'airbench_teleport_gate' pins the stock recipe; it "
+            "does not accept an optimizer override"
+        )
+    gate = _resolve_gate(config)
+    sampling = _resolve_sampling(config.get("recipe", {}))
+    if sampling is not None:
+        raise SystemExit("airbench_teleport_gate supports vendored sampling only")
+
+    if device.type != "cuda":
+        raise SystemExit("airbench_teleport_gate requires a CUDA device")
+
+    ab = load_vendor_airbench()
+
+    train_cfg = config.get("train", {})
+    recipe_cfg = config.get("recipe", {})
+    data_root = str(config.get("data", {}).get("root", "data/cifar10"))
+    epochs = float(train_cfg.get("epochs", 8))
+    batch_size = int(train_cfg.get("batch_size", 2000))
+    bias_lr = float(recipe_cfg.get("bias_lr", 0.053))
+    head_lr = float(recipe_cfg.get("head_lr", 0.67))
+    wd = float(recipe_cfg.get("sgd_weight_decay", 2e-6)) * batch_size
+    tta_level = int(recipe_cfg.get("tta_level", 0))
+
+    model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
+    if bool(recipe_cfg.get("compile", True)):
+        model.compile()
+
+    test_loader = ab.CifarLoader(data_root, train=False, batch_size=2000)
+    train_loader = ab.CifarLoader(
+        data_root, train=True, batch_size=batch_size, aug=dict(flip=True, translate=2)
+    )
+    total_train_steps = math.ceil(epochs * len(train_loader))
+    whiten_bias_train_steps = min(math.ceil(3 * len(train_loader)), total_train_steps)
+    _resolve_gate(config, total_train_steps)  # now with the bound known
+
+    # Parameter split + optimizers exactly as the stock harness
+    filter_params = [
+        p for p in model.parameters() if len(p.shape) == 4 and p.requires_grad
+    ]
+    norm_biases = [
+        p for n, p in model.named_parameters() if "norm" in n and p.requires_grad
+    ]
+    param_configs = [
+        dict(params=[model.whiten.bias], lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=norm_biases, lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=[model.head.weight], lr=head_lr, weight_decay=wd / head_lr),
+    ]
+    optimizer1 = torch.optim.SGD(
+        param_configs, momentum=0.85, nesterov=True, fused=True
+    )
+    optimizer2 = ab.Muon(
+        filter_params, lr=AIRBENCH_STOCK_LR, momentum=0.6, nesterov=True
+    )
+    optimizers = [optimizer1, optimizer2]
+    for opt in optimizers:
+        for group in opt.param_groups:
+            group["initial_lr"] = group["lr"]
+
+    pairs = find_conv_bn_pairs(model)
+    if not pairs:
+        raise SystemExit("no conv->BatchNorm pairs found; nothing to teleport along")
+
+    starter = torch.cuda.Event(enable_timing=True)
+    ender = torch.cuda.Event(enable_timing=True)
+    time_seconds = 0.0
+
+    def start_timer():
+        starter.record()
+
+    def stop_timer():
+        nonlocal time_seconds
+        ender.record()
+        torch.cuda.synchronize()
+        time_seconds += 1e-3 * starter.elapsed_time(ender)
+
+    model.reset()
+
+    start_timer()
+    train_images = train_loader.normalize(train_loader.images[:5000])
+    model.init_whiten(train_images)
+    stop_timer()
+
+    # Orbit draws use their own CPU generator, seeded from the (already
+    # run-seeded) global CPU RNG *after* model init so the init stream is
+    # untouched. Data augmentation draws from the CUDA RNG, so the probe's
+    # sampling cannot perturb the training trajectory at all.
+    gate_seed = int(torch.randint(0, 2**31 - 1, (1,)).item())
+    generator = torch.Generator().manual_seed(gate_seed)
+
+    def batch_stream():
+        while True:
+            for batch in train_loader:
+                yield batch
+
+    stream = batch_stream()
+
+    def train_step(inputs, labels, step_index):
+        """One stock-schedule training step (linear LR decay to zero)."""
+        # Probes leave the model in train mode already, but ab.evaluate() at the
+        # end of the run does not; re-assert per step as the branch harness does.
+        model.train()
+        outputs = model(
+            inputs, whiten_bias_grad=(step_index < whiten_bias_train_steps)
+        )
+        torch.nn.functional.cross_entropy(
+            outputs, labels, label_smoothing=0.2, reduction="sum"
+        ).backward()
+        for group in optimizer1.param_groups[:1]:
+            group["lr"] = group["initial_lr"] * (
+                1 - step_index / whiten_bias_train_steps
+            )
+        for group in optimizer1.param_groups[1:] + optimizer2.param_groups:
+            group["lr"] = group["initial_lr"] * (1 - step_index / total_train_steps)
+        for opt in optimizers:
+            opt.step()
+        model.zero_grad(set_to_none=True)
+
+    def teleport_probe(step_index, cache):
+        """Measure gradient-size variation along the orbit at this state."""
+        snap = snapshot_training_state(model, optimizers)
+        whiten_grad = step_index < whiten_bias_train_steps
+
+        def measure():
+            """Loss + gradient norms on the fixed probe batches; grads zeroed.
+
+            The logits are cast to float32 first.  The training loop leaves
+            them half, but a half-precision SUM-reduced loss over these batch
+            sizes lands near 1e4, where fp16 spacing is ~4 -- a relative
+            resolution of ~7e-4, which would swamp an invariance measurement
+            whose whole point is that |rel_dloss| is small.  The cast applies
+            identically to the base point and every orbit draw.  (The residual
+            floor is fp16 rounding of the RESCALED weights themselves, which
+            moves the point slightly off the exact orbit; the reported
+            ``max_abs_rel_dloss`` is exactly that floor.)
+            """
+            model.train()
+            total = None
+            for inputs, labels in cache:
+                outputs = model(inputs, whiten_bias_grad=whiten_grad)
+                part = torch.nn.functional.cross_entropy(
+                    outputs.float(), labels, label_smoothing=0.2, reduction="sum"
+                )
+                total = part if total is None else total + part
+            total.backward()
+            value = float(total.detach().float().item())
+            norms = grad_norms(model, pairs)
+            model.zero_grad(set_to_none=True)
+            return value, norms
+
+        base_loss, base = measure()
+        restore_training_state(model, optimizers, snap)
+
+        def evaluate(scales):
+            apply_channel_scales(pairs, scales)
+            loss_value, norms = measure()
+            restore_training_state(model, optimizers, snap)
+            return {
+                "rel_dloss": _ratio(loss_value - base_loss, abs(base_loss)),
+                "total_grad_ratio": _ratio(norms["total"], base["total"]),
+                "nuclear_sum_ratio": _ratio(norms["nuclear_sum"], base["nuclear_sum"]),
+                "fro_ratio": [
+                    _ratio(v, b) for v, b in zip(norms["fro"], base["fro"])
+                ],
+                "nuc_ratio": [
+                    _ratio(v, b) for v, b in zip(norms["nuclear"], base["nuclear"])
+                ],
+            }
+
+        draws = []
+        for _ in range(gate["n_samples"]):
+            scales = sample_log_uniform_scales(pairs, gate["spread"], generator)
+            draws.append((scales, evaluate(scales)))
+
+        feasible = [
+            (s, r)
+            for s, r in draws
+            if abs(r["rel_dloss"]) < TELEPORT_INVARIANCE_TOL
+            and math.isfinite(r["nuclear_sum_ratio"])
+        ]
+        best_random = None
+        init_scales = [torch.ones(int(c.weight.shape[0])) for c, _b, _n in pairs]
+        if feasible:
+            scales, best_random = max(
+                feasible, key=lambda sr: sr[1]["nuclear_sum_ratio"]
+            )
+            init_scales = scales
+
+        # Constrained refinement: maximize the nuclear-norm sum, discarding any
+        # proposal that leaves the level set.
+        best_holder: Dict[str, Any] = {"value": float("-inf"), "record": None}
+
+        def objective(scales):
+            record = evaluate(scales)
+            if abs(record["rel_dloss"]) >= TELEPORT_INVARIANCE_TOL:
+                return None
+            value = record["nuclear_sum_ratio"]
+            if not math.isfinite(value):
+                return None
+            if value > best_holder["value"]:
+                best_holder["value"] = value
+                best_holder["record"] = record
+            return value
+
+        search = refine_scales(
+            objective,
+            init_scales,
+            iters=gate["refine_iters"],
+            step_size=TELEPORT_REFINE_STEP,
+            spread_limit=gate["spread"],
+            generator=generator,
+        )
+        best_refined = None
+        if best_holder["record"] is not None:
+            best_refined = dict(best_holder["record"])
+            best_refined["n_accepted"] = search["n_accepted"]
+            best_refined["n_infeasible"] = search["n_infeasible"]
+
+        model.zero_grad(set_to_none=True)
+        restore_training_state(model, optimizers, snap)
+        model.train()
+
+        samples = [r for _s, r in draws]
+        return {
+            "step": step_index,
+            "base_loss": base_loss,
+            "base_total_grad": base["total"],
+            "base_nuclear_sum": base["nuclear_sum"],
+            "base_fro": base["fro"],
+            "base_nuclear": base["nuclear"],
+            "samples": samples,
+            "n_feasible": len(feasible),
+            "max_abs_rel_dloss": max(abs(r["rel_dloss"]) for r in samples),
+            "best_random": best_random,
+            "best_refined": best_refined,
+        }
+
+    import time as _time
+
+    snapshots: Dict[str, Dict[str, Any]] = {}
+    probe_seconds = 0.0  # measurement overhead, kept out of time_seconds
+    pending: list = []  # cached probe batches the base must still consume
+    remaining = list(gate["snapshot_steps"])
+
+    step = 0
+    start_timer()
+    while True:
+        if remaining and step == remaining[0]:
+            t_s = remaining.pop(0)
+            stop_timer()
+            cache = [
+                pending.pop(0) if pending else next(stream)
+                for _ in range(gate["probe_batches"])
+            ]
+            t_probe = _time.perf_counter()
+            snapshots[str(t_s)] = teleport_probe(t_s, cache)
+            torch.cuda.synchronize()
+            probe_seconds += _time.perf_counter() - t_probe
+            pending = cache + pending  # base resumes through the same batches
+            start_timer()
+        if step >= total_train_steps:
+            break
+        inputs, labels = pending.pop(0) if pending else next(stream)
+        train_step(inputs, labels, step)
+        step += 1
+    stop_timer()
+
+    final_val_acc = ab.evaluate(model, test_loader, tta_level=0)
+    final_tta_val_acc = (
+        ab.evaluate(model, test_loader, tta_level=tta_level) if tta_level else None
+    )
+
+    return {
+        "optimizer": "vendor_muon",
+        "epochs": epochs,
+        "steps": step,
+        "lr_schedule": "linear",
+        "gate": dict(gate),
+        "invariance_tol": TELEPORT_INVARIANCE_TOL,
+        "refine_step_size": TELEPORT_REFINE_STEP,
+        "gate_seed": gate_seed,
+        "pair_names": pair_names(pairs),
+        "snapshots": snapshots,
+        "final_val_acc": final_val_acc,
+        "final_tta_val_acc": final_tta_val_acc,
+        "time_seconds": time_seconds,  # training only
+        "probe_seconds": probe_seconds,  # orbit measurement overhead
+    }
+
+
 AIRBENCH_STOCK_LR = 0.24  # vendored record hyperparameter (airbench94_muon.py:362)
 
 # Gate-1 amendment A4 (mechanism probes): the ONLY optimizer keys a

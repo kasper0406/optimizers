@@ -289,6 +289,17 @@ convergence-speed payoff:
    cash-out reading of river-valley is refuted here; explains why the tuned
    recipe decays from step 0. Next: sub-100 branch points to find the phase
    boundary where the essential buildup ends.**
+**Decision 2026-08-03 (user):** mechanistic changes over further dissection.
+Adopted: **central-flow Muon** (item 2 below upgraded — integrate the
+time-averaged effective dynamics explicitly: Muon + oscillation-variance-
+weighted sharpness-gradient term via third-order autograd, `src/optim/
+sharpgrad.py` + `centralflow.py`; hypothesis: low-LR + explicit term
+reproduces high-LR effective dynamics and can compress the anneal walk) and
+**teleportation** (item 4, gate first: `airbench_teleport_gate` measures
+Frobenius AND nuclear grad-norm heterogeneity along per-channel conv→BN
+scale orbits at fixed train-mode loss; kill if O(1%)). Dropped by user:
+terminal-process replacement suite (batch-ramp / second-order finishers).
+
 2. **Progress decomposition** — attribute per-window loss decrease to motion
    along tracked oscillating directions vs the bulk complement, phase by
    phase (the measurable aggregate form of the river coordinate; the

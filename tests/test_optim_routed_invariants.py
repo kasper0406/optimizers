@@ -36,7 +36,26 @@ from src.optim.routed import RoutedMuon
 OPTIM_DIR = REPO_ROOT / "src" / "optim"
 # The experiment-harness adapter (not an optimizer; wires the WP1.2
 # instrumented experiment, whose probes live in src.instrument).
-HARNESS_EXCLUDED = {"airbench_zoo.py"}
+# sharpgrad/centralflow: the central-flow experiment line (litreview j §6,
+# adopted 2026-08-03) is *deliberately* curvature-in-the-update-path — that
+# is its scientific point — and must stay out of the WP2.x routed update
+# path instead (enforced by test_routed_does_not_import_centralflow below).
+HARNESS_EXCLUDED = {"airbench_zoo.py", "sharpgrad.py", "centralflow.py"}
+CENTRALFLOW_FILES = {"sharpgrad.py", "centralflow.py"}
+
+
+def test_routed_does_not_import_centralflow():
+    # The central-flow line may use curvature in its update path; the routed
+    # optimizer (WP2.1 distributed invariant 3) must never inherit that by
+    # importing it.
+    for path in _update_path_sources():
+        text = path.read_text()
+        for name in ("sharpgrad", "centralflow"):
+            assert f"optim.{name}" not in text and f"import {name}" not in text, (
+                f"src/optim/{path.name} imports the central-flow line "
+                f"({name}); the routed/WP2.x update path must stay "
+                "trajectory-only"
+            )
 
 
 def _update_path_sources():
