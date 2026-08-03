@@ -1610,6 +1610,238 @@ def run_airbench_centralflow(
     }
 
 
+TELEPORT_KEYS = {"enabled", "every", "start_step", "spread", "ascend_iters", "step_size"}
+
+
+def _resolve_teleport(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate the ``teleport:`` block (CPU-safe)."""
+    tp = config.get("teleport")
+    if not isinstance(tp, dict) or set(tp) != TELEPORT_KEYS:
+        raise SystemExit(
+            "experiment 'airbench_teleport' needs a teleport: block with "
+            f"exactly the keys {sorted(TELEPORT_KEYS)}"
+        )
+    out = {
+        "enabled": bool(tp["enabled"]),
+        "every": int(tp["every"]),
+        "start_step": int(tp["start_step"]),
+        "spread": float(tp["spread"]),
+        "ascend_iters": int(tp["ascend_iters"]),
+        "step_size": float(tp["step_size"]),
+    }
+    if out["every"] < 1:
+        raise SystemExit("teleport.every must be >= 1")
+    if out["start_step"] < 1:
+        raise SystemExit(
+            "teleport.start_step must be >= 1 (momentum buffers must exist)"
+        )
+    if out["spread"] <= 1.0:
+        raise SystemExit("teleport.spread must be > 1")
+    if out["ascend_iters"] < 0 or out["step_size"] <= 0:
+        raise SystemExit("teleport.ascend_iters must be >= 0, step_size > 0")
+    return out
+
+
+def run_airbench_teleport(
+    config: Dict[str, Any], device: torch.device
+) -> Dict[str, Any]:
+    """Teleport-Muon round 2 (litreview j §6 item 4; gate GO in
+    reports/wpj-mech-round1.md: +21–23% nuclear-norm headroom at fixed loss).
+
+    Stock airbench recipe (vendored Muon, compile per recipe — no
+    higher-order autograd here, so compile stays ON by default). Every
+    ``teleport.every`` steps from ``teleport.start_step`` on, between the
+    backward pass and the optimizer step, the harness:
+
+      1. runs the closed-form nuclear-norm ascent (src/optim/teleport.py) on
+         the current conv→BN gradient matrices — no extra forwards; the
+         gradient's transformation law along the orbit is exact;
+      2. moves the weights along the orbit (orbit.apply_channel_scales) and
+         transports the ENTIRE first-order state to the new gauge: p.grad
+         and the vendored Muon momentum buffer are row-scaled by 1/α, so the
+         imminent optimizer step acts coherently at the teleported point.
+
+    The vendored Muon's per-step Frobenius renormalization is
+    gauge-compatible (a uniform rescale is itself in the symmetry group), so
+    the relative channel pattern the ascent found survives it.
+
+    Arms are configs varying ``teleport.enabled``; dev-seed measurement
+    experiment; never a comparison-table entry.
+    """
+    if "optimizer" in config:
+        raise SystemExit(
+            "experiment 'airbench_teleport' pins the stock recipe; it does "
+            "not accept an optimizer override"
+        )
+    tp = _resolve_teleport(config)
+    sampling = _resolve_sampling(config.get("recipe", {}))
+    if sampling is not None:
+        raise SystemExit("airbench_teleport supports vendored sampling only")
+
+    if device.type != "cuda":
+        raise SystemExit("airbench_teleport requires a CUDA device")
+
+    from src.instrument.orbit import apply_channel_scales, find_conv_bn_pairs
+    from src.optim.teleport import teleport_alphas, transport_gradlike
+
+    ab = load_vendor_airbench()
+
+    train_cfg = config.get("train", {})
+    recipe_cfg = config.get("recipe", {})
+    data_root = str(config.get("data", {}).get("root", "data/cifar10"))
+    epochs = float(train_cfg.get("epochs", 8))
+    batch_size = int(train_cfg.get("batch_size", 2000))
+    bias_lr = float(recipe_cfg.get("bias_lr", 0.053))
+    head_lr = float(recipe_cfg.get("head_lr", 0.67))
+    wd = float(recipe_cfg.get("sgd_weight_decay", 2e-6)) * batch_size
+    tta_level = int(recipe_cfg.get("tta_level", 2))
+
+    model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
+    if bool(recipe_cfg.get("compile", True)):
+        model.compile()
+
+    test_loader = ab.CifarLoader(data_root, train=False, batch_size=2000)
+    train_loader = ab.CifarLoader(
+        data_root, train=True, batch_size=batch_size, aug=dict(flip=True, translate=2)
+    )
+    total_train_steps = math.ceil(epochs * len(train_loader))
+    whiten_bias_train_steps = min(math.ceil(3 * len(train_loader)), total_train_steps)
+
+    filter_params = [
+        p for p in model.parameters() if len(p.shape) == 4 and p.requires_grad
+    ]
+    norm_biases = [
+        p for n, p in model.named_parameters() if "norm" in n and p.requires_grad
+    ]
+    param_configs = [
+        dict(params=[model.whiten.bias], lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=norm_biases, lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=[model.head.weight], lr=head_lr, weight_decay=wd / head_lr),
+    ]
+    optimizer1 = torch.optim.SGD(
+        param_configs, momentum=0.85, nesterov=True, fused=True
+    )
+    optimizer2 = ab.Muon(
+        filter_params, lr=AIRBENCH_STOCK_LR, momentum=0.6, nesterov=True
+    )
+    optimizers = [optimizer1, optimizer2]
+    for opt in optimizers:
+        for group in opt.param_groups:
+            group["initial_lr"] = group["lr"]
+
+    pairs = find_conv_bn_pairs(model)
+    if tp["enabled"] and not pairs:
+        raise SystemExit("no conv->BatchNorm pairs found; nothing to teleport along")
+
+    starter = torch.cuda.Event(enable_timing=True)
+    ender = torch.cuda.Event(enable_timing=True)
+    time_seconds = 0.0
+
+    def start_timer():
+        starter.record()
+
+    def stop_timer():
+        nonlocal time_seconds
+        ender.record()
+        torch.cuda.synchronize()
+        time_seconds += 1e-3 * starter.elapsed_time(ender)
+
+    model.reset()
+    step = 0
+
+    start_timer()
+    train_images = train_loader.normalize(train_loader.images[:5000])
+    model.init_whiten(train_images)
+    stop_timer()
+
+    teleport_timeseries = []
+    val_accs = []
+    train_acc = float("nan")
+    for _epoch in range(math.ceil(total_train_steps / len(train_loader))):
+        start_timer()
+        model.train()
+        for inputs, labels in train_loader:
+            outputs = model(inputs, whiten_bias_grad=(step < whiten_bias_train_steps))
+            torch.nn.functional.cross_entropy(
+                outputs, labels, label_smoothing=0.2, reduction="sum"
+            ).backward()
+            if (
+                tp["enabled"]
+                and step >= tp["start_step"]
+                and step % tp["every"] == 0
+            ):
+                grads_2d = [
+                    conv.weight.grad.detach().float().reshape(
+                        conv.weight.shape[0], -1
+                    )
+                    for conv, _bn, _n in pairs
+                ]
+                alphas, ratios = teleport_alphas(
+                    pairs,
+                    grads_2d,
+                    spread=tp["spread"],
+                    iters=tp["ascend_iters"],
+                    step_size=tp["step_size"],
+                )
+                apply_channel_scales(pairs, alphas)
+                with torch.no_grad():
+                    for (conv, _bn, _n), a in zip(pairs, alphas):
+                        transport_gradlike(conv.weight.grad, a)
+                        if conv.bias is not None and conv.bias.grad is not None:
+                            transport_gradlike(conv.bias.grad, a)
+                        buf = optimizer2.state.get(conv.weight, {}).get(
+                            "momentum_buffer"
+                        )
+                        if buf is not None:
+                            transport_gradlike(buf, a)
+                teleport_timeseries.append(
+                    {
+                        "step": step,
+                        "mean_ratio": float(sum(ratios) / len(ratios)),
+                        "max_ratio": float(max(ratios)),
+                        "min_ratio": float(min(ratios)),
+                    }
+                )
+            for group in optimizer1.param_groups[:1]:
+                group["lr"] = group["initial_lr"] * (
+                    1 - step / whiten_bias_train_steps
+                )
+            for group in optimizer1.param_groups[1:] + optimizer2.param_groups:
+                group["lr"] = group["initial_lr"] * (1 - step / total_train_steps)
+            for opt in optimizers:
+                opt.step()
+            model.zero_grad(set_to_none=True)
+            step += 1
+            if step >= total_train_steps:
+                break
+        stop_timer()
+
+        train_acc = (outputs.detach().argmax(1) == labels).float().mean().item()
+        val_accs.append(ab.evaluate(model, test_loader, tta_level=0))
+        if step >= total_train_steps:
+            break
+
+    start_timer()
+    tta_val_acc = (
+        ab.evaluate(model, test_loader, tta_level=tta_level) if tta_level else None
+    )
+    stop_timer()
+
+    return {
+        "optimizer": "vendor_muon",
+        "epochs": epochs,
+        "steps": step,
+        "teleport": dict(tp),
+        "train_acc_last": train_acc,
+        "val_accs": val_accs,
+        "val_acc": val_accs[-1],
+        "tta_val_acc": tta_val_acc,
+        "teleport_timeseries": teleport_timeseries,
+        "n_teleports": len(teleport_timeseries),
+        "time_seconds": time_seconds,
+    }
+
+
 AIRBENCH_STOCK_LR = 0.24  # vendored record hyperparameter (airbench94_muon.py:362)
 
 # Gate-1 amendment A4 (mechanism probes): the ONLY optimizer keys a

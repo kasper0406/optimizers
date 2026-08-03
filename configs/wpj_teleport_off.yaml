@@ -1,0 +1,32 @@
+# Teleport-Muon round 2, arm OFF: the stock trajectory through the identical
+# harness (compile on, stock schedule) — the seed-paired baseline for
+# wpj_teleport_on.yaml. Dev-seed measurement run; never a comparison-table
+# entry.
+# Launch: uv run python scripts/sweep.py configs/wpj_teleport_off.yaml
+experiment: airbench_teleport
+seed: 3001
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  compile: true
+  tta_level: 2
+
+teleport:
+  enabled: false
+  every: 25
+  start_step: 10
+  spread: 2.0
+  ascend_iters: 20
+  step_size: 0.3
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 20
