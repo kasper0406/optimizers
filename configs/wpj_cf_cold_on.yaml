@@ -1,0 +1,34 @@
+# Central-flow Muon v0, arm C: cold LR (quarter of stock) + the EXPLICIT
+# central-flow curvature-penalty term — the mechanism arm. Prediction if the
+# central flow is the operative mechanism of high-LR training: this arm
+# recovers toward the arm-A stock reference (accuracy and/or its sharpness
+# trajectory) without oscillating; if it stays at arm B's level the explicit
+# term is not capturing what the oscillation does. litreview j §6 item 2.
+# Dev-seed measurement run; never a comparison-table entry.
+# Launch: uv run python scripts/sweep.py configs/wpj_cf_cold_on.yaml
+experiment: airbench_centralflow
+seed: 3001
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  compile: false
+  tta_level: 2
+
+cf:
+  lr_scale: 0.25
+  enabled: true
+  refresh_every: 10
+  k_directions: 4
+  beta_scale: 1.0
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 10

@@ -146,6 +146,7 @@ from src.optim.airbench_zoo import (  # noqa: E402
     run_airbench_anneal_branch,
     run_airbench_ema,
     run_airbench_instrumented,
+    run_airbench_centralflow,
     run_airbench_smoke,
     run_airbench_teleport_gate,
 )
@@ -183,6 +184,9 @@ EXPERIMENT_REGISTRY = {
     # teleportation go/no-go gate (litreview j §6 item 4 / T6): grad-norm
     # variation along conv->BN symmetry orbits at fixed loss
     "airbench_teleport_gate": run_airbench_teleport_gate,
+    # central-flow Muon v0 (litreview j §6 item 2): explicit curvature-penalty
+    # term at reduced LR vs implicit high-LR oscillation
+    "airbench_centralflow": run_airbench_centralflow,
     "probe_divergence": _load_probe_divergence(),  # twin-trajectory probe
     # Later WPs register nanogpt experiments here.
 }

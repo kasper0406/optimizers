@@ -1311,6 +1311,273 @@ def run_airbench_teleport_gate(
     }
 
 
+CF_KEYS = {"lr_scale", "enabled", "refresh_every", "k_directions", "beta_scale"}
+
+
+def _resolve_cf(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate the ``cf:`` block of a central-flow config (CPU-safe)."""
+    cf = config.get("cf")
+    if not isinstance(cf, dict) or set(cf) != CF_KEYS:
+        raise SystemExit(
+            "experiment 'airbench_centralflow' needs a cf: block with exactly "
+            f"the keys {sorted(CF_KEYS)}"
+        )
+    out = {
+        "lr_scale": float(cf["lr_scale"]),
+        "enabled": bool(cf["enabled"]),
+        "refresh_every": int(cf["refresh_every"]),
+        "k_directions": int(cf["k_directions"]),
+        "beta_scale": float(cf["beta_scale"]),
+    }
+    if not 0.0 < out["lr_scale"] <= 1.0:
+        raise SystemExit(f"cf.lr_scale must be in (0, 1], got {out['lr_scale']}")
+    if out["refresh_every"] < 1:
+        raise SystemExit("cf.refresh_every must be >= 1")
+    if not 1 <= out["k_directions"] <= 16:
+        raise SystemExit("cf.k_directions must be in [1, 16]")
+    if out["beta_scale"] < 0.0:
+        raise SystemExit("cf.beta_scale must be >= 0")
+    return out
+
+
+def momentum_topk_directions(momentum: torch.Tensor, k: int):
+    """Top-k singular directions of a (2-D-reshaped) momentum buffer as
+    rank-1 matrices ``u_i v_i^T`` (unit Frobenius norm each).
+
+    These are the directions Muon's polar update weights equally and where
+    the per-direction iterate oscillation of amplitude ~eta lives (finding
+    F3/T3, docs/litreview/j-theory-theorem-sweep.md); the central-flow v0
+    penalizes directional curvature exactly there.
+    """
+    m = momentum.detach().float().reshape(momentum.shape[0], -1)
+    k = min(k, min(m.shape))
+    u, _s, vh = torch.linalg.svd(m, full_matrices=False)
+    return [
+        torch.outer(u[:, i], vh[i, :]).reshape(momentum.shape) for i in range(k)
+    ]
+
+
+def run_airbench_centralflow(
+    config: Dict[str, Any], device: torch.device
+) -> Dict[str, Any]:
+    """Central-flow Muon v0 — flow-first program item 2 (litreview j §6).
+
+    The mechanism test: does an EXPLICIT central-flow curvature-penalty term
+    (src/optim/centralflow.py) at reduced LR reproduce what high-LR
+    oscillating training achieves implicitly? Stock airbench recipe with the
+    Muon (and SGD) LRs scaled by ``cf.lr_scale``, stock linear schedule
+    shape; when ``cf.enabled``, every ``cf.refresh_every`` steps the penalty
+    gradient ``grad_w sum_i w_i * v_i^T H v_i`` is recomputed on the current
+    batch over the top-``cf.k_directions`` momentum singular directions of
+    each filter matrix, with the theory-grounded v0 weights
+
+        w_i = eta_t^2 / 2        (eta_t = current scaled Muon LR)
+
+    — Muon's per-direction oscillation amplitude is ~eta (our F3/T3 bounded-
+    update finding), so eta^2 is the iterate-oscillation variance the central
+    flow says the oscillation would contribute. The cached penalty is applied
+    every step with beta = eta_t * cf.beta_scale.
+
+    ``recipe.compile`` defaults OFF here: the refresh runs a third-order
+    autograd chain through the model forward, which torch.compile does not
+    reliably support; arms are compared uncompiled-vs-uncompiled.
+
+    Arms are config files varying (lr_scale, enabled); dev-seed measurement
+    experiment; never a comparison-table entry.
+    """
+    from src.optim.centralflow import CentralFlowTerm
+
+    if "optimizer" in config:
+        raise SystemExit(
+            "experiment 'airbench_centralflow' pins the stock recipe; it "
+            "does not accept an optimizer override"
+        )
+    cf = _resolve_cf(config)
+    sampling = _resolve_sampling(config.get("recipe", {}))
+    if sampling is not None:
+        raise SystemExit("airbench_centralflow supports vendored sampling only")
+
+    if device.type != "cuda":
+        raise SystemExit("airbench_centralflow requires a CUDA device")
+
+    ab = load_vendor_airbench()
+
+    train_cfg = config.get("train", {})
+    recipe_cfg = config.get("recipe", {})
+    data_root = str(config.get("data", {}).get("root", "data/cifar10"))
+    epochs = float(train_cfg.get("epochs", 8))
+    batch_size = int(train_cfg.get("batch_size", 2000))
+    bias_lr = float(recipe_cfg.get("bias_lr", 0.053))
+    head_lr = float(recipe_cfg.get("head_lr", 0.67))
+    wd = float(recipe_cfg.get("sgd_weight_decay", 2e-6)) * batch_size
+    tta_level = int(recipe_cfg.get("tta_level", 2))
+
+    model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
+    if bool(recipe_cfg.get("compile", False)):  # default OFF (third-order chain)
+        model.compile()
+
+    test_loader = ab.CifarLoader(data_root, train=False, batch_size=2000)
+    train_loader = ab.CifarLoader(
+        data_root, train=True, batch_size=batch_size, aug=dict(flip=True, translate=2)
+    )
+    total_train_steps = math.ceil(epochs * len(train_loader))
+    whiten_bias_train_steps = min(math.ceil(3 * len(train_loader)), total_train_steps)
+
+    filter_params = [
+        p for p in model.parameters() if len(p.shape) == 4 and p.requires_grad
+    ]
+    norm_biases = [
+        p for n, p in model.named_parameters() if "norm" in n and p.requires_grad
+    ]
+    param_configs = [
+        dict(params=[model.whiten.bias], lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=norm_biases, lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=[model.head.weight], lr=head_lr, weight_decay=wd / head_lr),
+    ]
+    # LR scale applies to every scheduled group (Muon AND the SGD groups):
+    # the arm is "the same recipe, colder", not a per-group reweighting.
+    optimizer1 = torch.optim.SGD(
+        param_configs, momentum=0.85, nesterov=True, fused=True
+    )
+    optimizer2 = ab.Muon(
+        filter_params, lr=AIRBENCH_STOCK_LR, momentum=0.6, nesterov=True
+    )
+    optimizers = [optimizer1, optimizer2]
+    for opt in optimizers:
+        for group in opt.param_groups:
+            group["initial_lr"] = group["lr"] * cf["lr_scale"]
+
+    term = CentralFlowTerm() if cf["enabled"] else None
+
+    starter = torch.cuda.Event(enable_timing=True)
+    ender = torch.cuda.Event(enable_timing=True)
+    time_seconds = 0.0
+
+    def start_timer():
+        starter.record()
+
+    def stop_timer():
+        nonlocal time_seconds
+        ender.record()
+        torch.cuda.synchronize()
+        time_seconds += 1e-3 * starter.elapsed_time(ender)
+
+    model.reset()
+    step = 0
+
+    start_timer()
+    train_images = train_loader.normalize(train_loader.images[:5000])
+    model.init_whiten(train_images)
+    stop_timer()
+
+    cf_timeseries = []
+    val_accs = []
+    train_acc = float("nan")
+    for _epoch in range(math.ceil(total_train_steps / len(train_loader))):
+        start_timer()
+        model.train()
+        for inputs, labels in train_loader:
+            outputs = model(inputs, whiten_bias_grad=(step < whiten_bias_train_steps))
+            torch.nn.functional.cross_entropy(
+                outputs, labels, label_smoothing=0.2, reduction="sum"
+            ).backward()
+            for group in optimizer1.param_groups[:1]:
+                group["lr"] = group["initial_lr"] * (
+                    1 - step / whiten_bias_train_steps
+                ) / cf["lr_scale"]  # whiten bias keeps its stock, unscaled decay
+            for group in optimizer1.param_groups[1:] + optimizer2.param_groups:
+                group["lr"] = group["initial_lr"] * (1 - step / total_train_steps)
+            muon_lr = optimizer2.param_groups[0]["lr"]
+            for opt in optimizers:
+                opt.step()
+            model.zero_grad(set_to_none=True)
+            if term is not None:
+                if step % cf["refresh_every"] == 0:
+                    directions = []
+                    for p in filter_params:
+                        buf = optimizer2.state.get(p, {}).get("momentum_buffer")
+                        if buf is None:
+                            continue
+                        for d in momentum_topk_directions(buf, cf["k_directions"]):
+                            directions.append(
+                                [
+                                    d.to(q.dtype) if q is p else None
+                                    for q in filter_params
+                                ]
+                            )
+                    if directions:
+                        weights = [0.5 * muon_lr**2] * len(directions)
+                        b_inputs, b_labels = inputs, labels
+
+                        def loss_fn():
+                            model.train()
+                            out = model(
+                                b_inputs,
+                                whiten_bias_grad=False,  # frozen past epoch 3;
+                                # CF only ever touches filter params anyway
+                            )
+                            return torch.nn.functional.cross_entropy(
+                                out.float(),
+                                b_labels,
+                                label_smoothing=0.2,
+                                reduction="sum",
+                            )
+
+                        term.refresh(
+                            loss_fn, filter_params, directions, weights, step=step
+                        )
+                if term.penalty_grads is not None:
+                    term.apply(filter_params, beta=muon_lr * cf["beta_scale"])
+                    if step % ROUTING_TS_EVERY == 0:
+                        stats = term.stats()
+                        cf_timeseries.append(
+                            {
+                                "step": step,
+                                "muon_lr": muon_lr,
+                                "n_directions": stats["n_directions"],
+                                "penalty_grad_norm": stats["penalty_grad_norm"],
+                                "curvature_mean": (
+                                    sum(stats["curvatures"])
+                                    / max(1, len(stats["curvatures"]))
+                                ),
+                                "curvature_max": (
+                                    max(stats["curvatures"])
+                                    if stats["curvatures"]
+                                    else 0.0
+                                ),
+                            }
+                        )
+            step += 1
+            if step >= total_train_steps:
+                break
+        stop_timer()
+
+        train_acc = (outputs.detach().argmax(1) == labels).float().mean().item()
+        val_accs.append(ab.evaluate(model, test_loader, tta_level=0))
+        if step >= total_train_steps:
+            break
+
+    start_timer()
+    tta_val_acc = (
+        ab.evaluate(model, test_loader, tta_level=tta_level) if tta_level else None
+    )
+    stop_timer()
+
+    return {
+        "optimizer": "vendor_muon",
+        "epochs": epochs,
+        "steps": step,
+        "cf": dict(cf),
+        "weight_mode": "eta_sq_half_topk_momentum",
+        "train_acc_last": train_acc,
+        "val_accs": val_accs,
+        "val_acc": val_accs[-1],
+        "tta_val_acc": tta_val_acc,
+        "cf_timeseries": cf_timeseries,
+        "time_seconds": time_seconds,
+    }
+
+
 AIRBENCH_STOCK_LR = 0.24  # vendored record hyperparameter (airbench94_muon.py:362)
 
 # Gate-1 amendment A4 (mechanism probes): the ONLY optimizer keys a
