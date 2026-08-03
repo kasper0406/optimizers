@@ -1507,41 +1507,41 @@ def run_airbench_centralflow(
             model.zero_grad(set_to_none=True)
             if term is not None:
                 if step % cf["refresh_every"] == 0:
-                    # Memory-bounded refresh: one chunk per filter matrix,
-                    # each with its own forward on a small probe slice of the
-                    # current batch — a joint refresh over all matrices on the
-                    # full 2000-sample graph OOMs a 48 GB card (third-order
-                    # chains hold the full graph per direction set).
+                    # Memory-bounded fp32 refresh. Two hard-won constraints
+                    # from the GPU smokes: (a) a joint refresh over all
+                    # matrices on the full-batch graph OOMs a 48 GB card, so
+                    # chunk per matrix on a probe slice; (b) second/third-
+                    # order autograd through the fp16 training graph is NaN
+                    # from step 0, so the curvature is evaluated on the
+                    # detached-fp32 functional pattern of src/instrument/hvp
+                    # (train-mode BN uses batch stats, so sharing one
+                    # override set across chunks does not shift the surface).
+                    from src.instrument.hvp import (
+                        default_ce_loss,
+                        fp32_functional_loss,
+                        fp32_overrides,
+                    )
+
                     b_inputs = inputs[:CF_PROBE_SAMPLES]
                     b_labels = labels[:CF_PROBE_SAMPLES]
+                    overrides, leaves = fp32_overrides(
+                        model, grad_param_ids={id(p) for p in filter_params}
+                    )
+                    cf_params = [leaves[id(p)] for p in filter_params]
+                    ce = default_ce_loss()
 
-                    def make_loss_fn():
-                        def loss_fn():
-                            model.train()
-                            out = model(
-                                b_inputs,
-                                whiten_bias_grad=False,  # frozen past epoch 3;
-                                # CF only ever touches filter params anyway
-                            )
-                            return torch.nn.functional.cross_entropy(
-                                out.float(),
-                                b_labels,
-                                label_smoothing=0.2,
-                                reduction="sum",
-                            )
-
-                        return loss_fn
+                    def loss_fn():
+                        return fp32_functional_loss(
+                            model, overrides, b_inputs, b_labels, ce
+                        )
 
                     chunks = []
-                    for p in filter_params:
+                    for j, p in enumerate(filter_params):
                         buf = optimizer2.state.get(p, {}).get("momentum_buffer")
                         if buf is None:
                             continue
                         dirs = [
-                            [
-                                d.to(q.dtype) if q is p else None
-                                for q in filter_params
-                            ]
+                            [d if i == j else None for i in range(len(cf_params))]
                             for d in momentum_topk_directions(
                                 buf, cf["k_directions"]
                             )
@@ -1549,11 +1549,15 @@ def run_airbench_centralflow(
                         if not dirs:
                             continue  # degenerate/non-finite buffer this step
                         weights = [0.5 * muon_lr**2] * len(dirs)
-                        chunks.append(
-                            (make_loss_fn(), filter_params, dirs, weights)
-                        )
+                        chunks.append((loss_fn, cf_params, dirs, weights))
                     if chunks:
                         term.refresh_from_chunks(chunks, step=step)
+                        if not math.isfinite(
+                            term.stats()["penalty_grad_norm"]
+                        ):
+                            # Poisoned refresh must never reach the weights
+                            # (a NaN penalty flatlined smoke attempt 4).
+                            term.penalty_grads = None
                 if term.penalty_grads is not None:
                     term.apply(filter_params, beta=muon_lr * cf["beta_scale"])
                     if step % ROUTING_TS_EVERY == 0:
