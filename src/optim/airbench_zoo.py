@@ -1312,6 +1312,11 @@ def run_airbench_teleport_gate(
 
 
 CF_KEYS = {"lr_scale", "enabled", "refresh_every", "k_directions", "beta_scale"}
+# Probe-slice size for the central-flow curvature refresh: the third-order
+# chain's memory scales with the forward graph, and curvature estimates do
+# not need the full 2000-sample batch. Constant, not a config key (the cf:
+# block is pinned to exactly five keys).
+CF_PROBE_SAMPLES = 256
 
 
 def _resolve_cf(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -1493,22 +1498,15 @@ def run_airbench_centralflow(
             model.zero_grad(set_to_none=True)
             if term is not None:
                 if step % cf["refresh_every"] == 0:
-                    directions = []
-                    for p in filter_params:
-                        buf = optimizer2.state.get(p, {}).get("momentum_buffer")
-                        if buf is None:
-                            continue
-                        for d in momentum_topk_directions(buf, cf["k_directions"]):
-                            directions.append(
-                                [
-                                    d.to(q.dtype) if q is p else None
-                                    for q in filter_params
-                                ]
-                            )
-                    if directions:
-                        weights = [0.5 * muon_lr**2] * len(directions)
-                        b_inputs, b_labels = inputs, labels
+                    # Memory-bounded refresh: one chunk per filter matrix,
+                    # each with its own forward on a small probe slice of the
+                    # current batch — a joint refresh over all matrices on the
+                    # full 2000-sample graph OOMs a 48 GB card (third-order
+                    # chains hold the full graph per direction set).
+                    b_inputs = inputs[:CF_PROBE_SAMPLES]
+                    b_labels = labels[:CF_PROBE_SAMPLES]
 
+                    def make_loss_fn():
                         def loss_fn():
                             model.train()
                             out = model(
@@ -1523,9 +1521,28 @@ def run_airbench_centralflow(
                                 reduction="sum",
                             )
 
-                        term.refresh(
-                            loss_fn, filter_params, directions, weights, step=step
+                        return loss_fn
+
+                    chunks = []
+                    for p in filter_params:
+                        buf = optimizer2.state.get(p, {}).get("momentum_buffer")
+                        if buf is None:
+                            continue
+                        dirs = [
+                            [
+                                d.to(q.dtype) if q is p else None
+                                for q in filter_params
+                            ]
+                            for d in momentum_topk_directions(
+                                buf, cf["k_directions"]
+                            )
+                        ]
+                        weights = [0.5 * muon_lr**2] * len(dirs)
+                        chunks.append(
+                            (make_loss_fn(), filter_params, dirs, weights)
                         )
+                    if chunks:
+                        term.refresh_from_chunks(chunks, step=step)
                 if term.penalty_grads is not None:
                     term.apply(filter_params, beta=muon_lr * cf["beta_scale"])
                     if step % ROUTING_TS_EVERY == 0:

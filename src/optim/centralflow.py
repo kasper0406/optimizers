@@ -100,6 +100,49 @@ class CentralFlowTerm:
         self.step_of_refresh = self.n_refreshes if step is None else int(step)
         self.n_refreshes += 1
 
+    def refresh_from_chunks(self, chunks, step: Optional[int] = None) -> None:
+        """Chunked refresh for memory-bounded third-order chains.
+
+        ``chunks``: iterable of ``(loss_fn, params, directions, weights)``.
+        The penalty gradient is ADDITIVE across directions, so splitting the
+        direction set into chunks — each with its own forward pass and its own
+        (freed) graph — computes the same total penalty as one joint refresh
+        while holding only one chunk's graph in memory. Every chunk must pass
+        the SAME ``params`` (asserted); curvatures are concatenated in chunk
+        order. Needed on the airbench GPU path: a joint refresh over all
+        matrices' directions on a full-batch graph OOMs a 48 GB card.
+        """
+        totals: Optional[List[torch.Tensor]] = None
+        curvatures: List[float] = []
+        ref_params: Optional[List[torch.Tensor]] = None
+        for loss_fn, params, directions, weights in chunks:
+            plist = list(params)
+            if ref_params is None:
+                ref_params = plist
+            elif len(plist) != len(ref_params) or any(
+                p is not q for p, q in zip(plist, ref_params)
+            ):
+                raise ValueError(
+                    "refresh_from_chunks: every chunk must pass the same params"
+                )
+            curv, grads = directional_curvature_and_grad(
+                loss_fn, plist, directions, weights=weights, create_graph_chain=True
+            )
+            assert grads is not None
+            curvatures.extend(curv)
+            if totals is None:
+                totals = [g.clone() for g in grads]
+            else:
+                for t, g in zip(totals, grads):
+                    t += g
+        if totals is None or ref_params is None:
+            raise ValueError("refresh_from_chunks needs at least one chunk")
+        self.curvatures = curvatures
+        self.penalty_grads = totals
+        self._shapes = [tuple(p.shape) for p in ref_params]
+        self.step_of_refresh = self.n_refreshes if step is None else int(step)
+        self.n_refreshes += 1
+
     @torch.no_grad()
     def apply(self, params: Sequence[torch.Tensor], beta: float) -> None:
         """``params[j] -= beta * penalty_grads[j]`` for the cached gradient."""

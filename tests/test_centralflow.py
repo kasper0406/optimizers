@@ -254,3 +254,51 @@ def test_apply_does_not_build_graph_or_touch_grads():
     term.apply([x], beta=0.1)
     assert x.grad is None
     assert x.is_leaf and x.requires_grad
+
+
+def test_refresh_from_chunks_matches_joint_refresh():
+    """Penalty grads are additive across directions: chunked == joint."""
+    torch.manual_seed(0)
+    x = torch.randn(3, dtype=torch.float64, requires_grad=True)
+
+    def loss_fn():
+        return (x**4).sum() + (x[0] * x[1] * x[2]) ** 2
+
+    d1 = [torch.tensor([1.0, 0.0, 0.0], dtype=torch.float64)]
+    d2 = [torch.tensor([0.0, 1.0, 0.0], dtype=torch.float64)]
+    d3 = [torch.tensor([0.0, 0.0, 1.0], dtype=torch.float64)]
+
+    joint = CentralFlowTerm()
+    joint.refresh(loss_fn, [x], [d1, d2, d3], weights=[0.5, 2.0, 1.0])
+
+    chunked = CentralFlowTerm()
+    chunked.refresh_from_chunks(
+        [
+            (loss_fn, [x], [d1, d2], [0.5, 2.0]),
+            (loss_fn, [x], [d3], [1.0]),
+        ],
+        step=7,
+    )
+    assert torch.allclose(joint.penalty_grads[0], chunked.penalty_grads[0])
+    assert joint.curvatures == pytest.approx(chunked.curvatures)
+    assert chunked.step_of_refresh == 7
+
+
+def test_refresh_from_chunks_rejects_param_mismatch_and_empty():
+    x = torch.randn(2, dtype=torch.float64, requires_grad=True)
+    y = torch.randn(2, dtype=torch.float64, requires_grad=True)
+
+    def lf_x():
+        return (x**4).sum()
+
+    def lf_y():
+        return (y**4).sum()
+
+    d = [torch.tensor([1.0, 0.0], dtype=torch.float64)]
+    term = CentralFlowTerm()
+    with pytest.raises(ValueError, match="same params"):
+        term.refresh_from_chunks(
+            [(lf_x, [x], [d], None), (lf_y, [y], [d], None)]
+        )
+    with pytest.raises(ValueError, match="at least one chunk"):
+        term.refresh_from_chunks([])
