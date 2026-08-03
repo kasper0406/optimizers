@@ -309,6 +309,16 @@ unstable at stock LR; fourth independent oscillation-channel intervention
 with a null/negative. The Euclidean central-flow form does not transplant
 to Muon; a spectral central flow remains open theory.
 
+**Round-2 outcome 2026-08-03 (`reports/wpj-teleport-round2.md`):**
+teleport-Muon **negative** — gauge-fixed moves delivered 1.20–1.32×
+spendable descent potential at each of 7 teleports, yet final accuracy is
+−0.43pp ± 0.13 (n=20 paired), with the deficit concentrated in the decay
+phase. One-step descent potential does not compound; fifth intervention
+class returning null/negative at matched budget. The accumulating positive
+claim for the paper: stock Muon at the tuned schedule is a remarkably flat
+optimum of training-procedure space. Untested knob: hot-phase-only
+teleports (stop_step).
+
 2. **Progress decomposition** — attribute per-window loss decrease to motion
    along tracked oscillating directions vs the bulk complement, phase by
    phase (the measurable aggregate form of the river coordinate; the

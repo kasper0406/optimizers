@@ -1,0 +1,68 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_teleport",
+      "recipe": {
+        "compile": true,
+        "tta_level": 2
+      },
+      "teleport": {
+        "ascend_iters": 20,
+        "enabled": false,
+        "every": 25,
+        "spread": 2.0,
+        "start_step": 10,
+        "step_size": 0.3
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/wpj_teleport_off.yaml",
+    "sha256": "322b358473bf86d3097b402fb2255b6017a1f0cdbd21031d475630ab0473783f"
+  },
+  "cost_usd": 0.027,
+  "experiment": "airbench_teleport",
+  "finished_at": "2026-08-03T19:45:00.791419+00:00",
+  "git_dirty": false,
+  "git_sha": "53c064e72488d2a19298fd781061311b4b05df16",
+  "gpu_type": "NVIDIA L40",
+  "metrics": {
+    "epochs": 8.0,
+    "n_teleports": 0,
+    "optimizer": "vendor_muon",
+    "steps": 200,
+    "teleport": {
+      "ascend_iters": 20,
+      "enabled": false,
+      "every": 25,
+      "spread": 2.0,
+      "start_step": 10,
+      "step_size": 0.3
+    },
+    "teleport_timeseries": [],
+    "time_seconds": 9.660945083618163,
+    "train_acc_last": 0.9780000448226929,
+    "tta_val_acc": 0.9393999576568604,
+    "val_acc": 0.9292999505996704,
+    "val_accs": [
+      0.6837999820709229,
+      0.7698000073432922,
+      0.823699951171875,
+      0.8593999743461609,
+      0.8768999576568604,
+      0.902899980545044,
+      0.9174999594688416,
+      0.9292999505996704
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1006,
+  "started_at": "2026-08-03T19:44:48.457211+00:00",
+  "wall_time_s": 12.334170916999938
+}

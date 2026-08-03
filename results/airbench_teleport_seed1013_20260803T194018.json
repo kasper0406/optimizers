@@ -1,0 +1,111 @@
+{
+  "config": {
+    "contents": {
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_teleport",
+      "recipe": {
+        "compile": true,
+        "tta_level": 2
+      },
+      "teleport": {
+        "ascend_iters": 20,
+        "enabled": true,
+        "every": 25,
+        "spread": 2.0,
+        "start_step": 10,
+        "step_size": 0.3
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/wpj_teleport_on.yaml",
+    "sha256": "6f63feab8fb272aa272d2ebe642f60de05ef0ce785280a0df3b9f7271244df07"
+  },
+  "cost_usd": 0.027,
+  "experiment": "airbench_teleport",
+  "finished_at": "2026-08-03T19:40:35.282782+00:00",
+  "git_dirty": false,
+  "git_sha": "53c064e72488d2a19298fd781061311b4b05df16",
+  "gpu_type": "NVIDIA L40",
+  "metrics": {
+    "epochs": 8.0,
+    "n_teleports": 7,
+    "optimizer": "vendor_muon",
+    "steps": 200,
+    "teleport": {
+      "ascend_iters": 20,
+      "enabled": true,
+      "every": 25,
+      "spread": 2.0,
+      "start_step": 10,
+      "step_size": 0.3
+    },
+    "teleport_timeseries": [
+      {
+        "max_ratio": 1.334208239088831,
+        "mean_ratio": 1.2245720833409743,
+        "min_ratio": 1.165240701809249,
+        "step": 25
+      },
+      {
+        "max_ratio": 1.3458173577021426,
+        "mean_ratio": 1.2069834090721911,
+        "min_ratio": 1.1371704601310442,
+        "step": 50
+      },
+      {
+        "max_ratio": 1.2982442857207042,
+        "mean_ratio": 1.1961666832444635,
+        "min_ratio": 1.130299931283377,
+        "step": 75
+      },
+      {
+        "max_ratio": 1.2968096037778518,
+        "mean_ratio": 1.2001507308013852,
+        "min_ratio": 1.139445391653178,
+        "step": 100
+      },
+      {
+        "max_ratio": 1.3386227390882885,
+        "mean_ratio": 1.2138064430220725,
+        "min_ratio": 1.1427131334467335,
+        "step": 125
+      },
+      {
+        "max_ratio": 1.3864923388743908,
+        "mean_ratio": 1.2589139420325894,
+        "min_ratio": 1.1802223479868001,
+        "step": 150
+      },
+      {
+        "max_ratio": 1.4440935835127278,
+        "mean_ratio": 1.3044769451253202,
+        "min_ratio": 1.2171394769387616,
+        "step": 175
+      }
+    ],
+    "time_seconds": 14.378349960327148,
+    "train_acc_last": 0.9750000238418579,
+    "tta_val_acc": 0.9361000061035156,
+    "val_acc": 0.9269999861717224,
+    "val_accs": [
+      0.6480000019073486,
+      0.7156999707221985,
+      0.8105999827384949,
+      0.8187999725341797,
+      0.8739999532699585,
+      0.8895999789237976,
+      0.9019999504089355,
+      0.9269999861717224
+    ]
+  },
+  "schema_version": 1,
+  "seed": 1013,
+  "started_at": "2026-08-03T19:40:18.257824+00:00",
+  "wall_time_s": 17.024922865000008
+}
