@@ -1,0 +1,145 @@
+# Channel audit — step-matched BATCH RIDER, B=8000 (rung 3 of 3).
+#
+# STATUS: reports/channel-audit-preregistration.md §3 registers this run set
+# (checked mechanically by scripts/preflight_channel_audit.py), but that
+# document still reads "DRAFT -- not registered" and its Appendix
+# threshold-freeze table is empty, which blocks the launch until a human
+# freezes it.  The full status is in the header of
+# configs/dev/instrumented_airbench_demod.yaml; read it before launching.
+#
+# Companion to configs/dev/instrumented_airbench_demod.yaml; that file's header
+# carries the scientific rationale and the full list of instrumentation deltas
+# (hvp off, smoothness off, frozen_probes k3 64 / max_lag 32 / decimate 1).
+# The instrumentation block below parses to exactly the same values (checked
+# by config-load verification).  Only train.epochs, train.batch_size and the
+# sweep seeds differ.
+#
+# ---------------------------------------------------------------------------
+# WHAT THE RIDER IS FOR
+#
+# Batch size sets per-direction gradient SNR, and it is the one axis the frozen
+# tier has never been measured on: all 9 runs behind reports/frozen-probes.json
+# are B = 2000.  At a FIXED ~200 optimizer steps, the integration length n is
+# held constant while SNR moves like sqrt(B), which is the clean way to ask
+# whether the peeked DC-channel excess is signal or selection:
+#
+#   * SIGNAL.  If the DC excess is recoverable per-direction drift, its size
+#     should grow with SNR, i.e. roughly like sqrt(B) -- a factor ~4 across
+#     the 16x span from B = 500 to B = 8000.
+#   * ANCHORING / SELECTION.  If it is the momentum-alignment artifact that
+#     Phase A's kind-split points at (large in `top`, largely absent in
+#     `bulk`), it is a property of how the subspace is chosen and should be
+#     roughly B-invariant.
+#
+# NOT a re-test of the sampling account.  The negative-autocorrelation
+# population is already documented as robust to batch-sampling artefacts by
+# the with-replacement ablation (reports/project-state.md §3.1.1,
+# configs/dev/instrumented_airbench_withreplacement.yaml), so a B-dependence
+# found here must not be read back as a without-replacement effect.  The
+# rider's axis is SNR, and it doubles as the project's first per-direction
+# critical-batch-size probe (project-state.md §5 open question 4, §6 item 3:
+# "the frozen-probe tier is the instrument").
+#
+# Three rungs spanning 16x in B; 2 seeds per rung give a spread, not a
+# comparison-grade interval, which is what a dev-seed measurement should be.
+# A cluster bootstrap over runs has n = 2 per rung here -- thin, and stated so
+# it is not mistaken for an interval.
+#
+# ---------------------------------------------------------------------------
+# STEP MATCHING (arithmetic, not an estimate).  The vendored CifarLoader has
+# drop_last = True on the train split (vendor/airbench/airbench94_muon.py
+# __len__), so steps_per_epoch = 50000 // B, and
+# src.optim.airbench_zoo builds total_train_steps = ceil(epochs *
+# len(train_loader)).  Hence:
+#
+#     B =  500, epochs =  2 -> 100 steps/epoch -> 200 steps
+#     B = 2000, epochs =  8 ->  25 steps/epoch -> 200 steps
+#     B = 8000, epochs = 32 ->   6 steps/epoch -> 192 steps
+#
+# THIS RUNG: B = 8000, epochs = 32 -> 6 steps/epoch -> 192 steps.
+# The B = 8000 rung is 192 rather than 200 -- an unavoidable 4% shortfall from
+# drop_last, identical to the precedent
+# configs/dev/frontier_b8000_stepmatched.yaml, and it must be carried into any
+# n-dependent statistic (the Newey-West bandwidth rule floors at L = 4 for
+# both 192 and 200, so t_nw / ess are not affected by it).
+#
+# CONFOUNDS THAT RIDE ALONG WITH B, recorded because they are properties of
+# the pinned airbench recipe and are NOT being controlled:
+#
+#   * Sample budget is not matched -- it is step-matched by construction.
+#     This rung sees 1,536,000 training examples (with augmentation), vs
+#     100,000 at B = 500 and 400,000 at B = 2000.  These runs are read
+#     against each other on the autocovariance axis only, never as an
+#     accuracy ladder.
+#   * Weight decay scales with the batch: airbench_zoo sets
+#     wd = sgd_weight_decay * batch_size = 2e-6 * 8000 = 0.016 here (the stock
+#     recipe's own convention, since the loss is sum-reduced).
+#   * The whiten-bias warmup is min(ceil(3 * steps_per_epoch),
+#     total_train_steps) = 18 steps here, against 200 at B = 500 and 75 at
+#     B = 2000 -- so the fraction of the run spent training the whiten bias
+#     is itself B-dependent (100% at B = 500, 37.5% at B = 2000, 9.375% at
+#     B = 8000).
+#   * lr is the stock record 0.24 at every rung (no probe_overrides block), so
+#     the batch axis is not crossed with the lr axis.  The lr axis is covered
+#     separately by configs/dev/instrumented_airbench_demod_lr_ladder.yaml.
+#
+# Seeds 1320/1321 are shared by all three rungs, so the B contrast is
+# seed-matched; they are disjoint from every seed already present in results/.
+#
+# LAUNCH PRECONDITION (WP1.2, CLAUDE.md): criteria/phase1_preregistration.md
+# must exist; scripts/run.py enforces this for airbench_instrumented.  The
+# whole gate -- that file, the pre-registration's status line, its
+# threshold-freeze table, and config/pre-registration agreement -- is
+#   uv run --no-sync python scripts/preflight_channel_audit.py
+# which exits non-zero while any of them is unresolved.
+#
+# Launch (GPU box) -- full procedure in docs/channel-audit-gpu-runbook.md:
+#   uv run --no-sync python scripts/sweep.py configs/dev/instrumented_airbench_demod_b8000.yaml
+#   bash sweeps/instrumented_airbench_demod_b8000/run_all.sh
+# (2 runs = 1 variant x 2 seeds)
+
+experiment: airbench_instrumented
+seed: 1320
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 32            # step-matched: 6 steps/epoch x 32 = 192 steps
+  batch_size: 8000
+
+recipe:
+  tta_level: 2
+  compile: false       # trajectory parity with the frozen-tier base config
+
+instrumentation:
+  k1: 16
+  k2: 16
+  t_refresh: 50
+  subspace_iters: 2
+  betas: [0.9, 0.99]
+  align_min: 0.9
+  snapshot_every: 5
+  seed: 4242
+  min_dim: 8
+  momentum_key: momentum_buffer
+  hvp: false           # CHANGED (was true)
+  smoothness:
+    enabled: false     # CHANGED (was true)
+  frozen_probes:
+    enabled: true
+    k3: 64             # CHANGED (was 16)
+    max_lag: 32        # CHANGED (was 8); Newey-West caveat in the base config
+    decimate: 1
+  classifier:
+    tau_sig: 4.0
+    tau_noise: 2.0
+    rho_osc: 0.5
+    n_min: 50
+    z_reset: 6.0
+    innov_needed: 2
+    innov_window: 4
+
+sweep:
+  seeds: [1320, 1321]         # shared across all three batch rungs

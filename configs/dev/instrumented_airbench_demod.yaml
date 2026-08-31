@@ -1,0 +1,216 @@
+# Channel audit — frozen-tier RE-RUN, base rung (3 dev seeds at the record lr).
+#
+# ---------------------------------------------------------------------------
+# STATUS: LAUNCH IS BLOCKED ON A HUMAN.  READ FIRST.
+#
+# reports/channel-audit-preregistration.md §3 registers THIS run set: the same
+# five config filenames, seeds 1300-1302 / 1310-1311 / 1320-1321, the ladder
+# {0.12, 0.24, 0.48}, frozen_probes {enabled: true, k3: 64, max_lag: 32,
+# decimate: 1}, and three riders b500/b2000/b8000 at 2 seeds each.  That
+# agreement is mechanical, not a claim on trust: it is checks 4 and 5 of
+#
+#   uv run --no-sync python scripts/preflight_channel_audit.py
+#
+# which re-derives the run set from these configs and compares it cell by cell
+# against that document's own table.  Run it; do not take this comment's word.
+# (An earlier revision of this header listed a five-axis conflict with the
+# pre-registration -- seeds 1800-1802, a ladder reaching 0.96, k3 16 /
+# max_lag 8, two rider configs, channel_audit_*.yaml filenames.  The document
+# on disk contains none of those values; that text was written against a
+# superseded draft and has been removed.)
+#
+# WHAT BLOCKS THE LAUNCH -- checks 2 and 3 of the same script, both red:
+#
+#   * the pre-registration's status line still reads "DRAFT -- not
+#     registered", and its own standing instruction is that no Phase B run may
+#     launch while it says DRAFT;
+#   * every frozen-value cell of its Appendix threshold-freeze table is
+#     empty (the row count is not pinned here: revision R1 of that document
+#     took the checklist from 19 rows to 23).  Check 3 counts them.
+#
+# Freezing that table, flipping the status line, and committing before the
+# first run is what makes Phase B confirmatory.  That is a HUMAN act (CLAUDE.md
+# ground rules 1 and 3) and nothing in this repo may do it on the human's
+# behalf.  Launching first spends the only unpeeked surface this program has:
+# Phase A is already peeked, so an unfrozen Phase B is a second exploratory
+# pass rather than a confirmation.
+#
+# TWO DISCLOSURES THAT SURVIVE THE FREEZE:
+#
+#   * ORDER OF AUTHORSHIP.  These configs were written first; the
+#     pre-registration was written after them and registers the run set that
+#     already existed on disk (it says so in its own preamble).  What it
+#     pre-registers is the ANALYSIS -- no Phase B sidecar has been read
+#     because none exists yet -- not a design chosen before the configs.
+#     Its section 0 now records the reversal in full (an earlier revision
+#     specified seeds 1800-1802 and a ladder reaching 0.96; it was rewritten to
+#     match these files, which is what put the published frozen-tier aggregate
+#     of seeds 1300-1311 back inside this program's peek surface).  Read that
+#     record, not this header, for the authoritative account.
+#   * REGISTERED SCOPE LIMIT.  This ladder stops at lr = 0.48, while the
+#     Phase A DC excess peaks at lr = 0.96 (median |t_dc,nw| 3.77), off the
+#     grid.  The pre-registration registers that limit in advance (§3, "the lr
+#     ladder does not reach the Phase A peak") and leaves extending the grid
+#     (+2 runs, ~4 min) to the human as Appendix row 19, to be decided BEFORE
+#     any Phase B sidecar is read.
+#
+# Nothing here amends that document.  Editing a pre-registration so that it
+# matches a config is precisely what CLAUDE.md ground rule 3 forbids.
+# ---------------------------------------------------------------------------
+#
+# WHY THIS EXISTS
+#
+# reports/frozen-probes.json / .md report the frozen tier over 864 probes from
+# 9 runs (seeds 1300-1302 at the stock lr plus seeds 1310/1311 across the
+# {0.12, 0.24, 0.48} ladder).  Two things happened after that report:
+#
+#   1. Every one of those 864 probes has ESS > n (pooled min 217.5 against
+#      n = 200, median 389.9, zero Newey-West floorings).  ESS > n is the
+#      signature of NET-NEGATIVE autocovariance at the lags the Newey-West
+#      window actually sees, i.e. an anti-persistent projection stream, and it
+#      is universal rather than a tail phenomenon.
+#   2. An OFFLINE lag ladder over the 218 tracked-direction sidecars already
+#      on disk read a clean AR(1) with phi ~ -0.34, invariant in lr, whose
+#      implied variance inflation (1 - phi) / (1 + phi) = 2.03 matches the
+#      measured ESS / n = 1.95.  Under that null a demodulated (alternating)
+#      channel carries no excess, while the DC channel carries a large,
+#      monotone-in-lr excess confined almost entirely to the momentum-anchored
+#      'top' directions -- i.e. it looks like an anchoring/selection artifact.
+#
+# THAT SECOND ANALYSIS IS EXPLORATORY AND PEEKED.  It was done on data that had
+# already been looked at, its burn-in choice is load-bearing (segment burn-in
+# >= 5 is required before the AR(1) reads cleanly; without it rho_2 comes out
+# at ~-0.01 and the model looks wrong), and it needs a -1/n mean-subtraction
+# bias correction on finite refresh segments.  None of it can confirm itself.
+#
+# The FROZEN tier is the confirmatory surface, for a structural reason: frozen
+# probes are drawn once from the instrumentation seed and are never refreshed,
+# never re-orthogonalised, and never reset, so they cannot be anchored to the
+# momentum subspace and carry no selection.  Re-running that tier with 4x the
+# probes per matrix is what turns the peeked AR(1)/anchoring story into
+# something falsifiable.  These runs decide nothing on their own: gate
+# decisions are human-only (CLAUDE.md ground rule 1), and no threshold
+# appears in this file.
+#
+# ---------------------------------------------------------------------------
+# INSTRUMENTATION DELTAS vs configs/dev/instrumented_airbench_smoothness.yaml
+# (the config that produced the base 3 of the original 9 runs):
+#
+#   hvp: true  -> false            Q1's Euclidean eta*lambda is already
+#                                  measured and reported; the HVP double-
+#                                  backward is ~768 extra backwards per run
+#                                  and buys this audit nothing.
+#   smoothness.enabled: true
+#              -> false            same: the spectral stability law is
+#                                  reported in reports/smoothness-plateau.md;
+#                                  dropping it removes 40 measured steps x
+#                                  (1 fp32 fwd+bwd + 6 fp32 fwd) per run.
+#   frozen_probes.k3: 16 -> 64     4x probes per matrix = 384 per run
+#                                  (6 matrices), 5760 across the 15-run
+#                                  channel-audit set vs 864 originally.
+#   frozen_probes.max_lag: 8 -> 32 header room only, see the caveat below.
+#   frozen_probes.decimate: 1      UNCHANGED and load-bearing: the offline
+#                                  lag ladder and the demodulated/DC channel
+#                                  split are computed from the RAW per-step
+#                                  projection series, so no step may be
+#                                  dropped.
+#
+# EVERY OTHER SETTING IS IDENTICAL IN VALUE to the original config,
+# deliberately:
+# k1/k2 = 16/16, t_refresh = 50, betas, align_min, snapshot_every = 5,
+# instrumentation seed 4242, min_dim, the classifier block, tta_level,
+# train.epochs/batch_size, and -- notably -- recipe.compile: false.  compile
+# is no longer *required* here (nothing double-backwards any more), but it is
+# kept off so the trajectory-generating code path is the same one that
+# produced reports/frozen-probes.json; turning it on would change the
+# trajectory these probes are supposed to re-measure.
+#
+# CAVEAT ON THE GPU.  All 9 original runs ran on an NVIDIA RTX A6000 (gpu_type
+# in their results JSONs; wall 98.0-108.4 s); this set targets the local RTX
+# 5090.  The recipe is fp16, so the same seed does not reproduce those
+# trajectories bitwise across GPU generations -- fixing the seeds and the code
+# path preserves the design and the sampling, not the iterates.  Every
+# comparison against reports/frozen-probes.md is distributional, which it
+# already had to be for an independent reason: k3 = 64 draws a fresh probe set
+# (torch.randn fills row-major, so the 64-column draw does not contain the
+# 16-column one).
+#
+# CAVEAT ON max_lag: 32.  The Newey-West (1994) automatic Bartlett bandwidth
+# in src.instrument.tracker.FrozenProbeAccumulator.lag_truncation is
+# L = min(max_lag, floor(4 (n/100)^(2/9)), n - 2), which at n = 200 gives
+# L = 4 for max_lag = 8 and for max_lag = 32 alike.  So the LOGGED t_nw and
+# ess are unaffected by this change; max_lag: 32 raises only the cap.  Nor do
+# the deeper lag sums it retains reach the sidecar: FrozenProbeBank.to_log()
+# writes k3, max_lag, decimate, n_observations, lag_truncation and the L = 4
+# statistics, and no lagged cross-sum at all.  The setting is therefore inert
+# on this run set, and the lag ladder out to lag 32 is computed
+# OFFLINE from the raw `s` series that decimate: 1 preserves.  Recorded here
+# so nobody later reads a wider Newey-West window into these numbers.
+#
+# COST per run: no HVP graphs, no smoothness passes; the only instrumentation
+# work beyond the tracked tier is O(k3) projections per matrix per step, which
+# need no extra forward or backward pass.  Expected sidecar ~12.5 MB
+# (docs/channel-audit-gpu-runbook.md §6 has the measured arithmetic).
+#
+# COMPANION CONFIGS (the other 12 runs of the 15-run set):
+#   configs/dev/instrumented_airbench_demod_lr_ladder.yaml   6 runs
+#   configs/dev/instrumented_airbench_demod_b500.yaml        2 runs
+#   configs/dev/instrumented_airbench_demod_b2000.yaml       2 runs
+#   configs/dev/instrumented_airbench_demod_b8000.yaml       2 runs
+#
+# LAUNCH PRECONDITION (WP1.2, CLAUDE.md): criteria/phase1_preregistration.md
+# must exist; scripts/run.py enforces this for airbench_instrumented.  The
+# whole gate -- that file, the pre-registration's status line, its
+# threshold-freeze table, and config/pre-registration agreement -- is
+#   uv run --no-sync python scripts/preflight_channel_audit.py
+# which exits non-zero while any of them is unresolved.
+#
+# Launch (GPU box) -- full procedure in docs/channel-audit-gpu-runbook.md:
+#   uv run --no-sync python scripts/sweep.py configs/dev/instrumented_airbench_demod.yaml
+#   bash sweeps/instrumented_airbench_demod/run_all.sh
+
+experiment: airbench_instrumented
+seed: 1300
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  tta_level: 2
+  compile: false       # kept off for trajectory parity with the original 9 runs
+
+instrumentation:
+  k1: 16
+  k2: 16
+  t_refresh: 50
+  subspace_iters: 2
+  betas: [0.9, 0.99]
+  align_min: 0.9
+  snapshot_every: 5    # also the frozen-probe cumulative-t snapshot cadence
+  seed: 4242           # instrumentation probe RNG (dev seed, >= 1000)
+  min_dim: 8
+  momentum_key: momentum_buffer
+  hvp: false           # CHANGED (was true): eta*lambda already reported
+  smoothness:
+    enabled: false     # CHANGED (was true): plateau already reported
+  frozen_probes:       # the confirmatory tier for this audit
+    enabled: true
+    k3: 64             # CHANGED (was 16)
+    max_lag: 32        # CHANGED (was 8); see the max_lag caveat above
+    decimate: 1        # UNCHANGED; raw series feeds the offline lag ladder
+  classifier:          # identical to the WP1.2 baseline config
+    tau_sig: 4.0
+    tau_noise: 2.0
+    rho_osc: 0.5
+    n_min: 50
+    z_reset: 6.0
+    innov_needed: 2
+    innov_window: 4
+
+sweep:
+  seeds: [1300, 1301, 1302]   # same 3 dev seeds as the original base rung
