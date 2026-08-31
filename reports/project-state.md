@@ -64,6 +64,13 @@ provenance. All committed. (2026-07-21: program #6 ran locally on the new
    removing the integration-window ceiling (frozen probes, full-run
    accumulation, program #4) did **not** reveal hidden signal (median final
    |t| 0.61 naive / 0.87 Newey–West; growth slope ~0.05 vs √t's 0.5).
+   **Upheld across the frequency band and both frames by program #23
+   (2026-08-31, pre-registered, human-adjudicated, `reports/
+   channel-audit-gate.md`): P1 FAIL (no demodulated/Nyquist-band signal,
+   band_contrast 0.784 vs bar 1.30, zero alt-tail events), P2 row D (no
+   frame gain, 1.106 vs bar 3.0). BUT amended on the batch axis: the DC
+   excess scales ≈√B (Rider-1 PASS, 3.662 in [2.8, 5.6]) — the signal is
+   batch-starved, not absent (see the 2026-08-31 addition to §6).**
 
 ### 3.2 The intervention null (Gate 2, `reports/gate2-decision.md`)
 
@@ -259,6 +266,36 @@ is measurement-first with a clean null, not a method claim.
    re-anchoring transient; burn-in ≥5 required) + the corrected
    LR-dependent intermittency measurement. Cheap to fold in; guards
    future instrumentation work against the same trap.
+
+### Added 2026-08-31 (program #23: channel audit)
+
+9. **Program #23 (channel audit) — COMPLETE, both phases, human-adjudicated
+   same day** (`reports/channel-audit-preregistration.md`, REGISTERED with a
+   23-row human threshold freeze; Phase A `reports/channel-audit-phase-a.md`;
+   Phase B `reports/channel-audit.md`; verdict `reports/channel-audit-gate.md`).
+   First program executed on the local 5090 end-to-end (15 GPU runs ≈ 2 min).
+   Findings, in rank order of consequence:
+   (a) **No positive decorrelation time exists in per-direction gradient
+   projections** — τ_cal 0.41–0.89 with bootstrap CI upper < 1.0 at every
+   K ∈ {8,16,32,64} (P3 DECISIVE, K-stable). β₁* is undefined; any
+   temporal-filtering variance reduction is filtering a stream with nothing
+   positively correlated in it. Closes the temporal family on airbench and
+   supplies the mechanism for the sibling repo's slow-β₁ formation *delay*.
+   (b) **The per-direction DC excess scales ≈√B** (Rider-1 PASS, ratio 3.662,
+   band [2.8, 5.6]; excess 0.106 → 0.387 over 16× batch): per-direction signal
+   is **batch-starved, not absent** — open question #4 answered affirmatively
+   at the measurement level; successor: batch-axis program (unregistered).
+   (c) **The anti-correlation deepens with batch** (frozen φ̂ −0.157 → −0.488,
+   B 500 → 8000; Rider-2 MIXED, fails B-invariance in the deepening
+   direction): a trajectory-dynamics property progressively un-diluted as
+   sampling noise shrinks, not a sampling artifact.
+   (d) The Phase-A tracked-tier DC excess (top-only, up to 5.5× calibrated at
+   lr 0.96) shows **no frame gain on the clean tier at ≤2× record lr**
+   (P2 row D) — consistent with the anchoring-construction account, scope-
+   limited to the registered lr ladder ({0.12, 0.24, 0.48}).
+   Methodology: ten prereg defects of the bbp-A2 class repaired pre-launch
+   from published aggregates only (§0 of the prereg); K1 estimator controls
+   clean; no kill clause fired.
 
 ## 7. Reproducibility / repo state
 
