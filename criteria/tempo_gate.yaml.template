@@ -1,0 +1,155 @@
+# HUMAN MUST AUTHOR — template only, thresholds intentionally blank.
+# Copy to criteria/tempo_gate.yaml, fill every TODO, commit as human. Agents
+# must not fill a TODO here or in the copy (CLAUDE.md rule 3, criteria/README).
+# Consumed by: the program #8 disposition decision. The agent reports the
+# measured numbers against this file (reports/tempo-gate-memo.md); choosing the
+# exit is a human decision.
+
+# What this gates: program #8 (TempoMuon temporal trust ratio) — the
+# serial-correlation LR-gain controller. The evidence is finished and frozen;
+# what is missing is the judgment. Program #8 has been parked since
+# 2026-07-22 for exactly this file (reports/project-state.md section 6 item 6a).
+
+# DISCLOSURE — THIS IS A POST-HOC GATE, NOT A PRE-REGISTRATION.
+# The n=100 eval table already exists and is committed (reports/tempo-eval.md,
+# runs of 2026-07-22). Every threshold authored here is authored with the
+# outcome visible. That is a real weakening of the pre-registration culture the
+# rest of criteria/ enforces, and it must be recorded in `notes` below rather
+# than papered over. The Phase-B predictions that WERE pre-registered before
+# their runs live in reports/tempo-phase-a.md section 3 (commit 082a09d) and
+# are dev-phase only; they are not a substitute for this file.
+
+provenance:
+  # Fixed facts from the committed record, not criteria. Do not treat as
+  # thresholds; they exist so the gate reads against a pinned artifact set.
+  eval_table: reports/tempo-eval.md
+  decision_memo: reports/tempo-gate-memo.md
+  mechanism_evidence: reports/tempo-phase-b.md      # section 2 placebo, section 3 B'
+  signal_evidence: reports/tempo-phase-a.md
+  transfer_evidence: reports/tempo-nanogpt-phase-a.md
+  treatment_config: configs/tempo_eval_global.yaml  # frozen at 30a32ee, pre-launch
+  control_config: configs/tempo_eval_muon.yaml
+  optimizer: src/optim/tempomuon.py                 # bit-identical to muon at kappa=0
+  analysis: scripts/analyze_tempo.py                # compare / passive / nanogpt-passive
+  endpoint: tta_val_acc
+  testbed: "airbench_smoke record recipe, 8 epochs, batch 2000, 200 steps"
+  eval_seeds_used: "0-99, seed-paired across arms (100 pairs per LR rung)"
+  gpu_type: "NVIDIA GeForce RTX 5090"
+
+# ---------------------------------------------------------------- (a) free
+free_at_record_lr:
+  # The equivalence bound on the seed-paired delta-accuracy at the record LR
+  # (0.24 = 1x): the largest accuracy cost the human is willing to call "no
+  # cost", i.e. below which the controller counts as FREE to switch on.
+  equivalence_margin_pp: TODO      # e.g. 0.05 -> |delta| must be bounded by 0.05pp
+  decision_rule: TODO              # e.g. "TOST at alpha=0.05" or "two-sided 95%
+                                   # CI contained in [-margin, +margin]"
+  ci_method: TODO                  # e.g. "paired t, 95%, n-1 df"
+  n_paired_seeds_required: TODO    # minimum eval pairs at this rung
+  also_require_gain_idle: TODO     # true/false - additionally require telemetry
+                                   # showing the controller idles at 1x
+  min_mean_frozen_gain_at_1x: TODO # the idle bar if the above is true. The dev
+                                   # Phase-B P1 failure was an engagement
+                                   # failure (mean 1x gain fell to 0.36), so an
+                                   # accuracy-only test can pass a design that
+                                   # is silently active at the record LR.
+  free_verdict: TODO               # PASS / FAIL - human-entered after reading
+                                   # the memo against the fields above
+
+# -------------------------------------------------------------- (b) rescue
+rescue:
+  # Minimum seed-paired delta-accuracy at mis-set LR for the controller to count
+  # as a RESCUE at that rung. Rungs are multiples of the record LR 0.24.
+  min_delta_pp_2x: TODO            # lr 0.48
+  min_delta_pp_3x: TODO            # lr 0.72
+  min_delta_pp_4x: TODO            # lr 0.96
+  significance_rule: TODO          # e.g. "95% CI lower bound above min_delta_pp"
+  rungs_required: TODO             # which/how many rungs must clear to call the
+                                   # rescue established. Note the frozen config
+                                   # trades 2x correction for the 1x cost
+                                   # collapse (window 100 → 60), so a rule
+                                   # requiring all three rungs is a different
+                                   # gate than one requiring 3x and 4x.
+  min_fraction_of_deficit_recovered: TODO  # optional second form: fraction of
+                                   # stock's own paired deficit vs its 1x that
+                                   # must be recovered at each required rung
+  external_baseline_required: TODO # true/false - must a hand-tuned earlier-anneal
+                                   # LR schedule (the honest comparator for a
+                                   # "rescue") be run before rescue counts. No
+                                   # external-baseline arm has ever run
+                                   # (Gate-2 conditional protocol, unmet).
+  rescue_verdict: TODO             # PASS / PARTIAL / FAIL - human-entered
+
+# ----------------------------------------------------------- (c) mechanism
+mechanism_framing:
+  # Does the Phase-B mechanism finding disqualify the "controller" framing?
+  #
+  # The finding, stated as measured (reports/tempo-phase-b.md section 2; dev
+  # seeds 1420-1429, n=10 seed-paired): an OPEN-LOOP REPLAY arm — kappa = 0 plus
+  # a fixed gain_schedule equal to the closed-loop arm's mean gain trajectory,
+  # i.e. feedback switched off — matches the closed-loop controller within noise
+  # at all four LR rungs. The effect is carried by the DISCOVERED GAIN SCHEDULE,
+  # not by per-step feedback. Feedback's only demonstrated role is finding the
+  # LR-appropriate schedule online without being told the LR is mis-set.
+  # Bound, stated honestly: the replay arm ran on dev seeds at n=10 only and was
+  # never repeated at n=100, so the paired closed-loop-minus-replay contrast is
+  # BOUNDED, not zeroed (per-rung CIs in the memo, section 3).
+  disqualifies_controller_framing: TODO  # yes / no - human judgment
+  required_framing_if_no: TODO           # the wording the human will accept if
+                                         # "no" (e.g. "adaptive method as online
+                                         # schedule-discovery mechanism"), and
+                                         # where it must appear (abstract vs
+                                         # mechanism subsection only)
+  replay_confirmation_required: TODO     # true/false - must the placebo replay be
+                                         # repeated on eval seeds before any exit
+                                         # that makes a public claim
+  replay_confirmation_n: TODO            # if true, required paired seed count
+
+# --------------------------------------------------------- (d) disposition
+disposition:
+  # The rule mapping the (a)/(b)/(c) outcomes to exactly one of three exits.
+  # Exits (argued, without recommendation, in reports/tempo-gate-memo.md):
+  #   paper_method_section — keep program #8 as section 5 of the measurement
+  #                          paper (reports/paper-draft.md section 5, drafted)
+  #   standalone_note      - pull it out as its own short note, scoped to
+  #                          airbench and to schedule discovery
+  #   drop                 - park permanently; code and reports stay as record,
+  #                          no claim is made anywhere
+  exits: [paper_method_section, standalone_note, drop]
+
+  rule:
+    # One exit per row; rows are evaluated top to bottom and the first match
+    # wins. `free` / `rescue` take the verdicts above; `mechanism_disqualifies`
+    # takes the yes/no of mechanism_framing.disqualifies_controller_framing.
+    - {free: PASS, rescue: PASS,    mechanism_disqualifies: "no",  exit: TODO}
+    - {free: PASS, rescue: PASS,    mechanism_disqualifies: "yes", exit: TODO}
+    - {free: PASS, rescue: PARTIAL, mechanism_disqualifies: "no",  exit: TODO}
+    - {free: PASS, rescue: PARTIAL, mechanism_disqualifies: "yes", exit: TODO}
+    - {free: PASS, rescue: FAIL,    mechanism_disqualifies: "any", exit: TODO}
+    - {free: FAIL, rescue: "any",   mechanism_disqualifies: "any", exit: TODO}
+
+  prerequisites_by_exit:
+    # Blocking work the chosen exit makes mandatory before the claim is made.
+    # Lists, not thresholds. The Gate-2 conditional approval
+    # (reports/gate2-decision.md) names OrScale, NAMO/LANTON-style noise
+    # scaling, GALA, Prodigy and a hand-tuned schedule as mandatory baselines,
+    # and a criteria/-committed protocol; neither condition has been met.
+    paper_method_section: TODO
+    standalone_note: TODO
+    drop: TODO
+
+  scope_statement_required: TODO   # the scoping sentence that must accompany any
+                                   # non-drop exit (testbed, horizon, single GPU
+                                   # type, LR-rescue-only, airbench-only transfer
+                                   # status)
+  decided_exit: TODO               # human-entered
+  decided_on: TODO                 # YYYY-MM-DD
+  decided_by: TODO
+
+notes: >
+  TODO — human rationale. Record at minimum: (1) that this gate is post-hoc and
+  what that costs the claim; (2) why the chosen equivalence margin and rescue
+  bars are the right ones for THIS testbed rather than reverse-engineered from
+  the measured deltas; (3) the human's reading of the schedule-discovery
+  mechanism result; (4) which unmet Gate-2 conditional-protocol items the chosen
+  exit accepts as debt versus retires.
