@@ -33,6 +33,18 @@ Each direction has a full report in this directory. Verdicts:
 Four directly adjacent papers appeared Jan–Jun 2026 (OrScale, NAMO, SpecMuon,
 Aurora). The B slot and the D measurement are both time-sensitive.
 
+## Round 3 (2026-08-02) — theory/theorem sweep
+
+Four parallel sweeps over recent (2024–2026) theorems in optimization,
+geometry, and stochastic-process theory, mapped onto the project's six
+findings. Synthesis + ranked adaptation shortlist + repo connection map:
+[j-theory-theorem-sweep.md](j-theory-theorem-sweep.md). Headlines: weight-EMA
+≈ anneal equivalence exploits our negative-ρ population directly (T1, being
+tested); momentum-corrected batch-sharpness law 2(1±β)/η matches our
+implied-η·λ band at β=0.95 (T2); bounded-update limit-cycle theorem for the
+η·λ≈65 no-cliff finding is open and claimable (T3); occupancy trigger =
+direction-resolved Pflug test with an optimal-stopping value function (T4).
+
 ## Round 2 (2026-07-20) — brainstorm-direction reviews
 
 | Direction | Verdict | File |

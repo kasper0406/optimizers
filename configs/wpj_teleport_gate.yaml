@@ -1,0 +1,54 @@
+# Teleportation go/no-go gate — flow-first program #4 (T6),
+# docs/litreview/j-theory-theorem-sweep.md §6 item 4.
+#
+# WHAT IT MEASURES. For a conv whose output feeds a BatchNorm, scaling output
+# channel c's filter by alpha_c > 0 leaves the TRAIN-MODE loss invariant (the
+# BN batch statistics normalize the scale out, exactly up to BN eps) — a
+# closed-form, loss-invariant symmetry orbit. Along that orbit the gradient
+# transforms as grad_{W_c} -> grad_{W_c} / alpha_c, so gradient SIZE varies at
+# constant loss. At three representative states of the stock recipe (steps 50 /
+# 100 / 150 of a 200-step run) the harness snapshots training, draws 64
+# log-uniform rescalings in [1/2, 2], and records the realized relative loss
+# change plus the Euclidean (Frobenius) and NUCLEAR gradient-norm ratios; then
+# a 64-iteration random search maximizes the per-matrix nuclear-norm sum
+# subject to staying on the level set (|rel_dloss| < 1e-3). The nuclear norm is
+# the Muon-relevant size: a Muon step's first-order loss decrease is
+# <G, polar(G)> = ||G||_*.
+#
+# KILL CRITERION (human-judged from the results, not by the harness):
+# symmetry teleportation provably accelerates iff the gradient norm varies
+# along the level set (Zhao et al. arXiv:2205.10637 / arXiv:2305.13404;
+# Mishkin et al. arXiv:2403.03362). If the best achievable nuclear-norm
+# heterogeneity at fixed loss is only O(1%), the direction dies — teleportation
+# cannot fund a teleport-inside-Muon step for this workload. Large variation
+# funds it.
+#
+# The experiment reports only: it evaluates no gate and carries no threshold.
+# Dev-seed measurement run; never a comparison-table entry.
+# Launch: uv run python scripts/sweep.py configs/wpj_teleport_gate.yaml
+experiment: airbench_teleport_gate
+seed: 3001
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  compile: true
+  tta_level: 0
+
+gate:
+  snapshot_steps: [50, 100, 150]
+  n_samples: 64
+  spread: 2.0
+  refine_iters: 64
+  probe_batches: 2
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 5

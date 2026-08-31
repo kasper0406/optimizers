@@ -1,0 +1,139 @@
+{
+  "config": {
+    "contents": {
+      "branch": {
+        "anneal_lengths": [
+          0,
+          5,
+          10,
+          25,
+          50
+        ],
+        "branch_steps": [
+          100,
+          150,
+          200
+        ]
+      },
+      "data": {
+        "root": "data/cifar10"
+      },
+      "device": "cuda",
+      "experiment": "airbench_anneal_branch",
+      "recipe": {
+        "compile": true,
+        "tta_level": 2
+      },
+      "train": {
+        "batch_size": 2000,
+        "epochs": 8
+      }
+    },
+    "path": "sweep_out/wpj_flow_anneal_branch.yaml",
+    "sha256": "c1e97cef4ad4fb07775fed387abe0d0c0c3896669536a3388fb39e14b1d3dcc8"
+  },
+  "cost_usd": 0.32,
+  "experiment": "airbench_anneal_branch",
+  "finished_at": "2026-08-02T23:10:54.164171+00:00",
+  "git_dirty": false,
+  "git_sha": "36914608937a2c31cd529be03bdf05949654813f",
+  "gpu_type": "NVIDIA L40",
+  "metrics": {
+    "anneal_lengths": [
+      0,
+      5,
+      10,
+      25,
+      50
+    ],
+    "base_val_accs": {
+      "100": 0.6622999906539917,
+      "150": 0.7315999865531921,
+      "200": 0.7839999794960022
+    },
+    "branch_steps": [
+      100,
+      150,
+      200
+    ],
+    "branches": {
+      "100": {
+        "0": {
+          "tta_val_acc": 0.6697999835014343,
+          "val_acc": 0.6622999906539917
+        },
+        "10": {
+          "tta_val_acc": 0.8995999693870544,
+          "val_acc": 0.889799952507019
+        },
+        "25": {
+          "tta_val_acc": 0.9132999777793884,
+          "val_acc": 0.9038999676704407
+        },
+        "5": {
+          "tta_val_acc": 0.878600001335144,
+          "val_acc": 0.8675000071525574
+        },
+        "50": {
+          "tta_val_acc": 0.9236999750137329,
+          "val_acc": 0.9133999943733215
+        }
+      },
+      "150": {
+        "0": {
+          "tta_val_acc": 0.7508999705314636,
+          "val_acc": 0.7315999865531921
+        },
+        "10": {
+          "tta_val_acc": 0.8992999792098999,
+          "val_acc": 0.8912000060081482
+        },
+        "25": {
+          "tta_val_acc": 0.9167999625205994,
+          "val_acc": 0.9060999751091003
+        },
+        "5": {
+          "tta_val_acc": 0.8851000070571899,
+          "val_acc": 0.8689999580383301
+        },
+        "50": {
+          "tta_val_acc": 0.9294999837875366,
+          "val_acc": 0.9196999669075012
+        }
+      },
+      "200": {
+        "0": {
+          "tta_val_acc": 0.8064999580383301,
+          "val_acc": 0.7839999794960022
+        },
+        "10": {
+          "tta_val_acc": 0.9068999886512756,
+          "val_acc": 0.8955999612808228
+        },
+        "25": {
+          "tta_val_acc": 0.9186999797821045,
+          "val_acc": 0.9097999930381775
+        },
+        "5": {
+          "tta_val_acc": 0.8852999806404114,
+          "val_acc": 0.8756999969482422
+        },
+        "50": {
+          "tta_val_acc": 0.9289000034332275,
+          "val_acc": 0.9197999835014343
+        }
+      }
+    },
+    "epochs": 8.0,
+    "final_tta_val_acc": 0.8064999580383301,
+    "final_val_acc": 0.7839999794960022,
+    "lr_schedule": "constant",
+    "optimizer": "vendor_muon",
+    "steps": 200,
+    "time_seconds": 19.008928686738017
+  },
+  "schema_version": 1,
+  "seed": 1018,
+  "started_at": "2026-08-02T23:10:28.868488+00:00",
+  "wall_time_s": 25.295657624999876
+}

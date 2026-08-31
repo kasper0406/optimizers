@@ -1,0 +1,39 @@
+# T1 EMA-as-anytime-anneal, arm A (docs/litreview/j-theory-theorem-sweep.md §5):
+# the STOCK linear-decay-to-zero schedule with weight-EMA readouts. The
+# training trajectory is the WP0.1 baseline trajectory (EMA machinery is
+# read-only; eval swaps restore state bit-exactly); the EMA columns measure
+# whether averaging adds anything on top of an anneal that already happens,
+# and provide the seed-paired baseline final accuracies for arm B.
+#
+# Prediction under test (theme T1, Sandler et al. equivalence + our
+# negative-rho population): mid-run EMA val acc approaches the run's own
+# final annealed accuracy well before the schedule finishes.
+#
+# Dev-seed measurement run; never a comparison-table entry.
+# Launch: uv run python scripts/sweep.py configs/wpj_t1_ema_stock.yaml
+experiment: airbench_ema
+seed: 3001
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  compile: true
+  tta_level: 2
+  lr_schedule: linear
+  ema:
+    # 200 total steps; half-lives ln2/(1-gamma) ~ 7 / 17 / 34 / 69 steps.
+    # 0.99 matches the effective averaging window of the stock linear anneal
+    # (~last third of the run); the shorter horizons probe how much of the
+    # anneal gain a cheap average already captures.
+    gammas: [0.9, 0.96, 0.98, 0.99]
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 20

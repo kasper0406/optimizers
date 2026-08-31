@@ -1,0 +1,35 @@
+# Anneal dissection — "how short is the last mile?" (flow-first program #1,
+# docs/litreview/j-theory-theorem-sweep.md §6). Constant-LR base trajectory;
+# at each branch step, snapshot and run linear anneals of length k over an
+# identical cached batch stream; accuracy vs k measures how much of the
+# anneal is fast dynamical relaxation. Paired stock-schedule finals for these
+# dev seeds are in the T1 results (airbench_ema, lr_schedule=linear).
+#
+# Follow-up to the T1 refutation (reports/wpj-t1-ema.md): the anneal cannot
+# be averaged away — so how many real anneal steps does it need?
+#
+# Dev-seed measurement run; never a comparison-table entry.
+# Launch: uv run python scripts/sweep.py configs/wpj_flow_anneal_branch.yaml
+experiment: airbench_anneal_branch
+seed: 3001
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  compile: true
+  tta_level: 2
+
+branch:
+  branch_steps: [100, 150, 200]
+  anneal_lengths: [0, 5, 10, 25, 50]
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 20

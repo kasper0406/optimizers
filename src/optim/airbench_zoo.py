@@ -169,6 +169,42 @@ def load_vendor_airbench():
 
 VALID_SAMPLING = (None, "with_replacement")
 
+# T1 EMA-as-anneal experiment (docs/litreview/j-theory-theorem-sweep.md §5):
+# 'linear' is the vendored schedule (LR decays linearly to zero over the run,
+# airbench94_muon.py:377-379); 'constant' holds every group except the
+# whiten bias at its initial LR for the whole run (the whiten bias keeps its
+# stock 3-epoch decay in both arms — it is grad-disabled afterwards and is
+# not part of the schedule comparison).
+VALID_LR_SCHEDULES = ("linear", "constant")
+
+
+def _resolve_lr_schedule(recipe_cfg: Dict[str, Any]) -> str:
+    schedule = recipe_cfg.get("lr_schedule", "linear")
+    if schedule not in VALID_LR_SCHEDULES:
+        raise SystemExit(
+            f"recipe.lr_schedule must be one of {VALID_LR_SCHEDULES}, "
+            f"got {schedule!r}"
+        )
+    return schedule
+
+
+def _resolve_ema(recipe_cfg: Dict[str, Any]):
+    """Validate the optional recipe.ema block; returns the gamma list or None.
+
+    CPU-safe (config validation only). Shape: ``ema: {gammas: [0.9, ...]}``.
+    """
+    ema_cfg = recipe_cfg.get("ema", None)
+    if ema_cfg is None:
+        return None
+    from src.optim.ema_weights import validate_gammas
+
+    if not isinstance(ema_cfg, dict) or set(ema_cfg) != {"gammas"}:
+        raise SystemExit(
+            "recipe.ema must be a mapping with exactly the key 'gammas', "
+            f"got {ema_cfg!r}"
+        )
+    return validate_gammas(ema_cfg["gammas"])
+
 
 def _resolve_sampling(recipe_cfg: Dict[str, Any]):
     """Validate recipe.sampling.
@@ -314,7 +350,11 @@ def run_airbench_smoke(
 
     # Config validation first (CPU-safe): recipe.sampling gates the Phase-1
     # with-replacement ablation; absent = vendored behavior, bit-identical.
+    # recipe.lr_schedule / recipe.ema gate the T1 EMA-as-anneal arms; defaults
+    # (linear, no EMA) keep the vendored behavior bit-identical.
     sampling = _resolve_sampling(config.get("recipe", {}))
+    lr_schedule = _resolve_lr_schedule(config.get("recipe", {}))
+    ema_gammas = _resolve_ema(config.get("recipe", {}))
 
     if device.type != "cuda":
         raise SystemExit(
@@ -503,6 +543,22 @@ def run_airbench_smoke(
     model.init_whiten(train_images)
     stop_timer()
 
+    ema = None
+    ema_val_accs: Dict[str, list] = {}
+    if ema_gammas is not None:
+        from src.optim.ema_weights import WeightEMA
+
+        # Track every parameter plus the float buffers (BatchNorm running
+        # stats) so an EMA checkpoint is a complete, evaluable model state.
+        # Constructed after init_whiten so shadows start from the real init.
+        tracked = list(model.named_parameters()) + [
+            (name, buf)
+            for name, buf in model.named_buffers()
+            if buf.is_floating_point()
+        ]
+        ema = WeightEMA(tracked, ema_gammas)
+        ema_val_accs = {str(g): [] for g in ema.gammas}
+
     val_accs = []
     train_acc = float("nan")
     for _epoch in range(math.ceil(total_train_steps / len(train_loader))):
@@ -543,7 +599,12 @@ def run_airbench_smoke(
                     1 - step / whiten_bias_train_steps
                 )
             for group in optimizer1.param_groups[1:] + optimizer2.param_groups:
-                group["lr"] = group["initial_lr"] * (1 - step / total_train_steps)
+                if lr_schedule == "constant":
+                    group["lr"] = group["initial_lr"]
+                else:
+                    group["lr"] = group["initial_lr"] * (
+                        1 - step / total_train_steps
+                    )
             if lr_fork is not None and step >= lr_fork["step"]:
                 # P10: scale ALL optimizer LRs from the fork step on (the
                 # branch differs from its same-seed twin only in this).
@@ -566,6 +627,8 @@ def run_airbench_smoke(
                 _post_step_hook(step + 1, step_lr)
             if hub is not None:
                 hub.after_step()  # reads captured G + post-step momentum
+            if ema is not None:
+                ema.update()  # post-step, post-renorm weights
             model.zero_grad(set_to_none=True)
             step += 1
             if example_probe is not None and step % int(example_probe.get("every", 10)) == 0:
@@ -595,6 +658,15 @@ def run_airbench_smoke(
 
         train_acc = (outputs.detach().argmax(1) == labels).float().mean().item()
         val_accs.append(ab.evaluate(model, test_loader, tta_level=0))
+        if ema is not None:
+            # Per-epoch EMA readout (outside the timed region, like val_accs):
+            # swap each shadow in, evaluate, restore the live training state
+            # bit-exactly. TTA off here for speed; final TTA per gamma below.
+            for g in ema.gammas:
+                with ema.applied(g):
+                    ema_val_accs[str(g)].append(
+                        ab.evaluate(model, test_loader, tta_level=0)
+                    )
         if step >= total_train_steps:
             break
 
@@ -603,6 +675,17 @@ def run_airbench_smoke(
         ab.evaluate(model, test_loader, tta_level=tta_level) if tta_level else None
     )
     stop_timer()
+
+    ema_tta_val_accs = None
+    if ema is not None:
+        ema_tta_val_accs = {}
+        for g in ema.gammas:
+            with ema.applied(g):
+                ema_tta_val_accs[str(g)] = (
+                    ab.evaluate(model, test_loader, tta_level=tta_level)
+                    if tta_level
+                    else None
+                )
 
     metrics = {
         "optimizer": opt_name,
@@ -616,6 +699,14 @@ def run_airbench_smoke(
     }
     if sampling is not None:
         metrics["sampling"] = sampling  # ablation provenance; absent = vendor
+    if lr_schedule != "linear" or ema is not None:
+        # T1 arm provenance; keys absent on stock runs so pre-T1 outputs are
+        # byte-identical.
+        metrics["lr_schedule"] = lr_schedule
+    if ema is not None:
+        metrics["ema_gammas"] = list(ema.gammas)
+        metrics["ema_val_accs"] = ema_val_accs
+        metrics["ema_tta_val_accs"] = ema_tta_val_accs
     if track_routing:
         # Gate-1 amendment A5: end-of-run routing telemetry + coarse series.
         metrics["routing_stats"] = optimizer2.routing_stats()
@@ -684,6 +775,1227 @@ def run_airbench(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]
     recipe.setdefault("compile", True)  # the reference compiles the model
     merged["recipe"] = recipe
     return run_airbench_smoke(merged, device)
+
+
+def run_airbench_ema(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]:
+    """T1 EMA-as-anytime-anneal arms (docs/litreview/j-theory-theorem-sweep.md §5).
+
+    The stock WP0.1 recipe (vendored Muon at record hyperparameters, compile
+    on — identical pinning to :func:`run_airbench`) plus a mandatory
+    ``recipe.ema`` block (weight-EMA readouts per epoch and at final TTA) and
+    an optional ``recipe.lr_schedule`` arm switch (``linear`` = vendored
+    baseline arm, ``constant`` = schedule-free arm whose EMA readout is the
+    anneal substitute). Training trajectories are unaffected by the EMA
+    machinery: shadows are read-only observers and eval swaps restore the
+    live state bit-exactly, so the ``linear`` arm's trajectory is the stock
+    baseline trajectory.
+
+    Dev-seed measurement experiment; never a comparison-table entry.
+    """
+    if "optimizer" in config:
+        raise SystemExit(
+            "experiment 'airbench_ema' pins the stock WP0.1 recipe; it does "
+            "not accept an optimizer override (use experiment 'airbench_smoke')."
+        )
+    if _resolve_ema(config.get("recipe", {})) is None:
+        raise SystemExit(
+            "experiment 'airbench_ema' requires a recipe.ema block "
+            "(e.g. ema: {gammas: [0.9, 0.96, 0.99]}); for stock runs without "
+            "EMA use experiment 'airbench'."
+        )
+    merged = dict(config)
+    merged["optimizer"] = dict(
+        name="vendor_muon", lr=0.24, momentum=0.6, nesterov=True
+    )
+    recipe = dict(config.get("recipe", {}))
+    recipe["normalize_filter_weights"] = False  # vendored Muon.step does it
+    recipe.setdefault("compile", True)  # the reference compiles the model
+    merged["recipe"] = recipe
+    return run_airbench_smoke(merged, device)
+
+
+def _resolve_branch(config: Dict[str, Any], total_train_steps: int = None):
+    """Validate the ``branch:`` block of an anneal-dissection config.
+
+    Returns (branch_steps, anneal_lengths). CPU-safe. When total_train_steps
+    is given, branch points must lie in (0, total]."""
+    branch = config.get("branch")
+    if not isinstance(branch, dict) or set(branch) != {"branch_steps", "anneal_lengths"}:
+        raise SystemExit(
+            "experiment 'airbench_anneal_branch' needs a branch: block with "
+            "exactly the keys branch_steps and anneal_lengths"
+        )
+    steps = branch["branch_steps"]
+    lengths = branch["anneal_lengths"]
+    for name, values in (("branch_steps", steps), ("anneal_lengths", lengths)):
+        if (
+            not isinstance(values, list)
+            or not values
+            or not all(isinstance(v, int) and not isinstance(v, bool) for v in values)
+            or sorted(set(values)) != values
+        ):
+            raise SystemExit(
+                f"branch.{name} must be a non-empty strictly-increasing list "
+                f"of ints, got {values!r}"
+            )
+    if steps[0] < 1:
+        raise SystemExit("branch.branch_steps must be >= 1")
+    if lengths[0] < 0:
+        raise SystemExit("branch.anneal_lengths must be >= 0")
+    if total_train_steps is not None and steps[-1] > total_train_steps:
+        raise SystemExit(
+            f"branch.branch_steps beyond the run: {steps[-1]} > {total_train_steps}"
+        )
+    return steps, lengths
+
+
+def run_airbench_anneal_branch(
+    config: Dict[str, Any], device: torch.device
+) -> Dict[str, Any]:
+    """Anneal dissection ("how short is the last mile?") — flow-first program
+    item 1, docs/litreview/j-theory-theorem-sweep.md §6.
+
+    Stock airbench94 recipe (vendored Muon at record hyperparameters) trained
+    at CONSTANT LR (the T1 constant-arm schedule: every group pinned at its
+    initial LR; the whiten bias keeps its stock early decay and is
+    grad-disabled after 3 epochs). At each configured branch step the live
+    training state is snapshotted and, for each anneal length k, a branch
+    anneals the LR linearly to zero over k steps — all branches at one branch
+    point share the snapshot AND the identical cached continuation batches,
+    so accuracy differences are attributable to the anneal length alone. The
+    base trajectory then resumes from the snapshot through those same cached
+    batches, unperturbed by the branches (bit-exact restore).
+
+    Readout: accuracy vs k per branch point. The saturation k* measures how
+    much of the anneal is fast dynamical relaxation; paired stock-schedule
+    finals for the same dev seeds live in the T1 results
+    (`results/airbench_ema_*`, lr_schedule=linear).
+
+    Dev-seed measurement experiment; never a comparison-table entry.
+    """
+    from src.optim.train_snapshot import (
+        restore_training_state,
+        snapshot_training_state,
+    )
+
+    if "optimizer" in config:
+        raise SystemExit(
+            "experiment 'airbench_anneal_branch' pins the stock recipe; it "
+            "does not accept an optimizer override"
+        )
+    branch_steps, anneal_lengths = _resolve_branch(config)
+    sampling = _resolve_sampling(config.get("recipe", {}))
+    if sampling is not None:
+        raise SystemExit("airbench_anneal_branch supports vendored sampling only")
+
+    if device.type != "cuda":
+        raise SystemExit("airbench_anneal_branch requires a CUDA device")
+
+    ab = load_vendor_airbench()
+
+    train_cfg = config.get("train", {})
+    recipe_cfg = config.get("recipe", {})
+    data_root = str(config.get("data", {}).get("root", "data/cifar10"))
+    epochs = float(train_cfg.get("epochs", 8))
+    batch_size = int(train_cfg.get("batch_size", 2000))
+    bias_lr = float(recipe_cfg.get("bias_lr", 0.053))
+    head_lr = float(recipe_cfg.get("head_lr", 0.67))
+    wd = float(recipe_cfg.get("sgd_weight_decay", 2e-6)) * batch_size
+    tta_level = int(recipe_cfg.get("tta_level", 2))
+
+    model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
+    if bool(recipe_cfg.get("compile", True)):
+        model.compile()
+
+    test_loader = ab.CifarLoader(data_root, train=False, batch_size=2000)
+    train_loader = ab.CifarLoader(
+        data_root, train=True, batch_size=batch_size, aug=dict(flip=True, translate=2)
+    )
+    total_train_steps = math.ceil(epochs * len(train_loader))
+    whiten_bias_train_steps = min(math.ceil(3 * len(train_loader)), total_train_steps)
+    _resolve_branch(config, total_train_steps)  # now with the bound known
+
+    # Parameter split + optimizers exactly as the stock harness
+    filter_params = [
+        p for p in model.parameters() if len(p.shape) == 4 and p.requires_grad
+    ]
+    norm_biases = [
+        p for n, p in model.named_parameters() if "norm" in n and p.requires_grad
+    ]
+    param_configs = [
+        dict(params=[model.whiten.bias], lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=norm_biases, lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=[model.head.weight], lr=head_lr, weight_decay=wd / head_lr),
+    ]
+    optimizer1 = torch.optim.SGD(
+        param_configs, momentum=0.85, nesterov=True, fused=True
+    )
+    optimizer2 = ab.Muon(filter_params, lr=0.24, momentum=0.6, nesterov=True)
+    optimizers = [optimizer1, optimizer2]
+    for opt in optimizers:
+        for group in opt.param_groups:
+            group["initial_lr"] = group["lr"]
+
+    starter = torch.cuda.Event(enable_timing=True)
+    ender = torch.cuda.Event(enable_timing=True)
+    time_seconds = 0.0
+
+    def start_timer():
+        starter.record()
+
+    def stop_timer():
+        nonlocal time_seconds
+        ender.record()
+        torch.cuda.synchronize()
+        time_seconds += 1e-3 * starter.elapsed_time(ender)
+
+    model.reset()
+
+    start_timer()
+    train_images = train_loader.normalize(train_loader.images[:5000])
+    model.init_whiten(train_images)
+    stop_timer()
+
+    def batch_stream():
+        while True:
+            for batch in train_loader:
+                yield batch
+
+    stream = batch_stream()
+
+    def train_step(inputs, labels, step_index, lr_scale):
+        """One training step at global step_index; lr_scale multiplies every
+        non-whiten group's initial LR (1.0 = the constant base schedule)."""
+        # ab.evaluate() leaves the model in eval mode; the stock loop restores
+        # train mode once per epoch, but here evals happen mid-stream at every
+        # branch, so re-assert it per step (BatchNorm must train in train mode).
+        model.train()
+        outputs = model(
+            inputs, whiten_bias_grad=(step_index < whiten_bias_train_steps)
+        )
+        torch.nn.functional.cross_entropy(
+            outputs, labels, label_smoothing=0.2, reduction="sum"
+        ).backward()
+        for group in optimizer1.param_groups[:1]:
+            group["lr"] = group["initial_lr"] * (
+                1 - step_index / whiten_bias_train_steps
+            )
+        for group in optimizer1.param_groups[1:] + optimizer2.param_groups:
+            group["lr"] = group["initial_lr"] * lr_scale
+        for opt in optimizers:
+            opt.step()
+        model.zero_grad(set_to_none=True)
+
+    k_max = anneal_lengths[-1]
+    base_val_accs: Dict[str, float] = {}
+    branches: Dict[str, Dict[str, Dict[str, float]]] = {}
+    pending: list = []  # cached continuation batches the base must consume
+    remaining_branches = list(branch_steps)
+
+    step = 0
+    start_timer()
+    while True:
+        if remaining_branches and step == remaining_branches[0]:
+            t_b = remaining_branches.pop(0)
+            stop_timer()
+            # Cache the continuation batches once; branches and the resumed
+            # base all consume this identical stream.
+            cache = [
+                pending.pop(0) if pending else next(stream) for _ in range(k_max)
+            ]
+            snap = snapshot_training_state(model, optimizers)
+            base_val_accs[str(t_b)] = ab.evaluate(model, test_loader, tta_level=0)
+            branches[str(t_b)] = {}
+            start_timer()
+            for k in anneal_lengths:
+                restore_training_state(model, optimizers, snap)
+                for i in range(k):
+                    inputs, labels = cache[i]
+                    train_step(inputs, labels, t_b + i, (k - i) / k)
+                stop_timer()
+                entry = {"val_acc": ab.evaluate(model, test_loader, tta_level=0)}
+                entry["tta_val_acc"] = (
+                    ab.evaluate(model, test_loader, tta_level=tta_level)
+                    if tta_level
+                    else None
+                )
+                branches[str(t_b)][str(k)] = entry
+                start_timer()
+            restore_training_state(model, optimizers, snap)
+            pending = cache  # base resumes through the same batches
+        if step >= total_train_steps:
+            break
+        inputs, labels = pending.pop(0) if pending else next(stream)
+        train_step(inputs, labels, step, 1.0)
+        step += 1
+    stop_timer()
+
+    final_val_acc = ab.evaluate(model, test_loader, tta_level=0)
+    final_tta_val_acc = (
+        ab.evaluate(model, test_loader, tta_level=tta_level) if tta_level else None
+    )
+
+    return {
+        "optimizer": "vendor_muon",
+        "epochs": epochs,
+        "steps": step,
+        "lr_schedule": "constant",
+        "branch_steps": branch_steps,
+        "anneal_lengths": anneal_lengths,
+        "base_val_accs": base_val_accs,
+        "branches": branches,
+        "final_val_acc": final_val_acc,
+        "final_tta_val_acc": final_tta_val_acc,
+        "time_seconds": time_seconds,
+    }
+
+
+# ------------------------------------------------- teleportation go/no-go gate
+
+# Keys the ``gate:`` block must carry, exactly.
+GATE_KEYS = ("snapshot_steps", "n_samples", "spread", "refine_iters", "probe_batches")
+
+# A proposal counts as ON the loss level set iff |(L - L0) / L0| is below this.
+# Not a science threshold: it is the numerical definition of "same loss" for
+# the constrained search, and every draw's realized rel_dloss is reported so
+# the invariance itself is auditable from the results JSON.
+TELEPORT_INVARIANCE_TOL = 1e-3
+
+# Log-scale proposal standard deviation for the refinement random search.
+TELEPORT_REFINE_STEP = 0.25
+
+
+def _resolve_gate(config: Dict[str, Any], total_train_steps: int = None):
+    """Validate the ``gate:`` block of a teleportation-gate config.
+
+    Returns the normalized gate dict. CPU-safe (runs before any CUDA work).
+    When ``total_train_steps`` is given, snapshot points must lie in
+    (0, total].
+    """
+    gate = config.get("gate")
+    if not isinstance(gate, dict) or set(gate) != set(GATE_KEYS):
+        raise SystemExit(
+            "experiment 'airbench_teleport_gate' needs a gate: block with "
+            f"exactly the keys {', '.join(GATE_KEYS)}"
+        )
+    steps = gate["snapshot_steps"]
+    if (
+        not isinstance(steps, list)
+        or not steps
+        or not all(isinstance(v, int) and not isinstance(v, bool) for v in steps)
+        or sorted(set(steps)) != steps
+    ):
+        raise SystemExit(
+            "gate.snapshot_steps must be a non-empty strictly-increasing list "
+            f"of ints, got {steps!r}"
+        )
+    if steps[0] < 1:
+        raise SystemExit("gate.snapshot_steps must be >= 1")
+    counts = {}
+    for name, minimum in (
+        ("n_samples", 1),
+        ("refine_iters", 0),
+        ("probe_batches", 1),
+    ):
+        value = gate[name]
+        if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+            raise SystemExit(f"gate.{name} must be an int >= {minimum}, got {value!r}")
+        counts[name] = value
+    spread = gate["spread"]
+    if isinstance(spread, bool) or not isinstance(spread, (int, float)):
+        raise SystemExit(f"gate.spread must be a number > 1, got {spread!r}")
+    spread = float(spread)
+    if not spread > 1.0:
+        raise SystemExit(f"gate.spread must be > 1, got {spread}")
+    if total_train_steps is not None and steps[-1] > total_train_steps:
+        raise SystemExit(
+            f"gate.snapshot_steps beyond the run: {steps[-1]} > {total_train_steps}"
+        )
+    return {"snapshot_steps": list(steps), "spread": spread, **counts}
+
+
+def _ratio(value: float, base: float) -> float:
+    """value/base, or NaN when the base is zero (kept out of the JSON math)."""
+    return float(value / base) if base else float("nan")
+
+
+def run_airbench_teleport_gate(
+    config: Dict[str, Any], device: torch.device
+) -> Dict[str, Any]:
+    """Teleportation go/no-go gate — flow-first program item 4,
+    docs/litreview/j-theory-theorem-sweep.md section 6 (T6).
+
+    Symmetry teleportation provably accelerates iff the gradient norm VARIES
+    along the loss level set.  The conv->BatchNorm channel rescalings are a
+    closed-form, loss-invariant symmetry orbit of this network
+    (:mod:`src.instrument.orbit`), so the variation is directly measurable.
+    This experiment measures it at representative training states.
+
+    Stock airbench94 recipe (vendored Muon at the record hyperparameters
+    lr=0.24 momentum=0.6 nesterov, compile per recipe) trained under the STOCK
+    LINEAR LR decay -- unlike the anneal-dissection experiment, this one wants
+    the states the real recipe actually visits.  At each configured snapshot
+    step the live training state is snapshotted, ``probe_batches`` batches are
+    cached off the stream, and on that fixed probe loss (cross entropy,
+    label_smoothing 0.2, reduction sum -- the training loss) the harness:
+
+      1. records the base loss L0 and base gradient norms;
+      2. draws ``n_samples`` log-uniform channel rescalings in
+         [1/spread, spread], and for each records the realized relative loss
+         change and the Euclidean / Frobenius / NUCLEAR gradient-norm ratios;
+      3. runs a ``refine_iters``-iteration random search that MAXIMIZES the
+         nuclear-norm sum subject to |rel_dloss| < TELEPORT_INVARIANCE_TOL,
+         starting from the best feasible random draw.
+
+    Every probe evaluation is undone by a bit-exact restore from
+    ``src.optim.train_snapshot`` (multiplicative inversion is lossy in half
+    precision), and the cached probe batches are fed back to the base
+    trajectory afterwards, so the base run is unperturbed.
+
+    Reports BOTH Euclidean (Frobenius) and nuclear norms: the nuclear norm is
+    the Muon-relevant one (a Muon step's first-order loss decrease is
+    ``<G, polar(G)> = ||G||_*``), the Euclidean one is what the teleportation
+    literature states its conditions in.
+
+    The experiment measures and reports only.  It evaluates no gate and
+    carries no success threshold; the kill criterion (O(1%) heterogeneity)
+    lives in the config header and is judged by a human.
+
+    Dev-seed measurement experiment; never a comparison-table entry.
+    """
+    from src.instrument.orbit import (
+        apply_channel_scales,
+        find_conv_bn_pairs,
+        grad_norms,
+        pair_names,
+        refine_scales,
+        sample_log_uniform_scales,
+    )
+    from src.optim.train_snapshot import (
+        restore_training_state,
+        snapshot_training_state,
+    )
+
+    if "optimizer" in config:
+        raise SystemExit(
+            "experiment 'airbench_teleport_gate' pins the stock recipe; it "
+            "does not accept an optimizer override"
+        )
+    gate = _resolve_gate(config)
+    sampling = _resolve_sampling(config.get("recipe", {}))
+    if sampling is not None:
+        raise SystemExit("airbench_teleport_gate supports vendored sampling only")
+
+    if device.type != "cuda":
+        raise SystemExit("airbench_teleport_gate requires a CUDA device")
+
+    ab = load_vendor_airbench()
+
+    train_cfg = config.get("train", {})
+    recipe_cfg = config.get("recipe", {})
+    data_root = str(config.get("data", {}).get("root", "data/cifar10"))
+    epochs = float(train_cfg.get("epochs", 8))
+    batch_size = int(train_cfg.get("batch_size", 2000))
+    bias_lr = float(recipe_cfg.get("bias_lr", 0.053))
+    head_lr = float(recipe_cfg.get("head_lr", 0.67))
+    wd = float(recipe_cfg.get("sgd_weight_decay", 2e-6)) * batch_size
+    tta_level = int(recipe_cfg.get("tta_level", 0))
+
+    model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
+    if bool(recipe_cfg.get("compile", True)):
+        model.compile()
+
+    test_loader = ab.CifarLoader(data_root, train=False, batch_size=2000)
+    train_loader = ab.CifarLoader(
+        data_root, train=True, batch_size=batch_size, aug=dict(flip=True, translate=2)
+    )
+    total_train_steps = math.ceil(epochs * len(train_loader))
+    whiten_bias_train_steps = min(math.ceil(3 * len(train_loader)), total_train_steps)
+    _resolve_gate(config, total_train_steps)  # now with the bound known
+
+    # Parameter split + optimizers exactly as the stock harness
+    filter_params = [
+        p for p in model.parameters() if len(p.shape) == 4 and p.requires_grad
+    ]
+    norm_biases = [
+        p for n, p in model.named_parameters() if "norm" in n and p.requires_grad
+    ]
+    param_configs = [
+        dict(params=[model.whiten.bias], lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=norm_biases, lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=[model.head.weight], lr=head_lr, weight_decay=wd / head_lr),
+    ]
+    optimizer1 = torch.optim.SGD(
+        param_configs, momentum=0.85, nesterov=True, fused=True
+    )
+    optimizer2 = ab.Muon(
+        filter_params, lr=AIRBENCH_STOCK_LR, momentum=0.6, nesterov=True
+    )
+    optimizers = [optimizer1, optimizer2]
+    for opt in optimizers:
+        for group in opt.param_groups:
+            group["initial_lr"] = group["lr"]
+
+    pairs = find_conv_bn_pairs(model)
+    if not pairs:
+        raise SystemExit("no conv->BatchNorm pairs found; nothing to teleport along")
+
+    starter = torch.cuda.Event(enable_timing=True)
+    ender = torch.cuda.Event(enable_timing=True)
+    time_seconds = 0.0
+
+    def start_timer():
+        starter.record()
+
+    def stop_timer():
+        nonlocal time_seconds
+        ender.record()
+        torch.cuda.synchronize()
+        time_seconds += 1e-3 * starter.elapsed_time(ender)
+
+    model.reset()
+
+    start_timer()
+    train_images = train_loader.normalize(train_loader.images[:5000])
+    model.init_whiten(train_images)
+    stop_timer()
+
+    # Orbit draws use their own CPU generator, seeded from the (already
+    # run-seeded) global CPU RNG *after* model init so the init stream is
+    # untouched. Data augmentation draws from the CUDA RNG, so the probe's
+    # sampling cannot perturb the training trajectory at all.
+    gate_seed = int(torch.randint(0, 2**31 - 1, (1,)).item())
+    generator = torch.Generator().manual_seed(gate_seed)
+
+    def batch_stream():
+        while True:
+            for batch in train_loader:
+                yield batch
+
+    stream = batch_stream()
+
+    def train_step(inputs, labels, step_index):
+        """One stock-schedule training step (linear LR decay to zero)."""
+        # Probes leave the model in train mode already, but ab.evaluate() at the
+        # end of the run does not; re-assert per step as the branch harness does.
+        model.train()
+        outputs = model(
+            inputs, whiten_bias_grad=(step_index < whiten_bias_train_steps)
+        )
+        torch.nn.functional.cross_entropy(
+            outputs, labels, label_smoothing=0.2, reduction="sum"
+        ).backward()
+        for group in optimizer1.param_groups[:1]:
+            group["lr"] = group["initial_lr"] * (
+                1 - step_index / whiten_bias_train_steps
+            )
+        for group in optimizer1.param_groups[1:] + optimizer2.param_groups:
+            group["lr"] = group["initial_lr"] * (1 - step_index / total_train_steps)
+        for opt in optimizers:
+            opt.step()
+        model.zero_grad(set_to_none=True)
+
+    def teleport_probe(step_index, cache):
+        """Measure gradient-size variation along the orbit at this state."""
+        snap = snapshot_training_state(model, optimizers)
+        whiten_grad = step_index < whiten_bias_train_steps
+
+        def measure():
+            """Loss + gradient norms on the fixed probe batches; grads zeroed.
+
+            The logits are cast to float32 first.  The training loop leaves
+            them half, but a half-precision SUM-reduced loss over these batch
+            sizes lands near 1e4, where fp16 spacing is ~4 -- a relative
+            resolution of ~7e-4, which would swamp an invariance measurement
+            whose whole point is that |rel_dloss| is small.  The cast applies
+            identically to the base point and every orbit draw.  (The residual
+            floor is fp16 rounding of the RESCALED weights themselves, which
+            moves the point slightly off the exact orbit; the reported
+            ``max_abs_rel_dloss`` is exactly that floor.)
+            """
+            model.train()
+            total = None
+            for inputs, labels in cache:
+                outputs = model(inputs, whiten_bias_grad=whiten_grad)
+                part = torch.nn.functional.cross_entropy(
+                    outputs.float(), labels, label_smoothing=0.2, reduction="sum"
+                )
+                total = part if total is None else total + part
+            total.backward()
+            value = float(total.detach().float().item())
+            norms = grad_norms(model, pairs)
+            model.zero_grad(set_to_none=True)
+            return value, norms
+
+        base_loss, base = measure()
+        restore_training_state(model, optimizers, snap)
+
+        def evaluate(scales):
+            apply_channel_scales(pairs, scales)
+            loss_value, norms = measure()
+            restore_training_state(model, optimizers, snap)
+            return {
+                "rel_dloss": _ratio(loss_value - base_loss, abs(base_loss)),
+                "total_grad_ratio": _ratio(norms["total"], base["total"]),
+                "nuclear_sum_ratio": _ratio(norms["nuclear_sum"], base["nuclear_sum"]),
+                "fro_ratio": [
+                    _ratio(v, b) for v, b in zip(norms["fro"], base["fro"])
+                ],
+                "nuc_ratio": [
+                    _ratio(v, b) for v, b in zip(norms["nuclear"], base["nuclear"])
+                ],
+            }
+
+        draws = []
+        for _ in range(gate["n_samples"]):
+            scales = sample_log_uniform_scales(pairs, gate["spread"], generator)
+            draws.append((scales, evaluate(scales)))
+
+        feasible = [
+            (s, r)
+            for s, r in draws
+            if abs(r["rel_dloss"]) < TELEPORT_INVARIANCE_TOL
+            and math.isfinite(r["nuclear_sum_ratio"])
+        ]
+        best_random = None
+        init_scales = [torch.ones(int(c.weight.shape[0])) for c, _b, _n in pairs]
+        if feasible:
+            scales, best_random = max(
+                feasible, key=lambda sr: sr[1]["nuclear_sum_ratio"]
+            )
+            init_scales = scales
+
+        # Constrained refinement: maximize the nuclear-norm sum, discarding any
+        # proposal that leaves the level set.
+        best_holder: Dict[str, Any] = {"value": float("-inf"), "record": None}
+
+        def objective(scales):
+            record = evaluate(scales)
+            if abs(record["rel_dloss"]) >= TELEPORT_INVARIANCE_TOL:
+                return None
+            value = record["nuclear_sum_ratio"]
+            if not math.isfinite(value):
+                return None
+            if value > best_holder["value"]:
+                best_holder["value"] = value
+                best_holder["record"] = record
+            return value
+
+        search = refine_scales(
+            objective,
+            init_scales,
+            iters=gate["refine_iters"],
+            step_size=TELEPORT_REFINE_STEP,
+            spread_limit=gate["spread"],
+            generator=generator,
+        )
+        best_refined = None
+        if best_holder["record"] is not None:
+            best_refined = dict(best_holder["record"])
+            best_refined["n_accepted"] = search["n_accepted"]
+            best_refined["n_infeasible"] = search["n_infeasible"]
+
+        model.zero_grad(set_to_none=True)
+        restore_training_state(model, optimizers, snap)
+        model.train()
+
+        samples = [r for _s, r in draws]
+        return {
+            "step": step_index,
+            "base_loss": base_loss,
+            "base_total_grad": base["total"],
+            "base_nuclear_sum": base["nuclear_sum"],
+            "base_fro": base["fro"],
+            "base_nuclear": base["nuclear"],
+            "samples": samples,
+            "n_feasible": len(feasible),
+            "max_abs_rel_dloss": max(abs(r["rel_dloss"]) for r in samples),
+            "best_random": best_random,
+            "best_refined": best_refined,
+        }
+
+    import time as _time
+
+    snapshots: Dict[str, Dict[str, Any]] = {}
+    probe_seconds = 0.0  # measurement overhead, kept out of time_seconds
+    pending: list = []  # cached probe batches the base must still consume
+    remaining = list(gate["snapshot_steps"])
+
+    step = 0
+    start_timer()
+    while True:
+        if remaining and step == remaining[0]:
+            t_s = remaining.pop(0)
+            stop_timer()
+            cache = [
+                pending.pop(0) if pending else next(stream)
+                for _ in range(gate["probe_batches"])
+            ]
+            t_probe = _time.perf_counter()
+            snapshots[str(t_s)] = teleport_probe(t_s, cache)
+            torch.cuda.synchronize()
+            probe_seconds += _time.perf_counter() - t_probe
+            pending = cache + pending  # base resumes through the same batches
+            start_timer()
+        if step >= total_train_steps:
+            break
+        inputs, labels = pending.pop(0) if pending else next(stream)
+        train_step(inputs, labels, step)
+        step += 1
+    stop_timer()
+
+    final_val_acc = ab.evaluate(model, test_loader, tta_level=0)
+    final_tta_val_acc = (
+        ab.evaluate(model, test_loader, tta_level=tta_level) if tta_level else None
+    )
+
+    return {
+        "optimizer": "vendor_muon",
+        "epochs": epochs,
+        "steps": step,
+        "lr_schedule": "linear",
+        "gate": dict(gate),
+        "invariance_tol": TELEPORT_INVARIANCE_TOL,
+        "refine_step_size": TELEPORT_REFINE_STEP,
+        "gate_seed": gate_seed,
+        "pair_names": pair_names(pairs),
+        "snapshots": snapshots,
+        "final_val_acc": final_val_acc,
+        "final_tta_val_acc": final_tta_val_acc,
+        "time_seconds": time_seconds,  # training only
+        "probe_seconds": probe_seconds,  # orbit measurement overhead
+    }
+
+
+CF_KEYS = {"lr_scale", "enabled", "refresh_every", "k_directions", "beta_scale"}
+# Probe-slice size for the central-flow curvature refresh: the third-order
+# chain's memory scales with the forward graph, and curvature estimates do
+# not need the full 2000-sample batch. Constant, not a config key (the cf:
+# block is pinned to exactly five keys).
+CF_PROBE_SAMPLES = 256
+
+
+def _resolve_cf(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate the ``cf:`` block of a central-flow config (CPU-safe)."""
+    cf = config.get("cf")
+    if not isinstance(cf, dict) or set(cf) != CF_KEYS:
+        raise SystemExit(
+            "experiment 'airbench_centralflow' needs a cf: block with exactly "
+            f"the keys {sorted(CF_KEYS)}"
+        )
+    out = {
+        "lr_scale": float(cf["lr_scale"]),
+        "enabled": bool(cf["enabled"]),
+        "refresh_every": int(cf["refresh_every"]),
+        "k_directions": int(cf["k_directions"]),
+        "beta_scale": float(cf["beta_scale"]),
+    }
+    if not 0.0 < out["lr_scale"] <= 1.0:
+        raise SystemExit(f"cf.lr_scale must be in (0, 1], got {out['lr_scale']}")
+    if out["refresh_every"] < 1:
+        raise SystemExit("cf.refresh_every must be >= 1")
+    if not 1 <= out["k_directions"] <= 16:
+        raise SystemExit("cf.k_directions must be in [1, 16]")
+    if out["beta_scale"] < 0.0:
+        raise SystemExit("cf.beta_scale must be >= 0")
+    return out
+
+
+def momentum_topk_directions(momentum: torch.Tensor, k: int):
+    """Top-k singular directions of a (2-D-reshaped) momentum buffer as
+    rank-1 matrices ``u_i v_i^T`` (unit Frobenius norm each).
+
+    These are the directions Muon's polar update weights equally and where
+    the per-direction iterate oscillation of amplitude ~eta lives (finding
+    F3/T3, docs/litreview/j-theory-theorem-sweep.md); the central-flow v0
+    penalizes directional curvature exactly there.
+    """
+    # SVD on CPU: cuSOLVER's gesvd fails to converge on the ill-conditioned
+    # early-training momentum buffers (observed on the first GPU smoke);
+    # LAPACK is robust and these matrices are small. sharpgrad moves the
+    # directions to the parameter device itself.
+    m = momentum.detach().float().reshape(momentum.shape[0], -1).cpu()
+    if not torch.isfinite(m).all():
+        return []  # fp16 overflow in an early buffer: skip this refresh
+    k = min(k, min(m.shape))
+    try:
+        u, _s, vh = torch.linalg.svd(m, full_matrices=False)
+    except torch.linalg.LinAlgError:
+        return []  # degenerate buffer: skip this matrix for this refresh
+    return [
+        torch.outer(u[:, i], vh[i, :]).reshape(momentum.shape) for i in range(k)
+    ]
+
+
+def run_airbench_centralflow(
+    config: Dict[str, Any], device: torch.device
+) -> Dict[str, Any]:
+    """Central-flow Muon v0 — flow-first program item 2 (litreview j §6).
+
+    The mechanism test: does an EXPLICIT central-flow curvature-penalty term
+    (src/optim/centralflow.py) at reduced LR reproduce what high-LR
+    oscillating training achieves implicitly? Stock airbench recipe with the
+    Muon (and SGD) LRs scaled by ``cf.lr_scale``, stock linear schedule
+    shape; when ``cf.enabled``, every ``cf.refresh_every`` steps the penalty
+    gradient ``grad_w sum_i w_i * v_i^T H v_i`` is recomputed on the current
+    batch over the top-``cf.k_directions`` momentum singular directions of
+    each filter matrix, with the theory-grounded v0 weights
+
+        w_i = eta_t^2 / 2        (eta_t = current scaled Muon LR)
+
+    — Muon's per-direction oscillation amplitude is ~eta (our F3/T3 bounded-
+    update finding), so eta^2 is the iterate-oscillation variance the central
+    flow says the oscillation would contribute. The cached penalty is applied
+    every step with beta = eta_t * cf.beta_scale.
+
+    ``recipe.compile`` defaults OFF here: the refresh runs a third-order
+    autograd chain through the model forward, which torch.compile does not
+    reliably support; arms are compared uncompiled-vs-uncompiled.
+
+    Arms are config files varying (lr_scale, enabled); dev-seed measurement
+    experiment; never a comparison-table entry.
+    """
+    from src.optim.centralflow import CentralFlowTerm
+
+    if "optimizer" in config:
+        raise SystemExit(
+            "experiment 'airbench_centralflow' pins the stock recipe; it "
+            "does not accept an optimizer override"
+        )
+    cf = _resolve_cf(config)
+    sampling = _resolve_sampling(config.get("recipe", {}))
+    if sampling is not None:
+        raise SystemExit("airbench_centralflow supports vendored sampling only")
+
+    if device.type != "cuda":
+        raise SystemExit("airbench_centralflow requires a CUDA device")
+
+    ab = load_vendor_airbench()
+
+    train_cfg = config.get("train", {})
+    recipe_cfg = config.get("recipe", {})
+    data_root = str(config.get("data", {}).get("root", "data/cifar10"))
+    epochs = float(train_cfg.get("epochs", 8))
+    batch_size = int(train_cfg.get("batch_size", 2000))
+    bias_lr = float(recipe_cfg.get("bias_lr", 0.053))
+    head_lr = float(recipe_cfg.get("head_lr", 0.67))
+    wd = float(recipe_cfg.get("sgd_weight_decay", 2e-6)) * batch_size
+    tta_level = int(recipe_cfg.get("tta_level", 2))
+
+    model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
+    if bool(recipe_cfg.get("compile", False)):  # default OFF (third-order chain)
+        model.compile()
+
+    test_loader = ab.CifarLoader(data_root, train=False, batch_size=2000)
+    train_loader = ab.CifarLoader(
+        data_root, train=True, batch_size=batch_size, aug=dict(flip=True, translate=2)
+    )
+    total_train_steps = math.ceil(epochs * len(train_loader))
+    whiten_bias_train_steps = min(math.ceil(3 * len(train_loader)), total_train_steps)
+
+    filter_params = [
+        p for p in model.parameters() if len(p.shape) == 4 and p.requires_grad
+    ]
+    norm_biases = [
+        p for n, p in model.named_parameters() if "norm" in n and p.requires_grad
+    ]
+    param_configs = [
+        dict(params=[model.whiten.bias], lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=norm_biases, lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=[model.head.weight], lr=head_lr, weight_decay=wd / head_lr),
+    ]
+    # LR scale applies to every scheduled group (Muon AND the SGD groups):
+    # the arm is "the same recipe, colder", not a per-group reweighting.
+    optimizer1 = torch.optim.SGD(
+        param_configs, momentum=0.85, nesterov=True, fused=True
+    )
+    optimizer2 = ab.Muon(
+        filter_params, lr=AIRBENCH_STOCK_LR, momentum=0.6, nesterov=True
+    )
+    optimizers = [optimizer1, optimizer2]
+    for opt in optimizers:
+        for group in opt.param_groups:
+            group["initial_lr"] = group["lr"] * cf["lr_scale"]
+
+    term = CentralFlowTerm() if cf["enabled"] else None
+
+    starter = torch.cuda.Event(enable_timing=True)
+    ender = torch.cuda.Event(enable_timing=True)
+    time_seconds = 0.0
+
+    def start_timer():
+        starter.record()
+
+    def stop_timer():
+        nonlocal time_seconds
+        ender.record()
+        torch.cuda.synchronize()
+        time_seconds += 1e-3 * starter.elapsed_time(ender)
+
+    model.reset()
+    step = 0
+
+    start_timer()
+    train_images = train_loader.normalize(train_loader.images[:5000])
+    model.init_whiten(train_images)
+    stop_timer()
+
+    cf_timeseries = []
+    val_accs = []
+    train_acc = float("nan")
+    for _epoch in range(math.ceil(total_train_steps / len(train_loader))):
+        start_timer()
+        model.train()
+        for inputs, labels in train_loader:
+            outputs = model(inputs, whiten_bias_grad=(step < whiten_bias_train_steps))
+            torch.nn.functional.cross_entropy(
+                outputs, labels, label_smoothing=0.2, reduction="sum"
+            ).backward()
+            for group in optimizer1.param_groups[:1]:
+                group["lr"] = group["initial_lr"] * (
+                    1 - step / whiten_bias_train_steps
+                ) / cf["lr_scale"]  # whiten bias keeps its stock, unscaled decay
+            for group in optimizer1.param_groups[1:] + optimizer2.param_groups:
+                group["lr"] = group["initial_lr"] * (1 - step / total_train_steps)
+            muon_lr = optimizer2.param_groups[0]["lr"]
+            for opt in optimizers:
+                opt.step()
+            model.zero_grad(set_to_none=True)
+            if term is not None:
+                if step % cf["refresh_every"] == 0:
+                    # Memory-bounded fp32 refresh. Two hard-won constraints
+                    # from the GPU smokes: (a) a joint refresh over all
+                    # matrices on the full-batch graph OOMs a 48 GB card, so
+                    # chunk per matrix on a probe slice; (b) second/third-
+                    # order autograd through the fp16 training graph is NaN
+                    # from step 0, so the curvature is evaluated on the
+                    # detached-fp32 functional pattern of src/instrument/hvp
+                    # (train-mode BN uses batch stats, so sharing one
+                    # override set across chunks does not shift the surface).
+                    from src.instrument.hvp import (
+                        default_ce_loss,
+                        fp32_functional_loss,
+                        fp32_overrides,
+                    )
+
+                    b_inputs = inputs[:CF_PROBE_SAMPLES]
+                    b_labels = labels[:CF_PROBE_SAMPLES]
+                    overrides, leaves = fp32_overrides(
+                        model, grad_param_ids={id(p) for p in filter_params}
+                    )
+                    cf_params = [leaves[id(p)] for p in filter_params]
+                    ce = default_ce_loss()
+
+                    def loss_fn():
+                        return fp32_functional_loss(
+                            model, overrides, b_inputs, b_labels, ce
+                        )
+
+                    chunks = []
+                    for j, p in enumerate(filter_params):
+                        buf = optimizer2.state.get(p, {}).get("momentum_buffer")
+                        if buf is None:
+                            continue
+                        dirs = [
+                            [d if i == j else None for i in range(len(cf_params))]
+                            for d in momentum_topk_directions(
+                                buf, cf["k_directions"]
+                            )
+                        ]
+                        if not dirs:
+                            continue  # degenerate/non-finite buffer this step
+                        weights = [0.5 * muon_lr**2] * len(dirs)
+                        chunks.append((loss_fn, cf_params, dirs, weights))
+                    if chunks:
+                        term.refresh_from_chunks(chunks, step=step)
+                        if not math.isfinite(
+                            term.stats()["penalty_grad_norm"]
+                        ):
+                            # Poisoned refresh must never reach the weights
+                            # (a NaN penalty flatlined smoke attempt 4).
+                            term.penalty_grads = None
+                if term.penalty_grads is not None:
+                    term.apply(filter_params, beta=muon_lr * cf["beta_scale"])
+                    if step % ROUTING_TS_EVERY == 0:
+                        stats = term.stats()
+                        cf_timeseries.append(
+                            {
+                                "step": step,
+                                "muon_lr": muon_lr,
+                                "n_directions": stats["n_directions"],
+                                "penalty_grad_norm": stats["penalty_grad_norm"],
+                                "curvature_mean": (
+                                    sum(stats["curvatures"])
+                                    / max(1, len(stats["curvatures"]))
+                                ),
+                                "curvature_max": (
+                                    max(stats["curvatures"])
+                                    if stats["curvatures"]
+                                    else 0.0
+                                ),
+                            }
+                        )
+            step += 1
+            if step >= total_train_steps:
+                break
+        stop_timer()
+
+        train_acc = (outputs.detach().argmax(1) == labels).float().mean().item()
+        val_accs.append(ab.evaluate(model, test_loader, tta_level=0))
+        if step >= total_train_steps:
+            break
+
+    start_timer()
+    tta_val_acc = (
+        ab.evaluate(model, test_loader, tta_level=tta_level) if tta_level else None
+    )
+    stop_timer()
+
+    return {
+        "optimizer": "vendor_muon",
+        "epochs": epochs,
+        "steps": step,
+        "cf": dict(cf),
+        "weight_mode": "eta_sq_half_topk_momentum",
+        "train_acc_last": train_acc,
+        "val_accs": val_accs,
+        "val_acc": val_accs[-1],
+        "tta_val_acc": tta_val_acc,
+        "cf_timeseries": cf_timeseries,
+        "time_seconds": time_seconds,
+    }
+
+
+TELEPORT_KEYS = {"enabled", "every", "start_step", "spread", "ascend_iters", "step_size"}
+
+
+def _resolve_teleport(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate the ``teleport:`` block (CPU-safe)."""
+    tp = config.get("teleport")
+    if not isinstance(tp, dict) or set(tp) != TELEPORT_KEYS:
+        raise SystemExit(
+            "experiment 'airbench_teleport' needs a teleport: block with "
+            f"exactly the keys {sorted(TELEPORT_KEYS)}"
+        )
+    out = {
+        "enabled": bool(tp["enabled"]),
+        "every": int(tp["every"]),
+        "start_step": int(tp["start_step"]),
+        "spread": float(tp["spread"]),
+        "ascend_iters": int(tp["ascend_iters"]),
+        "step_size": float(tp["step_size"]),
+    }
+    if out["every"] < 1:
+        raise SystemExit("teleport.every must be >= 1")
+    if out["start_step"] < 1:
+        raise SystemExit(
+            "teleport.start_step must be >= 1 (momentum buffers must exist)"
+        )
+    if out["spread"] <= 1.0:
+        raise SystemExit("teleport.spread must be > 1")
+    if out["ascend_iters"] < 0 or out["step_size"] <= 0:
+        raise SystemExit("teleport.ascend_iters must be >= 0, step_size > 0")
+    return out
+
+
+def run_airbench_teleport(
+    config: Dict[str, Any], device: torch.device
+) -> Dict[str, Any]:
+    """Teleport-Muon round 2 (litreview j §6 item 4; gate GO in
+    reports/wpj-mech-round1.md: +21–23% nuclear-norm headroom at fixed loss).
+
+    Stock airbench recipe (vendored Muon, compile per recipe — no
+    higher-order autograd here, so compile stays ON by default). Every
+    ``teleport.every`` steps from ``teleport.start_step`` on, between the
+    backward pass and the optimizer step, the harness:
+
+      1. runs the closed-form nuclear-norm ascent (src/optim/teleport.py) on
+         the current conv→BN gradient matrices — no extra forwards; the
+         gradient's transformation law along the orbit is exact;
+      2. moves the weights along the orbit (orbit.apply_channel_scales) and
+         transports the ENTIRE first-order state to the new gauge: p.grad
+         and the vendored Muon momentum buffer are row-scaled by 1/α, so the
+         imminent optimizer step acts coherently at the teleported point.
+
+    The vendored Muon's per-step Frobenius renormalization is
+    gauge-compatible (a uniform rescale is itself in the symmetry group), so
+    the relative channel pattern the ascent found survives it.
+
+    Arms are configs varying ``teleport.enabled``; dev-seed measurement
+    experiment; never a comparison-table entry.
+    """
+    if "optimizer" in config:
+        raise SystemExit(
+            "experiment 'airbench_teleport' pins the stock recipe; it does "
+            "not accept an optimizer override"
+        )
+    tp = _resolve_teleport(config)
+    sampling = _resolve_sampling(config.get("recipe", {}))
+    if sampling is not None:
+        raise SystemExit("airbench_teleport supports vendored sampling only")
+
+    if device.type != "cuda":
+        raise SystemExit("airbench_teleport requires a CUDA device")
+
+    from src.instrument.orbit import apply_channel_scales, find_conv_bn_pairs
+    from src.optim.teleport import teleport_alphas, transport_gradlike
+
+    ab = load_vendor_airbench()
+
+    train_cfg = config.get("train", {})
+    recipe_cfg = config.get("recipe", {})
+    data_root = str(config.get("data", {}).get("root", "data/cifar10"))
+    epochs = float(train_cfg.get("epochs", 8))
+    batch_size = int(train_cfg.get("batch_size", 2000))
+    bias_lr = float(recipe_cfg.get("bias_lr", 0.053))
+    head_lr = float(recipe_cfg.get("head_lr", 0.67))
+    wd = float(recipe_cfg.get("sgd_weight_decay", 2e-6)) * batch_size
+    tta_level = int(recipe_cfg.get("tta_level", 2))
+
+    model = ab.CifarNet().cuda().to(memory_format=torch.channels_last)
+    if bool(recipe_cfg.get("compile", True)):
+        model.compile()
+
+    test_loader = ab.CifarLoader(data_root, train=False, batch_size=2000)
+    train_loader = ab.CifarLoader(
+        data_root, train=True, batch_size=batch_size, aug=dict(flip=True, translate=2)
+    )
+    total_train_steps = math.ceil(epochs * len(train_loader))
+    whiten_bias_train_steps = min(math.ceil(3 * len(train_loader)), total_train_steps)
+
+    filter_params = [
+        p for p in model.parameters() if len(p.shape) == 4 and p.requires_grad
+    ]
+    norm_biases = [
+        p for n, p in model.named_parameters() if "norm" in n and p.requires_grad
+    ]
+    param_configs = [
+        dict(params=[model.whiten.bias], lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=norm_biases, lr=bias_lr, weight_decay=wd / bias_lr),
+        dict(params=[model.head.weight], lr=head_lr, weight_decay=wd / head_lr),
+    ]
+    optimizer1 = torch.optim.SGD(
+        param_configs, momentum=0.85, nesterov=True, fused=True
+    )
+    optimizer2 = ab.Muon(
+        filter_params, lr=AIRBENCH_STOCK_LR, momentum=0.6, nesterov=True
+    )
+    optimizers = [optimizer1, optimizer2]
+    for opt in optimizers:
+        for group in opt.param_groups:
+            group["initial_lr"] = group["lr"]
+
+    pairs = find_conv_bn_pairs(model)
+    if tp["enabled"] and not pairs:
+        raise SystemExit("no conv->BatchNorm pairs found; nothing to teleport along")
+
+    starter = torch.cuda.Event(enable_timing=True)
+    ender = torch.cuda.Event(enable_timing=True)
+    time_seconds = 0.0
+
+    def start_timer():
+        starter.record()
+
+    def stop_timer():
+        nonlocal time_seconds
+        ender.record()
+        torch.cuda.synchronize()
+        time_seconds += 1e-3 * starter.elapsed_time(ender)
+
+    model.reset()
+    step = 0
+
+    start_timer()
+    train_images = train_loader.normalize(train_loader.images[:5000])
+    model.init_whiten(train_images)
+    stop_timer()
+
+    teleport_timeseries = []
+    val_accs = []
+    train_acc = float("nan")
+    for _epoch in range(math.ceil(total_train_steps / len(train_loader))):
+        start_timer()
+        model.train()
+        for inputs, labels in train_loader:
+            outputs = model(inputs, whiten_bias_grad=(step < whiten_bias_train_steps))
+            torch.nn.functional.cross_entropy(
+                outputs, labels, label_smoothing=0.2, reduction="sum"
+            ).backward()
+            if (
+                tp["enabled"]
+                and step >= tp["start_step"]
+                and step % tp["every"] == 0
+            ):
+                grads_2d = [
+                    conv.weight.grad.detach().float().reshape(
+                        conv.weight.shape[0], -1
+                    )
+                    for conv, _bn, _n in pairs
+                ]
+                alphas, ratios = teleport_alphas(
+                    pairs,
+                    grads_2d,
+                    spread=tp["spread"],
+                    iters=tp["ascend_iters"],
+                    step_size=tp["step_size"],
+                )
+                apply_channel_scales(pairs, alphas)
+                with torch.no_grad():
+                    for (conv, _bn, _n), a in zip(pairs, alphas):
+                        transport_gradlike(conv.weight.grad, a)
+                        if conv.bias is not None and conv.bias.grad is not None:
+                            transport_gradlike(conv.bias.grad, a)
+                        buf = optimizer2.state.get(conv.weight, {}).get(
+                            "momentum_buffer"
+                        )
+                        if buf is not None:
+                            transport_gradlike(buf, a)
+                teleport_timeseries.append(
+                    {
+                        "step": step,
+                        "mean_ratio": float(sum(ratios) / len(ratios)),
+                        "max_ratio": float(max(ratios)),
+                        "min_ratio": float(min(ratios)),
+                    }
+                )
+            for group in optimizer1.param_groups[:1]:
+                group["lr"] = group["initial_lr"] * (
+                    1 - step / whiten_bias_train_steps
+                )
+            for group in optimizer1.param_groups[1:] + optimizer2.param_groups:
+                group["lr"] = group["initial_lr"] * (1 - step / total_train_steps)
+            for opt in optimizers:
+                opt.step()
+            model.zero_grad(set_to_none=True)
+            step += 1
+            if step >= total_train_steps:
+                break
+        stop_timer()
+
+        train_acc = (outputs.detach().argmax(1) == labels).float().mean().item()
+        val_accs.append(ab.evaluate(model, test_loader, tta_level=0))
+        if step >= total_train_steps:
+            break
+
+    start_timer()
+    tta_val_acc = (
+        ab.evaluate(model, test_loader, tta_level=tta_level) if tta_level else None
+    )
+    stop_timer()
+
+    return {
+        "optimizer": "vendor_muon",
+        "epochs": epochs,
+        "steps": step,
+        "teleport": dict(tp),
+        "train_acc_last": train_acc,
+        "val_accs": val_accs,
+        "val_acc": val_accs[-1],
+        "tta_val_acc": tta_val_acc,
+        "teleport_timeseries": teleport_timeseries,
+        "n_teleports": len(teleport_timeseries),
+        "time_seconds": time_seconds,
+    }
 
 
 AIRBENCH_STOCK_LR = 0.24  # vendored record hyperparameter (airbench94_muon.py:362)

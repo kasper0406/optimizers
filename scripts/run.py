@@ -143,8 +143,13 @@ def run_smoke(config: Dict[str, Any], device: torch.device) -> Dict[str, Any]:
 
 from src.optim.airbench_zoo import (  # noqa: E402
     run_airbench,
+    run_airbench_anneal_branch,
+    run_airbench_ema,
     run_airbench_instrumented,
+    run_airbench_centralflow,
     run_airbench_smoke,
+    run_airbench_teleport,
+    run_airbench_teleport_gate,
 )
 
 
@@ -183,6 +188,17 @@ EXPERIMENT_REGISTRY = {
     "airbench": run_airbench,  # WP0.1 stock baseline (vendored Muon, compile on)
     "airbench_smoke": run_airbench_smoke,  # WP0.4 zoo smoke harness
     "airbench_instrumented": run_airbench_instrumented,  # WP1.2 measurement runs
+    "airbench_ema": run_airbench_ema,  # T1 EMA-as-anneal arms (litreview j §5)
+    "airbench_anneal_branch": run_airbench_anneal_branch,  # anneal dissection (j §6.1)
+    # teleportation go/no-go gate (litreview j §6 item 4 / T6): grad-norm
+    # variation along conv->BN symmetry orbits at fixed loss
+    "airbench_teleport_gate": run_airbench_teleport_gate,
+    # central-flow Muon v0 (litreview j §6 item 2): explicit curvature-penalty
+    # term at reduced LR vs implicit high-LR oscillation
+    "airbench_centralflow": run_airbench_centralflow,
+    # teleport-Muon round 2 (gate GO, reports/wpj-mech-round1.md): orbit
+    # ascent + gauge transport between backward and step
+    "airbench_teleport": run_airbench_teleport,
     "probe_divergence": _load_probe_divergence(),  # twin-trajectory probe
     "bbp_probe": _run_bbp_probe,  # program #22 msign alignment probe
     # Later WPs register nanogpt experiments here.

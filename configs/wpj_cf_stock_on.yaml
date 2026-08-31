@@ -1,0 +1,32 @@
+# Central-flow Muon v0, arm D: stock LR + the explicit term ON TOP of the
+# implicit high-LR oscillation (double-penalty probe: if the implicit
+# mechanism already saturates, adding the explicit term should change little
+# or hurt slightly). litreview j §6 item 2; uncompiled like all CF arms.
+# Dev-seed measurement run; never a comparison-table entry.
+# Launch: uv run python scripts/sweep.py configs/wpj_cf_stock_on.yaml
+experiment: airbench_centralflow
+seed: 3001
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  compile: false
+  tta_level: 2
+
+cf:
+  lr_scale: 1.0
+  enabled: true
+  refresh_every: 10
+  k_directions: 4
+  beta_scale: 1.0
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 10

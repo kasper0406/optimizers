@@ -1060,7 +1060,11 @@ def test_real_results_dir_cost_totals():
     analyze = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(analyze)
     costs = analyze.project_costs(REPO_ROOT / "results")
-    assert costs["total_usd"] == pytest.approx(13.60, abs=0.01)
+    # Reconciled 2026-08-03 post-merge over the UNION of both sessions'
+    # results: $13.60 baseline + $2.05 T1 EMA + $6.72 anneal-dissection +
+    # $7.76 mech round-1 + $1.11 teleport round-2; the parallel session's
+    # program #20-22 runs carry no additional billed cost in results/.
+    assert costs["total_usd"] == pytest.approx(31.24, abs=0.01)
     assert costs["nanogpt_usd"] == pytest.approx(4.80, abs=0.01)
 
 

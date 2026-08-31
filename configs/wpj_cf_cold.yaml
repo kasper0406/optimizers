@@ -1,0 +1,31 @@
+# Central-flow Muon v0, arm B: cold LR (quarter of stock), term OFF — the
+# low-LR baseline the mechanism test needs (prediction: undertrains vs the
+# arm-A stock reference). litreview j §6 item 2; uncompiled like all CF arms.
+# Dev-seed measurement run; never a comparison-table entry.
+# Launch: uv run python scripts/sweep.py configs/wpj_cf_cold.yaml
+experiment: airbench_centralflow
+seed: 3001
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  compile: false
+  tta_level: 2
+
+cf:
+  lr_scale: 0.25
+  enabled: false
+  refresh_every: 10
+  k_directions: 4
+  beta_scale: 1.0
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 10

@@ -1,0 +1,32 @@
+# Central-flow Muon v0, arm A: stock LR, term OFF — the compile-off stock
+# reference all CF arms compare against (litreview j §6 item 2; CF arms run
+# uncompiled because the refresh's third-order autograd chain does not
+# reliably compose with torch.compile, so the reference must be uncompiled
+# too). Dev-seed measurement run; never a comparison-table entry.
+# Launch: uv run python scripts/sweep.py configs/wpj_cf_stock.yaml
+experiment: airbench_centralflow
+seed: 3001
+device: cuda
+
+data:
+  root: data/cifar10
+
+train:
+  epochs: 8
+  batch_size: 2000
+
+recipe:
+  compile: false
+  tta_level: 2
+
+cf:
+  lr_scale: 1.0
+  enabled: false
+  refresh_every: 10
+  k_directions: 4
+  beta_scale: 1.0
+
+sweep:
+  seeds:
+    policy: dev
+    num_seeds: 10
